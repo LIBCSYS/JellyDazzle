@@ -11,8 +11,8 @@
 #include <SDL.h>
 #include <stdint.h>
 
-#define W 1024
-#define H 768
+#define W 1280
+#define H 960
 
 /* implemented in draw.s */
 extern void draw_frame(uint32_t *fb, int width, int height, int frame);
