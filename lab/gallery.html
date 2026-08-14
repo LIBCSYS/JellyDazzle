@@ -29,7 +29,20 @@ h2 { max-width:1400px; margin:2.4rem auto 1rem; font-size:1.3rem; letter-spacing
 .chips i { flex:1; }
 @media (max-width:480px) { .grid { grid-template-columns:1fr; } }
 </style></head><body>
-<p style="text-align:center;padding:10px;margin:0;background:#111;font-family:sans-serif"><a href="https://github.com/LIBCSYS/JellyDazzle" style="color:#7fd0ff;text-decoration:none">&#11088; JellyDazzle is open source &mdash; download the app &amp; source on GitHub</a></p>
+<div style="background:#111;font-family:system-ui,sans-serif;padding:18px 14px;margin:0;border-bottom:1px solid #2a2a2a">
+  <p style="text-align:center;margin:0 0 10px"><a href="https://github.com/LIBCSYS/JellyDazzle/releases/latest" style="color:#7fd0ff;text-decoration:none;font-size:1.05rem">&#11088; <b>Download JellyDazzle</b> &mdash; free &amp; open source, Apple&nbsp;Silicon Macs</a></p>
+  <details style="max-width:760px;margin:0 auto;color:#bbb;font-size:.92rem;line-height:1.6">
+    <summary style="cursor:pointer;color:#e0b24a">First launch: macOS says &ldquo;Apple could not verify JellyDazzle is free of malware&rdquo; &mdash; here&rsquo;s how to open it</summary>
+    <ul style="margin:.7rem 0 .3rem 1.1rem;padding:0">
+      <li>Unzip the download, then <b>right-click</b> (or Control-click) the JellyDazzle app and choose <b>Open</b></li>
+      <li>When the warning appears, click <b>Open</b> again &mdash; once only; after that it opens normally</li>
+      <li>If no <i>Open</i> option appears: double-click it once, then go to <b>System Settings &rarr; Privacy &amp; Security</b>, scroll down, and click <b>Open Anyway</b></li>
+      <li>Terminal alternative: <code style="color:#9fe0a0">xattr -dr com.apple.quarantine /path/to/JellyDazzle.app</code></li>
+      <li>Press <b>ESC</b> to quit. Requires Apple Silicon (M1 or newer)</li>
+    </ul>
+    <p style="margin:.6rem 0 0">The warning means the app hasn&rsquo;t been through Apple&rsquo;s paid notarization service &mdash; not that anything is wrong with it. Every line of source is public on <a href="https://github.com/LIBCSYS/JellyDazzle" style="color:#7fd0ff">GitHub</a>.</p>
+  </details>
+</div>
 
 <header>
 <h1>DAZZLE LAB — <b>100 Patterns</b> / <b>30 Palettes</b></h1>
