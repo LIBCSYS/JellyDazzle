@@ -55,8 +55,8 @@ _draw_frame:
     mov     w10, #3
     mul     w9, w3, w10
     bl      Lsin16
-    asr     w12, w12, #5                // wobble +-512 Q8 (~3 deg)
-    mov     w10, #5
+    asr     w12, w12, #6                // wobble tiny
+    mov     w10, #3
     mul     w9, w3, w10
     add     w9, w9, w12
     fmov    s4, w9                      // spin phase Q8 (~3.6 min/rev)
@@ -103,7 +103,11 @@ _draw_frame:
     cmp     w12, #0
     csel    w12, wzr, w12, lt
     mul     w12, w12, w12
-    lsr     w12, w12, #20               // duoQ 0..256
+    lsr     w12, w12, #20
+    add     w12, w12, #72               // duoQ 72..328: second color
+    cmp     w12, #256                   //   family ALWAYS present
+    mov     w10, #256
+    csel    w12, w10, w12, gt
     orr     w16, w16, w12, lsl #16
     fmov    s28, w16
 
@@ -198,7 +202,7 @@ _draw_frame:
     add     w17, w17, w22
     add     w17, w17, w23
     sub     w17, w17, w21, lsl #2       // rays run flow backwards
-    mov     w10, #5
+    mov     w10, #3
     mul     w27, w3, w10
     mov     w10, #3
     mul     w9, w3, w10
@@ -215,7 +219,7 @@ _draw_frame:
     asr     w12, w12, #7
     add     w12, w12, #192              // ampQ 64..320
     mov     w17, w12
-    mov     w10, #4
+    mov     w10, #2
     mul     w9, w3, w10
     bl      Lsin16
     mov     w16, w12                    // pulse sin
@@ -233,7 +237,7 @@ _draw_frame:
 
     // D32: quarter-phase pulse (base w10 still live here)
     mov     w17, w10
-    mov     w10, #4
+    mov     w10, #2
     mul     w9, w3, w10
     add     w9, w9, #16384
     bl      Lsin16
@@ -258,14 +262,14 @@ _draw_frame:
     lsr     w12, w12, #8
     fmov    s3, w12                     // ~base*(2..4), drifts gently
 
-    lsr     w26, w3, #3                 // ripple phase (calmer)
+    lsr     w26, w3, #4                 // ripple phase (calmest)
 
     // ---- satellites: continuous orbits, drifting radii ----
-    mov     w10, #9
+    mov     w10, #5
     mul     w9, w3, w10
     bl      Lsin16
     mov     w16, w12
-    mov     w10, #9
+    mov     w10, #5
     mul     w9, w3, w10
     add     w9, w9, #16384
     bl      Lsin16
@@ -298,12 +302,12 @@ _draw_frame:
     csel    w12, w16, w17, ge
     fmov    s1, w13
     fmov    s2, w12
-    mov     w10, #7
+    mov     w10, #4
     mul     w9, w3, w10
     neg     w9, w9
     bl      Lsin16
     mov     w16, w12
-    mov     w10, #7
+    mov     w10, #4
     mul     w9, w3, w10
     neg     w9, w9
     add     w9, w9, #16384
@@ -720,7 +724,7 @@ Ldwell:
     stp     x29, x30, [sp, #-16]!
     mov     w29, w9
     bl      Lsin16
-    sub     w9, w29, w12, asr #1
+    sub     w9, w29, w12, asr #2
     bl      Lsin16
     ldp     x29, x30, [sp], #16
     ret
