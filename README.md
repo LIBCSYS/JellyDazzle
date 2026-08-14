@@ -16,8 +16,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-ffb02e?style=flat-square" alt="version 2.1.0">
+  <img src="https://img.shields.io/badge/version-2.2.0-ffb02e?style=flat-square" alt="version 2.1.0">
   <img src="https://img.shields.io/badge/routines-225-52e0ff?style=flat-square" alt="225 routines">
+  <img src="https://img.shields.io/badge/audio-reactive-ff7ad9?style=flat-square" alt="audio reactive">
   <img src="https://img.shields.io/badge/patterns-201-ff5ec8?style=flat-square" alt="201 patterns">
   <img src="https://img.shields.io/badge/palettes-100-a0e060?style=flat-square" alt="100 palettes">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-lightgrey?style=flat-square" alt="Apple Silicon">
@@ -78,6 +79,26 @@ watch is the *combination*, and the combinations essentially never recur.
   <img src="lab/jellydazzle.gif" width="520" alt="Layers fading in over each other">
   <br><i>Layers arriving over one another — the still images above are single frames of this.</i>
 </p>
+
+## It listens
+
+**JellyDazzle hears whatever your Mac can hear** — Spotify through the speakers,
+a record, a guitar in the room — and the kaleidoscope moves with it:
+
+- **Colour rides the music.** Treble, loudness and beats slide the whole palette
+  forward, so hues travel with the track rather than on a blind clock.
+- **Layers surge with the bass.** The stack thickens on the low end and thins
+  again as it passes.
+- **New material arrives on the beat.** A downbeat pulls the next layer's entry
+  forward — never later, so things land *with* the rhythm.
+- **No flashing.** Brightness moves at most 1.06×, eased in over ~8 frames and
+  out over ~32. The music is carried by colour and structure, deliberately not
+  by luminance — a screensaver should never be a strobe.
+
+macOS asks for microphone permission the first time. Nothing is recorded, stored
+or transmitted: audio is analysed in memory, frame by frame, and discarded. With
+no microphone or in silence the values decay to zero and the engine runs on its
+own clocks exactly as before.
 
 ## What it is
 
