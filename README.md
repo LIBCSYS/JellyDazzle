@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://libcsys.github.io/JellyDazzle/">
-    <img src="lab/jellydazzle.gif" width="560" alt="JellyDazzle running — eight of its 124 kaleidoscope routines">
+  <a href="https://dazzle.jelia.nyc">
+    <img src="lab/jellydazzle.gif" width="560" alt="JellyDazzle: three routines layered over each other, crossfading">
   </a>
 </p>
 
@@ -8,7 +8,7 @@
 
 <p align="center">
   <b>An homage to DAZZLE.EXE — the magical DOS kaleidoscope —<br>
-  written in ARMv9.2-A assembly for Apple Silicon.</b>
+  rebuilt as a layering engine in ARMv9.2-A assembly and C.</b>
 </p>
 
 <p align="center">
@@ -16,97 +16,89 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-ffb02e?style=flat-square" alt="version 2.0.0">
-  <img src="https://img.shields.io/badge/routines-225-52e0ff?style=flat-square" alt="124 routines">
-  <img src="https://img.shields.io/badge/patterns-201-ff5ec8?style=flat-square" alt="100 patterns">
-  <img src="https://img.shields.io/badge/palettes-100-a0e060?style=flat-square" alt="30 palettes">
+  <img src="https://img.shields.io/badge/version-2.1.0-ffb02e?style=flat-square" alt="version 2.1.0">
+  <img src="https://img.shields.io/badge/routines-225-52e0ff?style=flat-square" alt="225 routines">
+  <img src="https://img.shields.io/badge/patterns-201-ff5ec8?style=flat-square" alt="201 patterns">
+  <img src="https://img.shields.io/badge/palettes-100-a0e060?style=flat-square" alt="100 palettes">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-lightgrey?style=flat-square" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
 </p>
 
 <p align="center">
   <a href="https://github.com/LIBCSYS/JellyDazzle/releases/latest"><b>Download for macOS</b></a> ·
-  <a href="https://dazzle.jelia.nyc"><b>Browse all 100 patterns</b></a> ·
+  <a href="https://dazzle.jelia.nyc"><b>Browse all the patterns</b></a> ·
   <a href="HOW_TO_OPEN.md"><b>First-launch help</b></a>
 </p>
-
-
 
 > "I spent hours and hours staring at that magical kaleidoscope. Never the
 > same pattern, never the same color scheme. It was amazing, and everything
 > looked cool." — the reason this exists
 
-Thirty years after the original DOS screensaver, this is a from-scratch
-rebuild: every pixel drawn by ARM64 assembly (`draw.s`), with a tiny SDL2
-shim (`main.c`) standing in for INT 10h and a flat framebuffer.
+Thirty years after the DOS screensaver, this is a from-scratch rebuild — and
+as of v2.1 it does something the original never did: **it layers.** A routine
+opens the frame, a few seconds later a second one fades in over it, then a
+third, each on its own clock with its own blend mode and lifetime. What you
+watch is the *combination*, and the combinations essentially never recur.
 
-**How it was made:** vibe-coded, with professional direction and execution.
-The assembly and C were written by [Claude](https://claude.com/claude-code)
-(Anthropic) working from a human's direction, reference footage, and repeated
-"no, that's wrong" — every routine was judged by eye against video of the real
-DAZZLE.EXE and rejected until it earned its place. Nobody typed 8,000 lines of
-`fmov` by hand in 2026, and pretending otherwise would be the one dishonest
-thing in a project built out of nostalgia.
+<p align="center">
+  <a href="https://dazzle.jelia.nyc">
+    <img src="lab/patterns_montage.png" width="900" alt="Contact sheet of the pattern library">
+  </a><br>
+  <i>The pattern library, one frame each — every tile is a routine that can appear in any layer.</i>
+</p>
 
-## A taste of the lab
+## What it is
 
-The ten highest-scoring patterns of the 100-entry catalog — click any tile
-for the full frame:
+- **225 routines** — 24 hand-tuned ARM64 assembly modes plus 201 C plug-ins:
+  kaleidoscope symmetries, demoscene classics (plasma, rotozoom, tunnels,
+  metaballs, munching squares, copper bars), interference and moiré,
+  self-drawing spirographs and harmonographs, cellular and Belousov-Zhabotinsky
+  spirals, particle swarms, fireworks, organic growth, and a multicoloured
+  lava lamp whose wax drifts over whatever is beneath it
+- **Layered composition** — up to four slots (ground, field, figure, spark)
+  with staggered entry, alpha envelopes and crossfades. Nothing hard-cuts.
+- **Nothing repeats** — shuffled bags rather than dice, re-seeded every launch,
+  so a routine plays once before any repeat and no two runs deal the same deck
+- **100 colour schemes** — community palettes and designed harmonies, expanded
+  into 32,768-entry ramps in **OKLab** along a cyclic **Catmull-Rom** spline:
+  no grey midpoints, no plateaus, no hairline banding
+- **All integer math in the assembly core** — sine tables, fixed point,
+  octagonal norms. The way 1994 would have wanted it.
 
-<table>
-<tr>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p011"><img src="lab/patterns/011_plasma_mandala/preview.png" width="160" alt="011 Plasma Mandala"></a><br><sub><b>011</b> Plasma Mandala</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p042"><img src="lab/patterns/042_bz_pinwheel/preview.png" width="160" alt="042 BZ Pinwheel"></a><br><sub><b>042</b> BZ Pinwheel</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p004"><img src="lab/patterns/004_mirror_truchet/preview.png" width="160" alt="004 Mirror Truchet"></a><br><sub><b>004</b> Mirror Truchet</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p019"><img src="lab/patterns/019_moire_silk/preview.png" width="160" alt="019 Moiré Silk"></a><br><sub><b>019</b> Moiré Silk</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p100"><img src="lab/patterns/100_pinwheel_swirl/preview.png" width="160" alt="100 Pinwheel Swirl"></a><br><sub><b>100</b> Pinwheel Swirl</sub></td>
-</tr>
-<tr>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p018"><img src="lab/patterns/018_kefrens_spiral/preview.png" width="160" alt="018 Kefrens Spiral"></a><br><sub><b>018</b> Kefrens Spiral</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p067"><img src="lab/patterns/067_twin_tunnels/preview.png" width="160" alt="067 Twin Tunnels"></a><br><sub><b>067</b> Twin Tunnels</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p089"><img src="lab/patterns/089_oval_drums/preview.png" width="160" alt="089 Oval Drums"></a><br><sub><b>089</b> Oval Drums</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p014"><img src="lab/patterns/014_copper_octarings/preview.png" width="160" alt="014 Copper Octarings"></a><br><sub><b>014</b> Copper Octarings</sub></td>
-<td align="center"><a href="https://libcsys.github.io/JellyDazzle/#p064"><img src="lab/patterns/064_starburst_forge/preview.png" width="160" alt="064 Starburst Forge"></a><br><sub><b>064</b> Starburst Forge</sub></td>
-</tr>
-</table>
+## How it works
 
-**Full catalog: [libcsys.github.io/JellyDazzle](https://libcsys.github.io/JellyDazzle/)**
-(mirror: [dazzle.jelia.nyc](https://dazzle.jelia.nyc)) — 100 numbered pattern
-prototypes and 30 palettes, built as the expansion roadmap.
+```
+main.c ──► jd_frame() ──► scheduler ──► layer slots ──► compositor ──► screen
+             (bridge.c)      │             │                │
+                             │             │                └── alpha / max / screen
+                             │             │                    blends, crossfades
+                             │             └── each slot runs one routine:
+                             │                 draw.s mode  or  patterns_c/pattern_NNN.c
+                             └── shuffled bags, per-run entropy, role-aware picks
+```
 
-## What it does
+**The probe.** At startup the engine renders every routine at low resolution
+and measures four things: how much of the frame it covers, how bright it is,
+how fast it moves, and what it costs. From that it assigns a **role** —
+*ground* (can carry a picture), *field*, *figure*, or *spark* (sparse, belongs
+on top) — and the scheduler only ever draws a ground layer from routines that
+actually emit light. Cost feeds an admission budget so the stack never exceeds
+the frame time.
 
-- **225 routines** — 24 hand-tuned ARM64 assembly modes plus 201 C plug-ins,
-  from kaleidoscope symmetries and demoscene classics (plasma, rotozoom,
-  tunnels, metaballs, copper bars) through interference, self-drawing
-  spirographs, cellular spirals, particle swarms, organic growth, and a
-  multicoloured lava lamp
-- **Layered composition** — routines don't take turns, they *stack*: a base
-  enters, seconds later a second fades in over it, then a third, each on its
-  own clock with its own blend and its own lifetime
-- **Nothing repeats** — shuffled bags rather than dice, seeded per run, so a
-  routine plays once before any repeat and no two launches deal the same deck
-- **100 colour schemes** — community palettes plus designed harmonies,
-  expanded into 32,768-entry ramps in OKLab along a cyclic Catmull-Rom spline
-  (no grey midpoints, no plateaus, no banding)
-- **A startup probe** measures every routine's coverage, brightness, motion
-  and cost, then casts it into a role — ground, field, figure or spark — so
-  the compositor knows what can carry a picture and what belongs on top
+**The plug-in contract** (`jellydazzle.h`) is deliberately tiny:
 
-### Under the hood (v2.0 and earlier)
+```c
+void pattern_NNN(uint32_t *fb, int w, int h, int frame, int sl,
+                 uint32_t seed, const uint32_t *pal);
+```
 
-- **24 drawing routines** on a shuffled wheel — interference kaleidoscopes,
-  the radius-sheared *twist*, tunnels, moiré eyes, spirographs that draw
-  themselves over 34 seconds, string-art fans, curl gardens, fireworks with
-  gravity-drooped spark trails, and more — several reverse-engineered from
-  video frames of the original
-- **Really random**: avalanche-hashed mode order (no back-to-back repeats),
-  random launch seed, random color-scheme pairs every leg
-- **30 color schemes**: 6 house palettes + 24 community palettes from
-  [Lospec](https://lospec.com) (PICO-8, NES, Apollo, resurrect-64, …)
-- **All integer math**: 16-bit interpolated sine tables, fixed point,
-  octagonal norms — the way 1994 would have wanted it. ~175 fps at
-  1280×960 on an M-series core, single thread
+`sl` is the segment-local frame, so accumulator patterns know when to clear
+their canvas; `pal` is a 32,768-entry palette the engine has already
+crossfaded for you. Drop a file in `patterns_c/`, run `tools/gen_registry.sh`,
+and the scheduler picks it up.
+
+**Run any routine on its own:** `JD_MODE=42 ./dazzle64`. Also `JD_LAYERS=n`
+to cap the stack and `JD_DEBUG=1` to watch spawns and palette picks.
 
 ## Download & run (no tools needed)
 
