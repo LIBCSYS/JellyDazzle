@@ -73,6 +73,8 @@ and double-click. Apple Silicon Macs only. ESC quits.
 > - in Terminal: `xattr -dr com.apple.quarantine /path/to/JellyDazzle.app`
 >
 > Building from source (below) produces an app with no warning at all.
+>
+> Sharing it with someone? Send them **[HOW_TO_OPEN.md](HOW_TO_OPEN.md)** — the same steps, plain and friendly.
 
 ## The engine vs. the lab
 
