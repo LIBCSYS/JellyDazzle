@@ -15,6 +15,7 @@ cp /opt/homebrew/opt/sdl3/lib/libSDL3.0.dylib "$APP/Contents/Frameworks/libSDL3.
 install_name_tool -change "$SHIM" @executable_path/../Frameworks/libSDL2-2.0.0.dylib \
     "$APP/Contents/MacOS/JellyDazzle"
 install_name_tool -id @loader_path/libSDL3.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+chmod u+w "$APP/Contents/Frameworks/"*.dylib      # Homebrew ships them read-only
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -29,7 +30,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-codesign --force --deep -s - "$APP"
+# strip stray xattrs BEFORE signing: they become ._AppleDouble files inside
+# the bundle on unzip and break the seal ("a sealed resource is missing")
+xattr -cr "$APP"
+# sign inside-out (--deep is deprecated and seals unreliably)
+codesign --force -s - "$APP/Contents/Frameworks/libSDL3.dylib"
+codesign --force -s - "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
+codesign --force -s - "$APP/Contents/MacOS/JellyDazzle"
+codesign --force -s - "$APP"
+codesign --verify --deep --strict "$APP"
 rm -f dist/JellyDazzle.app.zip
-(cd dist && ditto -c -k --keepParent JellyDazzle.app JellyDazzle.app.zip)
+# --sequesterRsrc keeps metadata out of the bundle tree on extraction
+(cd dist && ditto -c -k --sequesterRsrc --keepParent JellyDazzle.app JellyDazzle.app.zip)
 echo "built JellyDazzle v${VER} -> $APP (+ .zip)"
