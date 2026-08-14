@@ -8,8 +8,8 @@
 #define LW 480
 #define LH 360
 #define IN 8192                     /* 1/(d2+160) table, 32 units of d2 each  */
-#define GN 1024                     /* field -> colour LUT entries            */
-#define GMAX 6.0f
+#define GN 4096                     /* field -> colour LUT entries            */
+#define GMAX 24.0f
 
 static float pxt[LW * LH], pyt[LW * LH];
 static float invt[IN];
@@ -114,7 +114,7 @@ void pattern_017(uint32_t *fb, int w, int h, int frame, int sl,
         float body = (g - 0.55f) * 1.1f;
         if (body < 0.0f) body = 0.0f; else if (body > 1.0f) body = 1.0f;
         body = powf(body, 1.2f);
-        float val = body * bands + rim * 0.55f;
+        float val = (body * bands + rim * 0.55f) * 1.30f;
         if (val < 0.0f) val = 0.0f; else if (val > 1.0f) val = 1.0f;
         float hue = hbase - inside * 0.17f;
         uint32_t c = pal[(int)(hue * 32768.0f) & JD_PAL_MASK];

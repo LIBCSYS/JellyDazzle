@@ -137,9 +137,9 @@ static void p58_init(void)
 void pattern_058(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
 {
-    /* tt cycles over the jet-parameter period (3 frames per jet) so the
-     * fountain keeps launching forever without a visible seam. */
-    float tt = (float)(frame % (P58_NL * 3)) + 240.0f;
+    /* tt cycles over 25 jet-parameter periods (3 frames per jet); 90000 frames
+     * is also an exact whole number of hue turns, so the wrap is seamless. */
+    float tt = (float)(frame % (P58_NL * 3 * 25)) + 240.0f;
     int kbase, kk, x, y;
     float hshift = tt * 0.0002f;
     (void)sl; (void)seed;
@@ -160,8 +160,7 @@ void pattern_058(uint32_t *fb, int w, int h, int frame, int sl,
         int ki, ns, i;
         float age, vy, vx, aland, amax, oldf, cr, cg, cb, step;
         float lx = 0.0f, ly = 0.0f;
-        if (k < 0) continue;
-        ki = k % P58_NL;
+        ki = k % P58_NL; if (ki < 0) ki += P58_NL;
         age = tt - (float)k * 3.0f;
         if (age <= 0.0f) continue;
         vy = p58_spd[ki] * sinf(p58_ang[ki]);

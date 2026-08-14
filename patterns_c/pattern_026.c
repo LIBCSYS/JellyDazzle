@@ -67,7 +67,7 @@ void pattern_026(uint32_t *fb, int w, int h, int frame, int sl,
             int P = (A * B) >> 14;
             if (P > 16383) P = 16383;
             int v = 2458 + ((P * 13926) >> 14);
-            int idx = drift + ai * 8 + ((ring * 1800) >> 14);
+            int idx = drift + ai * 8 + ((ring * 3277) >> 14);
             row[x] = s_shade026(pal[idx & JD_PAL_MASK], v >> 6);
         }
     }

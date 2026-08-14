@@ -1,8 +1,8 @@
-/* 077 Mycelium Veil — 140 hyphae creeping out of a warm centre.
- * Port of lab/patterns/077_mycelium_veil/proto.py: each filament integrates a
- * unit step whose heading is a fixed random walk plus a slow global rotation
- * and a breathing sine; growth reveals steps outward, the last 7 steps glow as
- * a tip, spore nodes pulse at fixed arc positions. 320x240 canvas, upscaled. */
+/* 079 Golden Bloom — phyllotaxis sunflower head opening floret by floret.
+ * Port of lab/patterns/079_golden_bloom/proto.py: up to 900 florets on the
+ * golden-angle spiral, radius 6.4*sqrt(n) with a slow breath, a bloom wave
+ * rippling outward through the head, fresh outer florets bright and pale,
+ * 3x3 fat splat + 2 softens + exp tonemap. 320x240 canvas, upscaled. */
 #include "../jellydazzle.h"
 #include <math.h>
 #include <stdlib.h>
@@ -10,8 +10,9 @@
 
 #define GW 320
 #define GH 240
-#define NF 140
-#define SMAX 260
+#define NMAX 900
+#define GA 2.399963230f
+#define ANGK 651.8986f              /* 4096 / 2pi */
 
 static float (*acc)[GW][3];
 static float (*acc2)[GW][3];
@@ -20,25 +21,15 @@ static uint8_t (*bgp)[GW][3];
 static uint8_t tonelut[2048];
 static float huetab[1024][3];
 static float sintab[4096];
-static float *wand;                 /* NF * SMAX heading random walk */
-static float th0[NF], spdf[NF], wph[NF], huef[NF];
-static float vlut[SMAX], slut[SMAX];
+static float sq[NMAX];
 static int inited;
-static uint32_t last_seed = 0xFFFFFFFFu;
 static int up_w = -1;
 static int *up_xi;
 static uint8_t *up_fx;
 
-static uint32_t rs;
-static uint32_t rnd(void) { rs = rs * 1664525u + 1013904223u; return rs; }
-static float rnd01(void) { return (float)(rnd() >> 8) * (1.0f / 16777216.0f); }
-static float gauss(void) {
-    return (rnd01() + rnd01() + rnd01() + rnd01() - 2.0f) * 1.7320508f;
-}
-#define ANGK 651.8986f              /* 4096 / 2pi */
 static float lsin(float a) { return sintab[((int)(a * ANGK + 4096.5f)) & 4095]; }
 
-/* palette entry's hue at full saturation — keeps the hyphae vivid (hsv(H,1,1)) */
+/* palette hue at full saturation, so the head stays vivid in every scheme */
 static void build_huetab(const uint32_t *pal) {
     for (int i = 0; i < 1024; i++) {
         uint32_t u = pal[(i << 5) & JD_PAL_MASK];
@@ -138,82 +129,62 @@ static void upscale(uint32_t *fb, int w, int h) {
 static void init_tables(void) {
     for (int i = 0; i < 4096; i++) sintab[i] = sinf((float)i * (6.2831853f / 4096.0f));
     for (int i = 0; i < 2048; i++) {
-        float v = 255.0f * (1.0f - expf(-((float)i / 64.0f) * 0.7f));
+        float v = 255.0f * (1.0f - expf(-((float)i / 64.0f) * 0.85f));
         tonelut[i] = (uint8_t)(v > 255.0f ? 255.0f : v);
     }
-    for (int s = 0; s < SMAX; s++) {
-        vlut[s] = 0.5f + 0.5f * expf(-(float)s / 160.0f);
-        slut[s] = (float)s * 0.15f;
-    }
+    for (int n = 0; n < NMAX; n++) sq[n] = sqrtf((float)n);
     acc  = malloc(sizeof(float) * GH * GW * 3);
     acc2 = malloc(sizeof(float) * GH * GW * 3);
     img  = malloc(GH * GW * 3);
     bgp  = malloc(GH * GW * 3);
-    wand = malloc(sizeof(float) * NF * SMAX);
     for (int y = 0; y < GH; y++)
         for (int x = 0; x < GW; x++) {
             float dx = ((float)x - GW / 2.0f) / GW, dy = ((float)y - GH / 2.0f) / GH;
-            float g = expf(-(dx * dx + dy * dy) * 4.0f);
-            bgp[y][x][0] = (uint8_t)(255.0f * (0.060f + 0.06f * g));
-            bgp[y][x][1] = (uint8_t)(255.0f * (0.025f + 0.03f * g));
-            bgp[y][x][2] = (uint8_t)(255.0f * (0.020f + 0.02f * g));
+            float u = 1.0f - (dx * dx + dy * dy);
+            bgp[y][x][0] = (uint8_t)(255.0f * (0.015f + 0.02f * u));
+            bgp[y][x][1] = (uint8_t)(255.0f * (0.040f + 0.03f * u));
+            bgp[y][x][2] = (uint8_t)(255.0f * (0.015f + 0.02f * u));
         }
 }
 
-void pattern_077(uint32_t *fb, int w, int h, int frame, int sl,
+void pattern_079(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     if (!inited) { init_tables(); inited = 1; }
-    if (seed != last_seed) {
-        rs = seed ^ 0x11FE1Du; rnd(); rnd();
-        for (int i = 0; i < NF; i++) {
-            th0[i]  = rnd01() * 6.2831853f;
-            spdf[i] = 0.6f + rnd01() * 0.8f;
-            wph[i]  = rnd01() * 6.2831853f;
-            float hj = rnd01();
-            huef[i] = (rnd01() < 0.3f) ? (0.90f + 0.05f * hj) : (0.05f + 0.07f * hj);
-            float c = 0.0f;
-            float *wp = wand + (size_t)i * SMAX;
-            for (int s = 0; s < SMAX; s++) { c += gauss() * 0.085f; wp[s] = c; }
-        }
-        last_seed = seed;
-    }
     build_huetab(pal);
     float t = (float)frame;
-    float T = (float)sl + 130.0f;
-    float rot = t * 0.0015f;
-    float hueoff = (float)((seed >> 5) & 1023) * (1.0f / 1024.0f) + t * 0.0002f;
-    float bph = t * 0.006f;
-    float rip = -t * 0.03f;
+    float T = (float)sl + 60.0f;
+    float nf = 80.0f + T * 1.2f;
+    if (nf > NMAX) nf = NMAX;
+    int N = (int)nf;
+    float rot = t * 0.0025f;
+    float breathe = 6.4f * (1.0f + 0.03f * lsin(t * 0.01f));
+    float wph = -t * 0.035f;
+    float hueoff = (float)((seed >> 3) & 1023) * (1.0f / 1024.0f) + t * 0.0008f;
 
     memset(acc, 0, sizeof(float) * GH * GW * 3);
-    for (int i = 0; i < NF; i++) {
-        float nf = T * 0.33f * spdf[i];
-        if (nf > SMAX) nf = SMAX;
-        int n = (int)nf;
-        if (n < 1) continue;
-        int tips = (int)(nf - 7.0f);
-        const float *wp = wand + (size_t)i * SMAX;
-        float base = th0[i] + rot;
-        float bp = wph[i] + bph;
-        float col[3], c0[3];
-        palcol(huef[i] + hueoff, 0.85f, 1.0f, c0);
-        palcol(huef[i] + hueoff + 0.04f, 0.6f, 1.0f, col);
-        float x = GW / 2.0f, y = GH / 2.0f;
-        float nodepulse = t * 0.025f + th0[i];
-        for (int s = 0; s < n; s++) {
-            float th = base + wp[s] + 0.25f * lsin((float)s * 0.03f + bp);
-            int ai = ((int)(th * ANGK + 4096.5f));
-            x += sintab[(ai + 1024) & 4095] * 1.05f;
-            y += sintab[ai & 4095] * 0.85f;
-            float wgt = 0.55f + 0.25f * lsin(slut[s] + rip);
-            if (s > tips) wgt += 2.2f;
-            float v = vlut[s];
-            float cc[3] = { c0[0] * v, c0[1] * v, c0[2] * v };
-            splat(x, y, cc, wgt);
-            if (s >= 40 && ((s - 40) % 60) == 0)
-                splat(x, y, col, 1.5f + 1.0f * lsin(nodepulse + (float)s * 0.2f));
-        }
+    for (int n = 0; n < N; n++) {
+        float th = (float)n * GA + rot;
+        int ai = (int)(th * ANGK + 4096.5f);
+        float r = breathe * sq[n];
+        float x = GW / 2.0f + r * sintab[(ai + 1024) & 4095];
+        float y = GH / 2.0f + r * sintab[ai & 4095] * 0.80f;
+        if (x < -2.0f || x > GW + 2.0f || y < -2.0f || y > GH + 2.0f) continue;
+        float wave = 0.5f + 0.5f * lsin(sq[n] * 1.8f + wph);
+        float young = 1.0f - (float)(N - 1 - n) / 60.0f;
+        if (young < 0.0f) young = 0.0f; if (young > 1.0f) young = 1.0f;
+        float sat = 0.95f - young * 0.5f; if (sat < 0.5f) sat = 0.5f;
+        float val = 0.75f + 0.25f * wave + young * 0.3f;
+        if (val > 1.0f) val = 1.0f;
+        float col[3];
+        palcol((float)n * 0.0045f + hueoff, sat, val, col);
+        float wt = 2.6f + 3.6f * wave + 4.0f * young;
+        splat(x, y, col, wt);
+        splat(x - 1.0f, y, col, wt * 0.6f); splat(x + 1.0f, y, col, wt * 0.6f);
+        splat(x, y - 1.0f, col, wt * 0.6f); splat(x, y + 1.0f, col, wt * 0.6f);
+        splat(x - 1.0f, y - 1.0f, col, wt * 0.35f); splat(x + 1.0f, y - 1.0f, col, wt * 0.35f);
+        splat(x - 1.0f, y + 1.0f, col, wt * 0.35f); splat(x + 1.0f, y + 1.0f, col, wt * 0.35f);
     }
+    soften1();
     soften1();
     compose();
     upscale(fb, w, h);

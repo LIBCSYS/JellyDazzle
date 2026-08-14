@@ -30,21 +30,37 @@ static int up_w = -1;
 static int *up_xi;
 static uint8_t *up_fx;
 
+/* hue angle of each sampled palette entry; the duotone pair is built by
+ * rotating that angle, so the two domains stay complementary in any scheme */
 static void build_huetab(const uint32_t *pal) {
     for (int i = 0; i < 1024; i++) {
         uint32_t u = pal[(i << 5) & JD_PAL_MASK];
         float r = (float)((u >> 16) & 255), g = (float)((u >> 8) & 255), b = (float)(u & 255);
-        float m = r > g ? r : g; if (b > m) m = b; if (m < 24.0f) m = 24.0f;
-        float n = 1.0f / m;
-        huetab[i][0] = r * n; huetab[i][1] = g * n; huetab[i][2] = b * n;
+        float mx = r > g ? r : g; if (b > mx) mx = b;
+        float mn = r < g ? r : g; if (b < mn) mn = b;
+        float d = mx - mn, hu;
+        if (d < 1.0f)      hu = 0.0f;
+        else if (mx == r)  hu = (g - b) / d / 6.0f;
+        else if (mx == g)  hu = (2.0f + (b - r) / d) / 6.0f;
+        else               hu = (4.0f + (r - g) / d) / 6.0f;
+        if (hu < 0.0f) hu += 1.0f;
+        huetab[i][0] = hu;
     }
 }
-static void palcol(float hue, float sat, float val, float *out) {
-    const float *c = huetab[(int)(hue * 1024.0f + 1024.0f) & 1023];
-    float w = 1.0f - sat;
-    out[0] = (w + sat * c[0]) * val;
-    out[1] = (w + sat * c[1]) * val;
-    out[2] = (w + sat * c[2]) * val;
+static void hsvcol(float hue, float sat, float val, float *out) {
+    hue = hue - floorf(hue);
+    float h6 = hue * 6.0f;
+    int    i = (int)h6;
+    float  f = h6 - (float)i;
+    float p = val * (1.0f - sat), q = val * (1.0f - sat * f), w = val * (1.0f - sat * (1.0f - f));
+    switch (i % 6) {
+        case 0: out[0] = val; out[1] = w;   out[2] = p;   break;
+        case 1: out[0] = q;   out[1] = val; out[2] = p;   break;
+        case 2: out[0] = p;   out[1] = val; out[2] = w;   break;
+        case 3: out[0] = p;   out[1] = q;   out[2] = val; break;
+        case 4: out[0] = w;   out[1] = p;   out[2] = val; break;
+        default:out[0] = val; out[1] = p;   out[2] = q;   break;
+    }
 }
 static float lsin(float a) { return sintab[((int)(a * ANGK + 4096.5f)) & 4095]; }
 static float ltanh(float x) {
@@ -176,12 +192,14 @@ void pattern_078(uint32_t *fb, int w, int h, int frame, int sl,
     relax();
 
     /* duotone + gold rim + vignette */
-    float hueA = 0.52f + 0.08f * lsin(t * 0.003f)
+    float hsel = 0.52f + 0.08f * lsin(t * 0.003f)
                + (float)((seed >> 9) & 1023) * (1.0f / 1024.0f);
-    float cA[3], cB[3], gold[3];
-    palcol(hueA, 0.9f, 0.55f, cA);
-    palcol(hueA + 0.42f, 0.85f, 0.95f, cB);
-    palcol(0.13f, 0.55f, 1.0f, gold);
+    float hueA = huetab[(int)(hsel * 1024.0f + 1024.0f) & 1023][0];
+    float cA[3], cB[3];
+    hsvcol(hueA, 0.9f, 0.55f, cA);
+    hsvcol(hueA + 0.42f, 0.85f, 0.95f, cB);
+    /* rims stay a fixed warm gold in every scheme (spec: the cohesive constant) */
+    float gold[3] = { 1.0f, 0.85f, 0.35f };
     float pulse = (0.75f + 0.25f * lsin(t * 0.02f)) * 0.8f;
     for (int k = 0; k < 3; k++) gold[k] *= pulse;
 

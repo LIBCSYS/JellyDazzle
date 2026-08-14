@@ -14,10 +14,11 @@ static float p9_px[P9_NS], p9_py[P9_NS], p9_wt[P9_NS];
 static uint16_t p9_idx[P9_IW * P9_IH];
 static uint8_t p9_gl[P9_IW * P9_IH];
 static uint16_t p9_ground[P9_IW * P9_IH];
+static uint16_t p9_hrad[P9_IW * P9_IH];
 static uint8_t p9_glut[1024];
 static int p9_init;
 
-#define P9_SCALE 4096.0f
+#define P9_SCALE 8192.0f
 #define P9_BMAX  12.0f
 
 /* Bilinear upsample of the low-res (index, glow) pair straight to the target,
@@ -71,6 +72,7 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
                 float X = (float)x - P9_IW * 0.5f, Y = (float)y - P9_IH * 0.5f;
                 float rs = sqrtf(X * X + Y * Y);
                 p9_ground[y * P9_IW + x] = (uint16_t)(rs * 0.001f * P9_SCALE + 4096.0f);
+                p9_hrad[y * P9_IW + x] = (uint16_t)(rs * 0.0022f * P9_SCALE);
             }
     }
     float t = (float)frame;
@@ -124,9 +126,8 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
         int g = p9_glut[gi];
         p9_gl[i] = (uint8_t)g;
         int base = p9_ground[i];
-        /* thread index = ground index + glow-driven hue lift */
-        int col = base + (int)((0.55f * P9_SCALE) * ((float)g * (1.0f / 255.0f)))
-                       + (int)(0.0012f * P9_SCALE * 0.0f);
+        /* thread hue = glow ramp + radius bias; ground hue = radius only */
+        int col = 4096 + p9_hrad[i] + (int)(((0.55f * P9_SCALE) / 255.0f) * (float)g);
         int q = base + (((col - base) * g) >> 8);
         if (q < 0) q = 0;
         if (q > 65535) q = 65535;
