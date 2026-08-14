@@ -8,6 +8,26 @@
  * Motion law: SLOW and SMOOTH. Nothing may strobe. */
 #include <stdint.h>
 #define JD_PAL_MASK 0x7FFF
+/* ---- JellyDazzleAudio ------------------------------------------------
+ * What the machine can hear, smoothed so visuals sway instead of strobe.
+ * All fields 0..1024. Read them; never write them. When there is no
+ * microphone (or silence) everything decays to 0 and `live` is 0, and the
+ * engine falls back to its own clocks exactly as before. */
+typedef struct {
+    uint16_t level;      /* overall loudness                     */
+    uint16_t bass;       /* ~86-260 Hz   — kick, bassline        */
+    uint16_t mid;        /* ~350-2k Hz   — voice, body           */
+    uint16_t treble;     /* 2k-22k Hz    — cymbals, air          */
+    uint16_t beat;       /* 1024 on an onset, decays over ~0.2 s */
+    uint16_t bpm_q8;     /* tempo estimate, Q8; 0 = unsure       */
+    uint16_t live;       /* 1 while sound is actually arriving   */
+} jd_audio;
+
+extern jd_audio g_audio;
+int  jd_audio_init(void);    /* 1 = listening, 0 = no input device */
+void jd_audio_tick(void);    /* call once per frame, before drawing */
+void jd_audio_close(void);
+
 typedef void (*jd_pattern_fn)(uint32_t *fb, int w, int h,
                               int frame, int sl, uint32_t seed,
                               const uint32_t *pal);

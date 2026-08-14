@@ -20,8 +20,8 @@ SDLFLAGS = -I$(SDL2DIR)/include/SDL2 -D_THREAD_SAFE -L$(SDL2DIR)/lib -lSDL2 -Wl,
 # or touching any pattern actually forces a relink (it used to not).
 PATSRC = $(filter-out patterns_c/harness.c,$(wildcard patterns_c/*.c))
 
-dazzle64: main.c bridge.c jellydazzle.h VERSION $(PATSRC) draw.s palette.bin sintab.bin shapes.bin
-	$(CC) -O2 $(VERFLAG) $(NSFLAG) main.c bridge.c $(PATSRC) draw.s -o $@ $(SDLFLAGS)
+dazzle64: main.c audio.c bridge.c jellydazzle.h draw.s palette.bin sintab.bin shapes.bin $(PATSRC)
+	$(CC) -O2 $(VERFLAG) $(NSFLAG) main.c audio.c bridge.c $(PATSRC) draw.s -o $@ $(SDLFLAGS)
 
 palette.bin sintab.bin shapes.bin: gen_tables.py
 	python3 gen_tables.py

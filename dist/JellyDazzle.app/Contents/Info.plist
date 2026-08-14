@@ -4,9 +4,10 @@
   <key>CFBundleName</key><string>JellyDazzle</string>
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
-  <key>CFBundleIdentifier</key><string>nyc.jelia.jd2.1.0</string>
-  <key>CFBundleVersion</key><string>2.1.0</string>
-  <key>CFBundleShortVersionString</key><string>2.1.0</string>
+  <key>CFBundleIdentifier</key><string>nyc.jelia.jd2.2.0-audio</string>
+  <key>CFBundleVersion</key><string>2.2.0-audio</string>
+  <key>CFBundleShortVersionString</key><string>2.2.0-audio</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>JellyDazzle listens to whatever it can hear so the kaleidoscope can move with the music. Audio is analysed in memory only — never recorded, stored, or sent anywhere.</string>
 </dict></plist>

@@ -23,6 +23,9 @@
 
 /* implemented in draw.s */
 extern void jd_frame(uint32_t *fb, int width, int height, int frame);
+extern int  jd_audio_init(void);
+extern void jd_audio_tick(void);
+extern void jd_audio_close(void);
 
 static uint32_t framebuffer[W * H];   /* our A000:0000 */
 
@@ -42,6 +45,10 @@ int main(void)
         ren, SDL_PIXELFORMAT_ARGB8888,
         SDL_TEXTUREACCESS_STREAMING, W, H);
 
+    /* JellyDazzleAudio: listen to whatever the Mac can hear.  If there is
+     * no input device the engine simply runs on its own clocks. */
+    jd_audio_init();
+
     int running = 1;
     /* random launch seed: every run starts somewhere new in the wheel */
     srand((unsigned)time(NULL) ^ (unsigned)(getpid() * 2654435761u));
@@ -54,6 +61,7 @@ int main(void)
                 running = 0;
         }
 
+        jd_audio_tick();
         jd_frame(framebuffer, W, H, frame++);  /* <-- your assembly */
 
         SDL_UpdateTexture(tex, NULL, framebuffer, W * sizeof(uint32_t));
@@ -65,6 +73,7 @@ int main(void)
     SDL_DestroyTexture(tex);
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);
+    jd_audio_close();
     SDL_Quit();
     return 0;
 }

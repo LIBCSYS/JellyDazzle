@@ -191,6 +191,7 @@ static int    g_frame0 = 0;
  * mixes this in. */
 static uint32_t g_run = 0;
 static uint32_t g_gain = 256;              /* dead-air lift, Q8            */
+static uint32_t g_prot = 0;       /* audio palette rotation, 0..PAL_N-1 */
 static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
@@ -686,6 +687,10 @@ static void layer_pal_build(int s)
     uint32_t *d = g_pal[s], span = g_L[s].span, off = g_L[s].off;
     for (int i = 0; i < PAL_N; i++)
         d[i] = g_blend[((((uint32_t)i * span) >> 15) + off) & PAL_MASK];
+    /* duplicate: patterns index pal[x & 0x7FFF], so handing them
+     * (pal + k) stays in bounds for any k < PAL_N — that makes an
+     * audio-driven colour rotation completely free at draw time. */
+    memcpy(d + PAL_N, d, PAL_N * 4);
 
     static int noreshape = -1;
     if (noreshape < 0) noreshape = getenv("JD_NORESHAPE") ? 1 : 0;
@@ -1256,6 +1261,11 @@ static void sched_tick(int frame)
     for (int s = 1; s < JD_NSLOT; s++) {
         if (s >= g_slot_cap) { continue; }
         jd_layer *L = &g_L[s];
+        /* AUDIO: a downbeat pulls the next layer forward (never later), so
+         * new material arrives ON the music instead of on a blind clock. */
+        if (!L->live && g_audio.live && g_audio.beat > 700
+            && frame < g_rest[s] && g_rest[s] - frame < 90)
+            g_rest[s] = frame;
         if (L->live || frame < g_rest[s]) continue;
         /* never two layers arriving at once: 1 s minimum between entries,
          * and nothing enters while the ground is being handed over */
@@ -1284,7 +1294,7 @@ static void engine_init(uint32_t *fb, int w, int h, int frame)
 
     for (int i = 0; i < JD_NBUF; i++) {
         g_buf[i] = (uint32_t*)calloc((size_t)w * h, 4);
-        g_pal[i] = (uint32_t*)calloc(PAL_N, 4);
+        g_pal[i] = (uint32_t*)calloc(PAL_N * 2, 4);   /* 2x: audio rotation window */
         g_L[i].buf = g_buf[i]; g_L[i].pal = g_pal[i];
         g_L[i].live = 0; g_rest[i] = frame;
     }
@@ -1313,6 +1323,26 @@ static int mode_override(uint32_t *fb, int w, int h, int frame)
     if (ov == -2) { const char *e = getenv("JD_MODE"); ov = e ? atoi(e) : -1; }
     if (ov < 0) return 0;
     palette_update(frame);
+
+    /* AUDIO -> COLOUR.  Treble and level slide the whole ramp, and each beat
+     * kicks it a further step; the offset only ever moves forward, eased, so
+     * hues travel with the music instead of jumping.  Free at draw time
+     * because every layer palette is stored twice (see layer_pal_build). */
+    {
+        static uint32_t rot, vel;
+        if (g_audio.live) {
+            uint32_t target = ((uint32_t)g_audio.treble * 3
+                             + (uint32_t)g_audio.level  * 5
+                             + (uint32_t)g_audio.beat   * 6) >> 4;
+            vel = vel + ((target > vel ? target - vel : 0) >> 3)
+                      - ((vel > target ? vel - target : 0) >> 4);
+            rot += vel >> 2;
+        } else {
+            vel -= vel >> 5;
+            rot += vel >> 2;
+        }
+        g_prot = rot & (PAL_N - 1);
+    }
     int m;
     if (ov >= 1 && ov <= jd_pattern_count) m = JD_NASM + ov - 1;
     else                                   m = ov % JD_NASM;
@@ -1364,6 +1394,26 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     }
 
     palette_update(frame);
+
+    /* AUDIO -> COLOUR.  Treble and level slide the whole ramp, and each beat
+     * kicks it a further step; the offset only ever moves forward, eased, so
+     * hues travel with the music instead of jumping.  Free at draw time
+     * because every layer palette is stored twice (see layer_pal_build). */
+    {
+        static uint32_t rot, vel;
+        if (g_audio.live) {
+            uint32_t target = ((uint32_t)g_audio.treble * 3
+                             + (uint32_t)g_audio.level  * 5
+                             + (uint32_t)g_audio.beat   * 6) >> 4;
+            vel = vel + ((target > vel ? target - vel : 0) >> 3)
+                      - ((vel > target ? vel - target : 0) >> 4);
+            rot += vel >> 2;
+        } else {
+            vel -= vel >> 5;
+            rot += vel >> 2;
+        }
+        g_prot = rot & (PAL_N - 1);
+    }
     sched_tick(frame);
 
     /* ---- weights ---- */
@@ -1385,6 +1435,13 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         if (!L->live) { L->w_now = 0; continue; }
         L->w16   = layer_w_q16(L, frame);
         L->w_now = (uint16_t)(L->w16 >> 8);
+        /* AUDIO: overlays surge with the low end.  0.45x..1.6x — the old
+         * 0.85..1.15 was measured as invisible against the music. */
+        if (g_audio.live && s != 0 && s != JD_SHADOW && L->w_now) {
+            uint32_t k = 115 + ((uint32_t)g_audio.bass * 295 >> 10);
+            uint32_t v = ((uint32_t)L->w_now * k) >> 8;
+            L->w_now = (uint16_t)(v > 256 ? 256 : v);
+        }
         if (s == 0 || s == JD_SHADOW) { if (ng < 2) gnd[ng++] = s; }
         else if (L->w16 && no < JD_NSLOT) ov[no++] = s;
     }
@@ -1413,7 +1470,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             draw_frame(L->buf, w, h, frame);
         } else {
             jd_patterns[L->routine - JD_NASM](L->buf, w, h, L->fbase + L->sl,
-                                              L->sl, L->seed, L->pal);
+                                              L->sl, L->seed, L->pal + g_prot);
         }
         double dt = now_ms() - t0;
         if (dt > 20.0) TR("SLOW f=%d slot=%d rt=%d sl=%d dt=%.1f\n",
@@ -1562,6 +1619,23 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         }
     }
 #endif
+
+    /* ---- AUDIO: bloom on the beat, capped at ~1.18x and eased through the
+     * same gain the dead-air guard uses: a pulse of light, never a strobe. */
+    if (g_audio.live) {
+        /* bass carries a sustained lift, the beat adds a kick on top:
+         * up to ~1.45x, eased, so the picture pumps with the track. */
+        /* SEIZURE SAFETY (J: "leaning toward a flash"): brightness barely
+         * moves — 1.06x at most, and it EASES in over ~8 frames and out over
+         * ~32.  The music is carried by colour rotation and by layers
+         * surging, neither of which flashes. */
+        uint32_t bump = 256 + (((uint32_t)g_audio.bass * 10
+                              + (uint32_t)g_audio.beat * 6) >> 10);
+        if (bump > 272) bump = 272;
+        if (bump > g_gain) g_gain += (bump - g_gain) >> 3;
+        else               g_gain -= (g_gain - bump) >> 5;
+        if (g_gain > 260) span_gain(fb, fb, npix, g_gain);
+    }
 
     /* ---- health: frame time and composite motion ---- */
     motion_probe(fb, npix);
