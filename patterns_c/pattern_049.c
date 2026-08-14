@@ -68,7 +68,7 @@ void pattern_049(uint32_t *fb, int w, int h, int frame, int sl,
     float t = (float)frame;
     float sx[P49_NS], sy[P49_NS];
     uint32_t col[P49_NS];
-    int drift = (int)(t * 0.0004f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00028f * 32768.0f) + (int)(seed & 32767u);
 
     sx[0] = P49_LW * 0.5f; sy[0] = P49_LH * 0.5f;
     static const float rings[3][5] = {

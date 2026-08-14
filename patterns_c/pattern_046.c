@@ -23,7 +23,7 @@ static void p46_init(void) {
         p46_sin[i] = (int16_t)lrintf(16383.0f * sinf((float)i * 6.28318531f / 4096.0f));
     for (int i = 0; i < 256; i++) {
         float m = (float)i * (1.6f / 256.0f);
-        p46_mix[i] = (uint8_t)(255.0f / (1.0f + expf(4.0f * m)) + 0.5f);
+        p46_mix[i] = (uint8_t)(255.0f / (1.0f + expf(2.2f * m)) + 0.5f);
     }
     const float k = 4096.0f / 6.28318531f;
     for (int y = 0; y < P46_LH; y++) {
@@ -81,11 +81,11 @@ void pattern_046(uint32_t *fb, int w, int h, int frame, int sl,
     if (!p46_ready) p46_init();
     float t = (float)frame;
     const float k = 4096.0f / 6.28318531f;
-    int base_a = ((int)(-0.010f * t * k) + 1024) & 4095;   /* +1024 -> cos */
-    int base_b = ((int)(-0.006f * t * k) + 1024) & 4095;
+    int base_a = ((int)(-0.006f * t * k) + 1024) & 4095;   /* +1024 -> cos */
+    int base_b = ((int)(-0.0035f * t * k) + 1024) & 4095;
     int off_a[3], off_b[3];
     uint32_t col[3];
-    int drift = (int)(t * 0.0005f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00018f * 32768.0f) + (int)(seed & 32767u);
     for (int i = 0; i < 3; i++) {
         off_a[i] = (base_a + (int)(i * 4096 / 3)) & 4095;   /* 2*pi*i/3 */
         off_b[i] = (base_b + (int)(i * 4096 / 6)) & 4095;   /* pi*i/3   */

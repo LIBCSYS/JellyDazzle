@@ -88,18 +88,32 @@ void pattern_019(uint32_t *fb, int w, int h, int frame, int sl,
     const float t = (float)frame;
 
     /* both sources are themselves folded into the wedge */
-    float ax = 72.0f * s_sin(t * 0.0030f), ay = 56.0f * s_sin(t * 0.0022f + 0.8f);
-    float bx = 66.0f * s_sin(t * 0.0026f + 2.1f), by = 62.0f * s_sin(t * 0.0035f + 4.0f);
+    float ax = 72.0f * s_sin(t * 0.0017f), ay = 56.0f * s_sin(t * 0.0013f + 0.8f);
+    float bx = 66.0f * s_sin(t * 0.0015f + 2.1f), by = 62.0f * s_sin(t * 0.0020f + 4.0f);
     float ra = sqrtf(ax * ax + ay * ay), fa = fold8(atan2f(ay, ax));
     float rb = sqrtf(bx * bx + by * by), fb2 = fold8(atan2f(by, bx));
     const float c1x = ra * cosf(fa), c1y = ra * sinf(fa);
     const float c2x = rb * cosf(fb2), c2y = rb * sinf(fb2);
 
-    /* looping 256-stop silk ramp off the palette; rotation is the animation */
-    uint32_t lut[256];
-    int rot = (int)(t * 0.20f) + (int)(seed & 255u);
-    for (int i = 0; i < 256; i++)
-        lut[i] = pal[(((rot + i) & 255) * 128) & JD_PAL_MASK];
+    /* looping six-stop silk ramp sampled off the palette; rotating it (with
+     * sub-entry interpolation, so nothing steps) is the primary animation */
+    uint32_t lut[257];
+    {
+        uint32_t stop[7];
+        int base = (int)(seed & 0x7FFFu);
+        for (int j = 0; j < 6; j++) stop[j] = pal[(base + j * 5461) & JD_PAL_MASK];
+        stop[6] = stop[0];
+        for (int j = 0; j < 6; j++) {
+            uint32_t a = stop[j], b = stop[j + 1];
+            for (int q = 0; q < 43; q++) {
+                int e = j * 43 + q;
+                if (e > 256) break;
+                lut[e] = lerp2(a, b, (unsigned)(q * 256 / 43));
+            }
+        }
+        lut[256] = lut[0];
+    }
+    const float rot = t * 0.40f;
 
     const float ph1 = -t * 0.012f, ph2 = t * 0.010f;
 
@@ -110,9 +124,11 @@ void pattern_019(uint32_t *fb, int w, int h, int frame, int sl,
         float d1 = sqrtf(ux * ux + uy * uy);
         float d2 = sqrtf(vx * vx + vy * vy);
         float s = s_sin(d1 * 0.30f + ph1) + s_sin(d2 * 0.26f + ph2);
-        int k = (int)((s + 2.0f) * 63.75f);
-        if (k < 0) k = 0; else if (k > 255) k = 255;
-        lbuf[i] = lut[k];
+        float f = (s + 2.0f) * 63.75f + rot;
+        int ki = (int)f;
+        unsigned fr = (unsigned)((f - (float)ki) * 256.0f);
+        ki &= 255;
+        lbuf[i] = lerp2(lut[ki], lut[ki + 1], fr);
     }
     blit(fb, w, h);
 }

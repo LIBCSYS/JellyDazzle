@@ -91,10 +91,10 @@ void pattern_011(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     if (!init_done) { init_(); init_done = 1; }
     float t = (float)frame;
-    int ri = (int)(t * 0.0022f * RAD2IDX);
-    float t1 = t * 0.0105f, t2 = t * 0.0085f, t3 = t * 0.0065f, t4 = t * 0.0095f;
-    float tv1 = t * 0.0055f, tv2 = t * 0.0040f;
-    float hueT = t * 0.0005f + (float)(seed & 1023u) * 0.000976f;
+    int ri = (int)(t * 0.0013f * RAD2IDX);
+    float t1 = t * 0.0063f, t2 = t * 0.0051f, t3 = t * 0.0039f, t4 = t * 0.0057f;
+    float tv1 = t * 0.0033f, tv2 = t * 0.0024f;
+    float hueT = t * 0.0003f + (float)(seed & 1023u) * 0.000976f;
     for (int i = 0; i < LW * LH; i++) {
         float r = rtab[i];
         int ai = (atab[i] + ri) & SMASK;

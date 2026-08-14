@@ -33,9 +33,9 @@ void pattern_002(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     (void)sl; (void)seed;
     float t = (float)frame;
-    float L = 52.0f + 18.0f * sinf(t * 0.004f);
+    float L = 52.0f + 18.0f * sinf(t * 0.002f);
     float invL2 = 1.0f / (2.0f * L);
-    float dx = t * 0.16f, dy = t * 0.09f;
+    float dx = t * 0.08f, dy = t * 0.045f;
     for (int y = 0; y < P2_IH; y++) {
         float sy = (float)y + dy;
         float v0 = sy - floorf(sy * invL2) * 2.0f * L;
@@ -49,17 +49,17 @@ void pattern_002(uint32_t *fb, int w, int h, int frame, int sl,
             float vv = u > v0 ? v0 : u;
             float du = uu - L * 0.5f, dv = vv - L * 0.5f;
             float d = sqrtf(du * du + dv * dv);
-            float val = sinf(uu * 0.11f + t * 0.008f)
-                      + sinf(vv * 0.13f - t * 0.006f)
-                      + sinf((uu + vv) * 0.065f + t * 0.005f)
-                      + sinf(d * 0.17f - t * 0.010f);
+            float val = sinf(uu * 0.11f + t * 0.004f)
+                      + sinf(vv * 0.13f - t * 0.003f)
+                      + sinf((uu + vv) * 0.065f + t * 0.0025f)
+                      + sinf(d * 0.17f - t * 0.005f);
             val = val * 0.125f + 0.5f;
-            int q = (int)(val * 8192.0f + 4096.0f);
+            int q = (int)(val * 5632.0f + 4096.0f);
             if (q < 0) q = 0;
             if (q > 65535) q = 65535;
             row[x] = (uint16_t)q;
         }
     }
-    uint32_t off = (uint32_t)((double)frame * 2.048) & JD_PAL_MASK;
+    uint32_t off = (uint32_t)((double)frame * 1.408) & JD_PAL_MASK;
     p2_upsample(fb, w, h, p2_field, pal, off);
 }

@@ -92,7 +92,7 @@ void pattern_042(uint32_t *fb, int w, int h, int frame, int sl,
     int ph2 = (int)( 0.013f * t * k) & 4095;
     int ph3 = (int)(-0.008f * t * k) & 4095;
     int cq  = 1024;                                   /* cos = sin(+pi/2) */
-    int drift = (int)(t * 0.0004f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00022f * 32768.0f) + (int)(seed & 32767u);
 
     for (int i = 0; i < P42_N; i++) {
         int p1 = p42_sin[(p42_a1[i] + ph1 + cq) & 4095];

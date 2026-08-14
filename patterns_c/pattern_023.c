@@ -31,17 +31,17 @@ void pattern_023(uint32_t *fb, int w, int h, int frame, int sl,
     const float tt = (float)frame;
 
     /* the two ring sources sit ~420 lab px off-screen and sway slowly */
-    const float ax = cx + (-420.0f + 60.0f * sinf(0.0022f * tt)) * sc;
-    const float ay = cy + ( 120.0f * sinf(0.0018f * tt)) * sc;
-    const float bx = cx + ( 420.0f - 60.0f * sinf(0.0019f * tt)) * sc;
-    const float by = cy + (-120.0f * sinf(0.0017f * tt + 0.9f)) * sc;
+    const float ax = cx + (-420.0f + 60.0f * sinf(0.00085f * tt)) * sc;
+    const float ay = cy + ( 120.0f * sinf(0.00070f * tt)) * sc;
+    const float bx = cx + ( 420.0f - 60.0f * sinf(0.00075f * tt)) * sc;
+    const float by = cy + (-120.0f * sinf(0.00065f * tt + 0.9f)) * sc;
 
     /* f1=0.55, f2=0.61 rad per LAB px -> LUT index per SCREEN px */
     const float K1 = 0.55f / sc * 651.8986f;
     const float K2 = 0.61f / sc * 651.8986f;
-    const int ph1 = (int)( 0.019f * tt * 651.8986f);
-    const int ph2 = (int)(-0.015f * tt * 651.8986f);
-    const int phe = (int)( 0.006f * tt * 651.8986f) + 1024;   /* +1024 => cos */
+    const int ph1 = (int)( 0.0250f * tt * 651.8986f);
+    const int ph2 = (int)(-0.0200f * tt * 651.8986f);
+    const int phe = (int)( 0.0083f * tt * 651.8986f) + 1024;   /* +1024 => cos */
     /* park the ramp on the bright, colourful arc of the scheme */
     const int drift = 7200 + (int)(tt * 0.6f) + (int)(seed & 4095u);
 

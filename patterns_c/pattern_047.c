@@ -88,7 +88,7 @@ void pattern_047(uint32_t *fb, int w, int h, int frame, int sl,
     float th = -0.024f * t;
     int cs = (int)lrintf(cosf(th) * 16384.0f);
     int sn = (int)lrintf(sinf(th) * 16384.0f);
-    int drift = (int)(t * 0.0004f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00024f * 32768.0f) + (int)(seed & 32767u);
 
     for (int i = 0; i < P47_N; i++) {
         int wv = ((int)p47_ca[i] * cs + (int)p47_sa[i] * sn) >> 14;   /* Q12 +-4096 */

@@ -35,8 +35,8 @@ void pattern_003(uint32_t *fb, int w, int h, int frame, int sl,
     const float S3 = 1.7320508f;
     float t = (float)frame;
     const float L = 72.0f, invL = 1.0f / 72.0f;
-    float ox = t * 0.04f - P3_IW * 0.5f, oy = t * 0.018f - P3_IH * 0.5f;
-    float spin = t * 0.0009f;
+    float ox = t * 0.02f - P3_IW * 0.5f, oy = t * 0.009f - P3_IH * 0.5f;
+    float spin = t * 0.00045f;
     const float wg = (float)M_PI / 6.0f;
     const float inv2w = 1.0f / (2.0f * wg);
     for (int y = 0; y < P3_IH; y++) {
@@ -57,10 +57,10 @@ void pattern_003(uint32_t *fb, int w, int h, int frame, int sl,
             float tm = th - floorf(th * inv2w) * 2.0f * wg;
             float thf = fabsf(tm - wg);
             float val = 0.5f
-                + 0.30f * sinf(r * 0.16f - t * 0.005f + 4.0f * thf)
-                + 0.20f * sinf(r * 0.30f * cosf(thf * 6.0f) + t * 0.003f);
+                + 0.30f * sinf(r * 0.16f - t * 0.0025f + 4.0f * thf)
+                + 0.20f * sinf(r * 0.30f * cosf(thf * 6.0f) + t * 0.0015f);
             float idx = val * 0.9f + r * 0.002f;
-            int q = (int)(idx * 7168.0f + 4096.0f);
+            int q = (int)(idx * 5120.0f + 4096.0f);
             if (q < 0) q = 0;
             if (q > 65535) q = 65535;
             row[x] = (uint16_t)q;

@@ -11,10 +11,10 @@ static uint16_t p1_field[P1_IW * P1_IH];
 static int p1_init;
 
 static float p1_fieldval(float thf, int N, float t, float r) {
-    float rose = r - 78.0f * fabsf(cosf(3.0f * thf * (float)N * 0.25f + t * 0.006f));
+    float rose = r - 78.0f * fabsf(cosf(3.0f * thf * (float)N * 0.25f + t * 0.003f));
     return 0.50f
-         + 0.28f * sinf(r * 0.055f - t * 0.012f + 2.5f * cosf(thf * 6.0f))
-         + 0.22f * sinf(rose * 0.09f + t * 0.004f);
+         + 0.28f * sinf(r * 0.055f - t * 0.006f + 2.5f * cosf(thf * 6.0f))
+         + 0.22f * sinf(rose * 0.09f + t * 0.002f);
 }
 
 static void p1_upsample(uint32_t *fb, int w, int h, const uint16_t *f,
@@ -59,7 +59,7 @@ void pattern_001(uint32_t *fb, int w, int h, int frame, int sl,
     if (m < 0.0f) m = 0.0f;
     if (m > 1.0f) m = 1.0f;
     m = m * m * (3.0f - 2.0f * m);
-    float rot = t * 0.0025f;
+    float rot = t * 0.0010f;
     int Na = seq[i], Nb = seq[j];
     float wa = (float)M_PI / (float)Na, wb = (float)M_PI / (float)Nb;
     float inv2wa = 1.0f / (2.0f * wa), inv2wb = 1.0f / (2.0f * wb);
@@ -74,11 +74,11 @@ void pattern_001(uint32_t *fb, int w, int h, int frame, int sl,
             float v2 = p1_fieldval(thf2, Nb, t, r);
             v = v * (1.0f - m) + v2 * m;
         }
-        int q = (int)(v * 3481.6f + 8192.0f);   /* v*0.85*4096, biased */
+        int q = (int)(v * 2560.0f + 8192.0f);   /* v*0.85*4096, biased */
         if (q < 0) q = 0;
         if (q > 65535) q = 65535;
         p1_field[k] = (uint16_t)q;
     }
-    uint32_t off = (uint32_t)((double)frame * 2.4576) & JD_PAL_MASK;
+    uint32_t off = (uint32_t)((double)frame * 1.28) & JD_PAL_MASK;
     p1_upsample(fb, w, h, p1_field, pal, off);
 }

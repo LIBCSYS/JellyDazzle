@@ -2,7 +2,7 @@
  * Port of lab/patterns/048_excitable_spirals/proto.py
  * Greenberg-Hastings excitable medium (160x120, K=8) seeded with three broken
  * wavefront bars mirrored 4-fold; wavefronts crawl and curl into greek-key
- * spiral cores. Run live (1 generation per ~8.3 frames) with a smoothstep
+ * spiral cores. Run live (1 generation per 20 frames) with a smoothstep
  * crossfade between consecutive generations, then bilinear upscale. */
 #include "../jellydazzle.h"
 #include <math.h>
@@ -13,7 +13,7 @@
 #define P48_N  (P48_GW * P48_GH)
 #define P48_K  8
 #define P48_SKIP 100
-#define P48_SPEED 0.12f
+#define P48_SPEED 0.05f
 
 static uint8_t  p48_a[P48_N];      /* generation g   */
 static uint8_t  p48_b[P48_N];      /* generation g+1 */
@@ -121,7 +121,7 @@ void pattern_048(uint32_t *fb, int w, int h, int frame, int sl,
     unsigned fw = (unsigned)(f * 256.0f);
     if (fw > 256u) fw = 256u;
 
-    int drift = (int)(t * 0.0005f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00028f * 32768.0f) + (int)(seed & 32767u);
     uint32_t st[P48_K], pair[P48_K][P48_K];
     for (int s = 0; s < P48_K; s++) {
         if (s == 0) {

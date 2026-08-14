@@ -9,7 +9,7 @@
 #define P41_GH 120
 #define P41_K  12
 #define P41_SKIP 120
-#define P41_SPEED 0.07f          /* generations per frame (proto 0.15, eased for motion law) */
+#define P41_SPEED 0.06f          /* generations per frame (proto 0.15, eased for the motion law) */
 
 static uint8_t p41_ga[P41_GH * P41_GW];   /* generation i   */
 static uint8_t p41_gb[P41_GH * P41_GW];   /* generation i+1 */
@@ -134,7 +134,7 @@ void pattern_041(uint32_t *fb, int w, int h, int frame, int sl,
     unsigned fw = (unsigned)(f * 256.0f);
     if (fw > 256u) fw = 256u;
 
-    int drift = (int)((float)sl * 0.0006f * 32768.0f);
+    int drift = (int)((float)sl * 0.00015f * 32768.0f);
     uint32_t colA[P41_K], colB[P41_K], pair[P41_K][P41_K];
     for (int s = 0; s < P41_K; s++) {
         int idx = ((s * 32768) / P41_K + drift) & JD_PAL_MASK;

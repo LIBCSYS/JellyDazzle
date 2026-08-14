@@ -120,7 +120,7 @@ void pattern_043(uint32_t *fb, int w, int h, int frame, int sl,
     /* contrast breathing: uu = u*(1-0.35m) + ub*0.35m */
     float m = 0.5f + 0.5f * sinf(t * 0.006f);
     unsigned mb = (unsigned)(0.35f * m * 256.0f);       /* blend weight 0..90 */
-    int drift = (int)(t * 0.0006f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00028f * 32768.0f) + (int)(seed & 32767u);
 
     /* per-pixel tables over uu (-127..127 -> 0..254) */
     static uint8_t bri[256], seam[256], idxo[256];

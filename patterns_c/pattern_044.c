@@ -1,8 +1,8 @@
 /* pattern_044 — Majority Quilt
  * Port of lab/patterns/044_majority_quilt/proto.py
- * 160x120 majority-vote CA on a 4-fold symmetric +-1 seed; 150 generations are
+ * 240x180 majority-vote CA on a 4-fold symmetric +-1 seed; 70 generations are
  * precomputed as twice-box-blurred fields and scrubbed forward/back (ping-pong,
- * 0.09 gen/frame, smoothstep crossfade) so blobs merge then split forever.
+ * 0.06 gen/frame, smoothstep crossfade) so blobs merge then split forever.
  * Two-tone palette with inked borders, bilinearly upscaled. */
 #include "../jellydazzle.h"
 #include <math.h>
@@ -14,8 +14,6 @@
 #define P44_LO   12
 
 static int8_t   p44_hist[P44_NGEN][P44_N];   /* smoothed fields, Q7 */
-static int8_t   p44_cur[P44_N];
-static int8_t   p44_nxt[P44_N];
 static uint32_t p44_low[P44_N];
 static int      p44_ready = 0;
 
@@ -117,7 +115,7 @@ void pattern_044(uint32_t *fb, int w, int h, int frame, int sl,
     if (!p44_ready) p44_build();
     float t = (float)frame;
     const int span = P44_NGEN - 1 - P44_LO;
-    float m = fmodf(t * 0.09f, (float)(2 * span));
+    float m = fmodf(t * 0.06f, (float)(2 * span));
     float gp = (float)P44_LO + (m <= (float)span ? m : (float)(2 * span) - m);
     int i0 = (int)gp;
     if (i0 > P44_NGEN - 2) i0 = P44_NGEN - 2;
@@ -125,7 +123,7 @@ void pattern_044(uint32_t *fb, int w, int h, int frame, int sl,
     f = f * f * (3.0f - 2.0f * f);
     int fw = (int)(f * 256.0f);
     if (fw > 256) fw = 256;
-    int drift = (int)(t * 0.0005f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00022f * 32768.0f) + (int)(seed & 32767u);
 
     static uint8_t bri[256];
     static int16_t hue[256];
@@ -147,5 +145,4 @@ void pattern_044(uint32_t *fb, int w, int h, int frame, int sl,
                     |  (((c & 255) * g) >> 8));
     }
     p44_blit(fb, w, h);
-    (void)p44_cur; (void)p44_nxt;
 }

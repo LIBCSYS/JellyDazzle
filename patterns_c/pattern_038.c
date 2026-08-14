@@ -26,7 +26,9 @@ static uint8_t  p38_bgv[P38_AN * 3];
 static uint8_t  p38_lin[4096];
 static uint8_t  p38_gam[256];
 static const double p38_r0[5]  = { 34.0, 52.0, 68.0, 84.0, 100.0 };
-static const double p38_hue[5] = { 0.11, 0.05, 0.48, 0.14, 0.58 };
+/* the proto asks for gold / copper / teal / ivory / steel-blue; these are
+   the positions on the shared palette ring that carry those metals */
+static const double p38_hue[5] = { 0.310, 0.375, 0.500, 0.625, 0.560 };
 static const float  p38_sat[5] = { 0.85f, 0.90f, 0.80f, 0.35f, 0.80f };
 static int      p38_ready = 0;
 static int      p38_lastsl = -1000;

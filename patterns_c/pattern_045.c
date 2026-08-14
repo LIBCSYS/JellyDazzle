@@ -116,7 +116,7 @@ void pattern_045(uint32_t *fb, int w, int h, int frame, int sl,
     /* faint connective halo */
     p45_ring(cx, cy, 96.0f + 14.0f * sinf(t * 0.0027f), 34.0f, 0.35f);
 
-    int drift = (int)(t * 0.0004f * 32768.0f) + (int)(seed & 32767u);
+    int drift = (int)(t * 0.00028f * 32768.0f) + (int)(seed & 32767u);
     for (int i = 0; i < P45_N; i++) {
         float a = p45_acc[i];
         int q = (int)(a * 128.0f);                 /* 1024 entries over 0..8 */

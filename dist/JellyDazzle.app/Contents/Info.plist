@@ -5,8 +5,8 @@
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
   <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
-  <key>CFBundleVersion</key><string>1.8.1</string>
-  <key>CFBundleShortVersionString</key><string>1.8.1</string>
+  <key>CFBundleVersion</key><string>2.0.0</string>
+  <key>CFBundleShortVersionString</key><string>2.0.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>

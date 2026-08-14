@@ -11,8 +11,13 @@ VERFLAG = -DJD_VERSION='"$(VERSION)"'
 SDL2DIR  = /opt/homebrew/opt/sdl2
 SDLFLAGS = -I$(SDL2DIR)/include/SDL2 -D_THREAD_SAFE -L$(SDL2DIR)/lib -lSDL2 -Wl,-framework,Cocoa
 
-dazzle64: main.c draw.s palette.bin sintab.bin shapes.bin
-	$(CC) -O2 $(VERFLAG) main.c bridge.c $(filter-out patterns_c/harness.c,$(wildcard patterns_c/*.c)) draw.s -o $@ $(SDLFLAGS)
+# every .c under patterns_c except the standalone test harness — this is
+# both the link list AND the prerequisite list, so regenerating registry.c
+# or touching any pattern actually forces a relink (it used to not).
+PATSRC = $(filter-out patterns_c/harness.c,$(wildcard patterns_c/*.c))
+
+dazzle64: main.c bridge.c jellydazzle.h VERSION $(PATSRC) draw.s palette.bin sintab.bin shapes.bin
+	$(CC) -O2 $(VERFLAG) main.c bridge.c $(PATSRC) draw.s -o $@ $(SDLFLAGS)
 
 palette.bin sintab.bin shapes.bin: gen_tables.py
 	python3 gen_tables.py
@@ -25,4 +30,4 @@ run: dazzle64
 	./dazzle64
 
 clean:
-	rm -f dazzle64 palette.bin sintab.bin
+	rm -f dazzle64 palette.bin sintab.bin shapes.bin
