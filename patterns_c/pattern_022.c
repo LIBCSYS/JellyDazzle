@@ -10,16 +10,16 @@ void pattern_022(uint32_t *fb, int w, int h, int frame, int sl,
     const float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
     const float tt = (float)frame;
 
-    const float a1 = 0.0035f * tt;
-    const float a2 = -0.003f * tt + 1.7f;
+    const float a1 = 0.0022f * tt;
+    const float a2 = -0.0019f * tt + 1.7f;
     const float x1 = cx + 55.0f * sc * cosf(a1);
     const float y1 = cy + 40.0f * sc * sinf(1.3f * a1);
     const float x2 = cx - 55.0f * sc * cosf(a2);
     const float y2 = cy - 40.0f * sc * sinf(a2);
 
     const float kd = 1.6f / sc;               /* ring density per screen px */
-    const float p1 = 0.14f * tt;
-    const float p2 = -0.11f * tt;
+    const float p1 = 0.085f * tt;
+    const float p2 = -0.068f * tt;
 
     /* 64-entry fringe LUT: indigo floor -> gold peaks along the ramp,
      * slow global drift; one palette read per band. */

@@ -48,16 +48,26 @@ static void p61_init(int w, int h) {
     p61_w = w; p61_h = h;
 }
 
+/* smooth looping 6-stop rainbow sampled from the engine palette (the lab
+ * proto uses a 6-stop looping rainbow; raw pal indexing is too high-frequency
+ * and would strobe). */
 static void p61_build_lut(const uint32_t *pal) {
-    int idx, s;
+    int idx, s, j;
+    int ar[7], ag[7], ab[7];
+    for (j = 0; j < 6; j++) {
+        uint32_t c = pal[(j * 5461) & JD_PAL_MASK];
+        ar[j] = (c >> 16) & 255; ag[j] = (c >> 8) & 255; ab[j] = c & 255;
+    }
+    ar[6] = ar[0]; ag[6] = ag[0]; ab[6] = ab[0];
     for (idx = 0; idx < 256; idx++) {
-        int m = idx < 128 ? idx : 255 - idx;
-        uint32_t c = pal[(m << 8) & JD_PAL_MASK];
-        uint32_t r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+        int q = idx * 6, j0 = q >> 8, f = q & 255;
+        uint32_t r = (uint32_t)(ar[j0] + (((ar[j0+1] - ar[j0]) * f) >> 8));
+        uint32_t g = (uint32_t)(ag[j0] + (((ag[j0+1] - ag[j0]) * f) >> 8));
+        uint32_t b = (uint32_t)(ab[j0] + (((ab[j0+1] - ab[j0]) * f) >> 8));
         for (s = 0; s < 64; s++) {
-            uint32_t f = (uint32_t)(s * 65536 / 63);
-            p61_lut[s][idx] = 0xFF000000u | (((r * f) >> 16) << 16)
-                            | (((g * f) >> 16) << 8) | ((b * f) >> 16);
+            uint32_t k = (uint32_t)(s * 65536 / 63);
+            p61_lut[s][idx] = 0xFF000000u | (((r * k) >> 16) << 16)
+                            | (((g * k) >> 16) << 8) | ((b * k) >> 16);
         }
     }
 }
@@ -71,11 +81,11 @@ void pattern_061(uint32_t *fb, int w, int h, int frame, int sl,
     {
         double t = (double)frame;
         /* idx-domain accumulators (mod 256 units, x64) */
-        int rot_c = (int)(fmod(t * 0.12, 256.0) * 64.0);
-        int fly_c = (int)(fmod(t * 0.9, 256.0) * 64.0);
+        int rot_c = (int)(fmod(t * 0.09, 256.0) * 64.0);
+        int fly_c = (int)(fmod(t * 0.42, 256.0) * 64.0);
         /* checker-domain accumulators (mod 42 u-units = 2688 in x64) */
-        int rot_k = (int)fmod(t * 0.12 * 64.0, 2688.0);
-        int fly_k = (int)fmod(t * 0.9 * 64.0, 2688.0);
+        int rot_k = (int)fmod(t * 0.09 * 64.0, 2688.0);
+        int fly_k = (int)fmod(t * 0.42 * 64.0, 2688.0);
         int dt = (int)fmod(t * 0.01 * (1024.0 / (2.0 * M_PI)), 1024.0);
         for (i = 0; i < n; i++) {
             int s = p61_sin[(p61_wob[i] + dt) & 1023];

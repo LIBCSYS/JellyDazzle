@@ -91,21 +91,21 @@ void pattern_011(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     if (!init_done) { init_(); init_done = 1; }
     float t = (float)frame;
-    int ri = (int)(t * 0.004f * RAD2IDX);
-    float t1 = t * 0.021f, t2 = t * 0.017f, t3 = t * 0.013f, t4 = t * 0.019f;
-    float tv1 = t * 0.011f, tv2 = t * 0.008f;
-    float hueT = t * 0.0009f + (float)(seed & 1023u) * 0.000976f;
+    int ri = (int)(t * 0.0022f * RAD2IDX);
+    float t1 = t * 0.0105f, t2 = t * 0.0085f, t3 = t * 0.0065f, t4 = t * 0.0095f;
+    float tv1 = t * 0.0055f, tv2 = t * 0.0040f;
+    float hueT = t * 0.0005f + (float)(seed & 1023u) * 0.000976f;
     for (int i = 0; i < LW * LH; i++) {
         float r = rtab[i];
         int ai = (atab[i] + ri) & SMASK;
         float u = r * c6[ai], v = r * s6[ai];
         float c = s_sin(u * 0.046f + t1) + s_sin(v * 0.071f - t2)
                 + s_sin((u + v) * 0.038f + t3) + s_sin(r * 0.052f - t4);
-        float val = 0.46f + 0.36f * s_cos(c * 1.9f - tv1)
+        float val = 0.46f + 0.36f * s_cos(c * 1.15f - tv1)
                   + 0.16f * s_cos(r * 0.03f - tv2);
         if (val < 0.06f) val = 0.06f;
         if (val > 1.0f) val = 1.0f;
-        int idx = fold15((int)((c * 0.14f + hueT) * 65536.0f));
+        int idx = fold15((int)((c * 0.10f + hueT) * 65536.0f));
         lbuf[i] = shade_(pal[idx & JD_PAL_MASK], (unsigned)(val * 256.0f));
     }
     upscale_(fb, w, h);

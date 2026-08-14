@@ -1,156 +1,192 @@
 /* pattern_031 — Spirograph Bloom
  * Port of lab/patterns/031_spirograph_bloom/proto.py
- * Hypotrochoid with breathing gear ratio, D6 (6 rot x mirror) symmetry,
- * accumulated at 320x240 with exponential age fade, tone-mapped and
- * bilinearly upscaled to the framebuffer. Hue maps to the cyclic palette. */
+ * Hypotrochoid with breathing gear ratio q and pen offset d, deposited with
+ * D6 symmetry (6 rotations x y-mirror = 12 copies) into a 320x240 weight
+ * accumulator with exponential age fade, then 1-2-1 blurred, tone-mapped
+ * through 1-exp(-a*gain), vignette-blended and bilinearly upscaled.
+ * Hue rides the palette ring: a second accumulator carries weight*hue so the
+ * per-pixel mean hue survives the accumulation. Accumulator pattern. */
 #include "../jellydazzle.h"
 #include <math.h>
 #include <string.h>
 
 #define P31_AW   320
 #define P31_AH   240
-#define P31_N    (P31_AW * P31_AH)
-#define P31_BASE 260
+#define P31_AN   (P31_AW * P31_AH)
+#define P31_MAXD 4096
 #define P31_SUB  36
+#define P31_BASE 260
 #define P31_TAU  380.0f
 #define P31_GAIN 0.16f
-#define P31_TWOPI 6.283185307179586f
+#define P31_SAT  0.95f        /* proto HSV saturation */
+#define P31_TSC  585.14f          /* 4096/7 : tone LUT index scale */
 
-static float    p31_aw[P31_N];   /* weight accumulator            */
-static float    p31_hs[P31_N];   /* weight * sin(2*pi*hue)        */
-static float    p31_hc[P31_N];   /* weight * cos(2*pi*hue)        */
-static float    p31_bl[P31_N];   /* h-blurred copy of p31_aw      */
-static uint32_t p31_low[P31_N];  /* composed low-res ARGB         */
-static uint8_t  p31_tone[4096];
-static uint8_t  p31_vig[P31_N];
-static float    p31_secc[6], p31_secs[6];
+static float    p31_aw[P31_AN];   /* weight accumulator      */
+static float    p31_ah[P31_AN];   /* weight * hue            */
+static float    p31_bw[P31_AN];   /* h-blurred weight        */
+static float    p31_bh[P31_AN];   /* h-blurred weight*hue    */
+static uint32_t p31_low[P31_AN];
+static uint8_t  p31_bg[P31_AN * 3];
+static uint8_t  p31_lin[4096];
+static uint8_t  p31_gam[256];
+static float    p31_sc[6], p31_ss[6];
 static int      p31_ready = 0;
-static int      p31_last_sl = -2;
-static double   p31_n = 0.0;     /* substep counter               */
+static int      p31_lastsl = -1000;
+static double   p31_n = 0.0;
+static int      p31_uw = -1, p31_uh = -1;
+static int32_t  p31_x0[P31_MAXD], p31_y0[P31_MAXD];
+static uint8_t  p31_fx[P31_MAXD], p31_fy[P31_MAXD];
 
-static void p31_static_init(void) {
-    for (int i = 0; i < 4096; i++) {
-        double v = 1.0 - exp(-(double)i * 7.0 / 4096.0);
-        p31_tone[i] = (uint8_t)(pow(v, 0.85) * 255.0 + 0.5);
-    }
+static void p31_tabs(void) {
+    for (int i = 0; i < 4096; i++)
+        p31_lin[i] = (uint8_t)((1.0 - exp(-(double)i * 7.0 / 4096.0)) * 255.0 + 0.5);
+    for (int i = 0; i < 256; i++)
+        p31_gam[i] = (uint8_t)(pow((double)i / 255.0, 0.85) * 255.0 + 0.5);
     for (int y = 0; y < P31_AH; y++)
         for (int x = 0; x < P31_AW; x++) {
             double dx = (x - P31_AW * 0.5) / P31_AW;
             double dy = (y - P31_AH * 0.5) / P31_AH;
-            p31_vig[y * P31_AW + x] =
-                (uint8_t)(exp(-(dx * dx + dy * dy) * 3.0) * 255.0);
+            double e = exp(-(dx * dx + dy * dy) * 3.0) * 255.0;
+            int i = (y * P31_AW + x) * 3;
+            p31_bg[i + 0] = (uint8_t)(e * 0.04 + 0.5);
+            p31_bg[i + 1] = (uint8_t)(e * 0.01 + 0.5);
+            p31_bg[i + 2] = (uint8_t)(e * 0.07 + 0.5);
         }
     for (int k = 0; k < 6; k++) {
-        double a = k * (3.141592653589793 / 3.0);
-        p31_secc[k] = (float)cos(a);
-        p31_secs[k] = (float)sin(a);
+        double a = k * (3.14159265358979 / 3.0);
+        p31_sc[k] = (float)cos(a);
+        p31_ss[k] = (float)sin(a);
     }
     p31_ready = 1;
 }
 
-static void p31_splat(float x, float y, float s, float c, float w) {
-    int xi = (int)floorf(x + 0.5f), yi = (int)floorf(y + 0.5f);
-    if (xi < 0 || xi >= P31_AW || yi < 0 || yi >= P31_AH) return;
+static void p31_splat(int xi, int yi, float w, float hw) {
+    if ((unsigned)xi >= (unsigned)P31_AW || (unsigned)yi >= (unsigned)P31_AH) return;
     int i = yi * P31_AW + xi;
     p31_aw[i] += w;
-    p31_hs[i] += w * s;
-    p31_hc[i] += w * c;
+    p31_ah[i] += hw;
 }
 
 static void p31_emit(double n, float w) {
     double th = n * 0.11;
-    double q  = 2.5 + 1.2 * sin(n * 0.0021);
+    double q  = 2.5  + 1.2  * sin(n * 0.0021);
     double d  = 0.35 + 0.25 * sin(n * 0.0009 + 1.7);
     float  x  = (float)(55.2 * cos(th) + 92.0 * d * cos(q * th));
     float  y  = (float)(55.2 * sin(th) - 92.0 * d * sin(q * th));
-    float  hu = (float)(th * 0.0028) * P31_TWOPI;
-    float  hsn = sinf(hu), hcs = cosf(hu);
+    float  hw = (float)(th * 0.0028) * w;
+    const float ox = P31_AW * 0.5f, oy = P31_AH * 0.5f;
     for (int k = 0; k < 6; k++) {
-        float ck = p31_secc[k], sk = p31_secs[k];
-        for (int m = 0; m < 2; m++) {
-            float yy = m ? -y : y;
-            p31_splat(x * ck - yy * sk + P31_AW * 0.5f,
-                      x * sk + yy * ck + P31_AH * 0.5f, hsn, hcs, w);
-        }
+        float c = p31_sc[k], s = p31_ss[k];
+        float ax = x * c - y * s, ay = x * s + y * c;
+        float bx = x * c + y * s, by = x * s - y * c;
+        p31_splat((int)lrintf(ax + ox), (int)lrintf(ay + oy), w, hw);
+        p31_splat((int)lrintf(bx + ox), (int)lrintf(by + oy), w, hw);
     }
 }
 
-static void p31_compose(int tt) {
-    /* horizontal 1-2-1 blur of the weight plane */
+static void p31_hblur(void) {
     for (int y = 0; y < P31_AH; y++) {
-        const float *r = p31_aw + y * P31_AW;
-        float *o = p31_bl + y * P31_AW;
-        o[0] = 0.75f * r[0] + 0.25f * r[1];
-        for (int x = 1; x < P31_AW - 1; x++)
-            o[x] = 0.5f * r[x] + 0.25f * (r[x - 1] + r[x + 1]);
-        o[P31_AW - 1] = 0.75f * r[P31_AW - 1] + 0.25f * r[P31_AW - 2];
+        const float *rw = p31_aw + y * P31_AW, *rh = p31_ah + y * P31_AW;
+        float *ow = p31_bw + y * P31_AW, *oh = p31_bh + y * P31_AW;
+        ow[0] = 0.75f * rw[0] + 0.25f * rw[1];
+        oh[0] = 0.75f * rh[0] + 0.25f * rh[1];
+        for (int x = 1; x < P31_AW - 1; x++) {
+            ow[x] = 0.5f * rw[x] + 0.25f * (rw[x - 1] + rw[x + 1]);
+            oh[x] = 0.5f * rh[x] + 0.25f * (rh[x - 1] + rh[x + 1]);
+        }
+        ow[P31_AW - 1] = 0.75f * rw[P31_AW - 1] + 0.25f * rw[P31_AW - 2];
+        oh[P31_AW - 1] = 0.75f * rh[P31_AW - 1] + 0.25f * rh[P31_AW - 2];
     }
-    const float tscale = 4096.0f * P31_GAIN / 7.0f;
-    const float off = (float)(tt * 0.0007);              /* global hue drift */
-    const float h2i = 32768.0f / P31_TWOPI;
-    const int   ioff = (int)(off * 32768.0f);
-    /* bg vignette color 0.04,0.01,0.07 */
-    const int bgr = 10, bgg = 3, bgb = 18;
+}
+
+static void p31_compose(const uint32_t *pal, float hoff) {
+    p31_hblur();
     for (int y = 0; y < P31_AH; y++) {
         int yu = y ? y - 1 : 0, yd = (y < P31_AH - 1) ? y + 1 : y;
+        const float *cw = p31_bw + y * P31_AW, *uw = p31_bw + yu * P31_AW,
+                    *dw = p31_bw + yd * P31_AW;
+        const float *ch = p31_bh + y * P31_AW, *uh = p31_bh + yu * P31_AW,
+                    *dh = p31_bh + yd * P31_AW;
+        uint32_t *out = p31_low + y * P31_AW;
+        const uint8_t *bg = p31_bg + y * P31_AW * 3;
         for (int x = 0; x < P31_AW; x++) {
-            int i = y * P31_AW + x;
-            float a = 0.5f * p31_bl[i]
-                    + 0.25f * (p31_bl[yu * P31_AW + x] + p31_bl[yd * P31_AW + x]);
-            int ti = (int)(a * tscale);
-            if (ti > 4095) ti = 4095;
-            int v8 = p31_tone[ti];
-            int idx = ((int)(atan2f(p31_hs[i], p31_hc[i]) * h2i) + ioff) & 32767;
-            uint32_t c = ((const uint32_t *)p31_pal)[idx];
-            int r = (((c >> 16) & 255) * v8) >> 8;
-            int g = (((c >> 8) & 255) * v8) >> 8;
-            int b = ((c & 255) * v8) >> 8;
-            if (v8 > 200) {                        /* white-hot core */
-                int f = ((v8 - 200) * 255 / 55 * 200) >> 8;
-                r += ((255 - r) * f) >> 8;
-                g += ((255 - g) * f) >> 8;
-                b += ((255 - b) * f) >> 8;
+            float a = 0.5f * cw[x] + 0.25f * (uw[x] + dw[x]);
+            float hh = 0.5f * ch[x] + 0.25f * (uh[x] + dh[x]);
+            float hue = (a > 1e-6f) ? hh / a : 0.0f;
+            int idx = (int)((hue + hoff) * 32768.0f) & JD_PAL_MASK;
+            uint32_t c = pal[idx];
+            int pr = (c >> 16) & 255, pg = (c >> 8) & 255, pb = c & 255;
+            int m = pr > pg ? pr : pg; if (pb > m) m = pb;
+            int lo = pr < pg ? pr : pg; if (pb < lo) lo = pb;
+            /* Re-cast the palette entry as an HSV colour of value 1 and the
+               proto's saturation S:  c' = (1-S) + S*(c-lo)/(m-lo)          */
+            float base = a * P31_GAIN * P31_TSC;
+            int tr, tg, tb;
+            if (m - lo < 1) { tr = tg = tb = (int)base; }
+            else {
+                float k1 = base * (1.0f - P31_SAT);
+                float k2 = base * P31_SAT / (float)(m - lo);
+                tr = (int)(k1 + k2 * (pr - lo));
+                tg = (int)(k1 + k2 * (pg - lo));
+                tb = (int)(k1 + k2 * (pb - lo));
             }
-            int vg = p31_vig[i];
-            r += ((255 - r) * vg * bgr) >> 16;
-            g += ((255 - g) * vg * bgg) >> 16;
-            b += ((255 - b) * vg * bgb) >> 16;
-            p31_low[i] = 0xFF000000u | (r << 16) | (g << 8) | b;
+            if (tr > 4095) tr = 4095; if (tg > 4095) tg = 4095; if (tb > 4095) tb = 4095;
+            int vr = p31_lin[tr], vg = p31_lin[tg], vb = p31_lin[tb];
+            vr += ((255 - vr) * bg[x * 3 + 0]) >> 8;
+            vg += ((255 - vg) * bg[x * 3 + 1]) >> 8;
+            vb += ((255 - vb) * bg[x * 3 + 2]) >> 8;
+            out[x] = 0xFF000000u | ((uint32_t)p31_gam[vr] << 16)
+                   | ((uint32_t)p31_gam[vg] << 8) | p31_gam[vb];
         }
     }
 }
 
-static const uint32_t *p31_pal; /* set per call before compose */
-
-static uint32_t p31_lerp2(uint32_t a, uint32_t b, int f) {
-    uint32_t rb = ((((a & 0xFF00FFu) * (256 - f)) + ((b & 0xFF00FFu) * f)) >> 8)
-                  & 0xFF00FFu;
-    uint32_t g  = ((((a & 0x00FF00u) * (256 - f)) + ((b & 0x00FF00u) * f)) >> 8)
-                  & 0x00FF00u;
+static uint32_t p31_lerp(uint32_t a, uint32_t b, int f) {
+    uint32_t rb = ((((a & 0xFF00FFu) * (256 - f)) + ((b & 0xFF00FFu) * f)) >> 8) & 0xFF00FFu;
+    uint32_t g  = ((((a & 0x00FF00u) * (256 - f)) + ((b & 0x00FF00u) * f)) >> 8) & 0x00FF00u;
     return rb | g;
 }
 
+static void p31_utab(int w, int h) {
+    for (int x = 0; x < w && x < P31_MAXD; x++) {
+        long f = ((long)(2 * x + 1) * P31_AW << 15) / w - (1L << 15);
+        if (f < 0) f = 0;
+        long mx = ((long)(P31_AW - 1)) << 16; if (f > mx) f = mx;
+        p31_x0[x] = (int32_t)(f >> 16);
+        p31_fx[x] = (uint8_t)((f >> 8) & 255);
+    }
+    for (int y = 0; y < h && y < P31_MAXD; y++) {
+        long f = ((long)(2 * y + 1) * P31_AH << 15) / h - (1L << 15);
+        if (f < 0) f = 0;
+        long my = ((long)(P31_AH - 1)) << 16; if (f > my) f = my;
+        p31_y0[y] = (int32_t)(f >> 16);
+        p31_fy[y] = (uint8_t)((f >> 8) & 255);
+    }
+    p31_uw = w; p31_uh = h;
+}
+
 static void p31_upscale(uint32_t *fb, int w, int h) {
+    static uint32_t row[P31_AW];
+    if (w > P31_MAXD || h > P31_MAXD) {          /* fallback: nearest */
+        for (int y = 0; y < h; y++) {
+            const uint32_t *s = p31_low + (y * P31_AH / h) * P31_AW;
+            uint32_t *d = fb + (long)y * w;
+            for (int x = 0; x < w; x++) d[x] = s[x * P31_AW / w];
+        }
+        return;
+    }
+    if (w != p31_uw || h != p31_uh) p31_utab(w, h);
     for (int y = 0; y < h; y++) {
-        long fy = ((long)(2 * y + 1) * P31_AH << 15) / h - (1L << 15);
-        if (fy < 0) fy = 0;
-        long fymax = ((long)(P31_AH - 1)) << 16;
-        if (fy > fymax) fy = fymax;
-        int y0 = (int)(fy >> 16), wy = (int)((fy >> 8) & 255);
+        int y0 = p31_y0[y], fy = p31_fy[y];
         int y1 = (y0 < P31_AH - 1) ? y0 + 1 : y0;
-        const uint32_t *r0 = p31_low + y0 * P31_AW;
-        const uint32_t *r1 = p31_low + y1 * P31_AW;
-        uint32_t *dst = fb + (long)y * w;
+        const uint32_t *r0 = p31_low + y0 * P31_AW, *r1 = p31_low + y1 * P31_AW;
+        if (fy) for (int i = 0; i < P31_AW; i++) row[i] = p31_lerp(r0[i], r1[i], fy);
+        else    memcpy(row, r0, sizeof row);
+        uint32_t *d = fb + (long)y * w;
         for (int x = 0; x < w; x++) {
-            long fx = ((long)(2 * x + 1) * P31_AW << 15) / w - (1L << 15);
-            if (fx < 0) fx = 0;
-            long fxmax = ((long)(P31_AW - 1)) << 16;
-            if (fx > fxmax) fx = fxmax;
-            int x0 = (int)(fx >> 16), wx = (int)((fx >> 8) & 255);
+            int x0 = p31_x0[x];
             int x1 = (x0 < P31_AW - 1) ? x0 + 1 : x0;
-            uint32_t top = p31_lerp2(r0[x0], r0[x1], wx);
-            uint32_t bot = p31_lerp2(r1[x0], r1[x1], wx);
-            dst[x] = 0xFF000000u | p31_lerp2(top, bot, wy);
+            d[x] = 0xFF000000u | p31_lerp(row[x0], row[x1], p31_fx[x]);
         }
     }
 }
@@ -158,25 +194,26 @@ static void p31_upscale(uint32_t *fb, int w, int h) {
 void pattern_031(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     (void)frame;
-    if (!p31_ready) p31_static_init();
-    if (sl != p31_last_sl + 1) {                    /* segment (re)start */
+    if (!p31_ready) p31_tabs();
+    if (sl < 2 || sl != p31_lastsl + 1) {
         memset(p31_aw, 0, sizeof p31_aw);
-        memset(p31_hs, 0, sizeof p31_hs);
-        memset(p31_hc, 0, sizeof p31_hc);
-        p31_n = (double)(seed & 8191);
-        for (int f = 0; f < P31_BASE; f++) {        /* warm start */
-            float wgt = expf(-(float)(P31_BASE - f) / P31_TAU);
-            for (int i = 0; i < P31_SUB; i++) { p31_emit(p31_n, wgt); p31_n += 1.0; }
+        memset(p31_ah, 0, sizeof p31_ah);
+        p31_n = (double)(seed & 2047u);
+        for (int f = 0; f < P31_BASE; f++) {
+            float wg = expf(-(float)(P31_BASE - f) / P31_TAU);
+            for (int i = 0; i < P31_SUB; i++) {
+                p31_emit(p31_n + (double)i / P31_SUB, wg);
+            }
+            p31_n += 1.0;
         }
     } else {
-        const float K = 0.99737189f;                /* exp(-1/380) */
-        for (int i = 0; i < P31_N; i++) {
-            p31_aw[i] *= K; p31_hs[i] *= K; p31_hc[i] *= K;
-        }
-        for (int i = 0; i < P31_SUB; i++) { p31_emit(p31_n, 1.0f); p31_n += 1.0; }
+        const float K = 0.99737189f;               /* exp(-1/380) */
+        for (int i = 0; i < P31_AN; i++) { p31_aw[i] *= K; p31_ah[i] *= K; }
+        for (int i = 0; i < P31_SUB; i++)
+            p31_emit(p31_n + (double)i / P31_SUB, 1.0f);
+        p31_n += 1.0;
     }
-    p31_last_sl = sl;
-    p31_pal = pal;
-    p31_compose(sl + P31_BASE);
+    p31_lastsl = sl;
+    p31_compose(pal, (float)(p31_n * 0.0007));
     p31_upscale(fb, w, h);
 }
