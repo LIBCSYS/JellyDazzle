@@ -1,26 +1,27 @@
 // ============================================================
-// draw.s — ARM64 (Apple Silicon) — step 10: COLOR SATELLITES
+// draw.s — ARM64 (Apple Silicon) — step 11: MODE ENGINE
 //
 // void draw_frame(uint32_t *fb, int width, int height, int frame);
 //
-// From step 9 (kept): interpolated 16-bit clocks (Lsin16) — all
-// motion glides; 6-scheme palette with per-pixel crossfade
-// (jewels -> ember -> royal -> gilded -> ice -> spring).
-// Changed on J's review:
-//   - suit-morph SDF centerpiece DROPPED (read low-rez/off-look)
-//   - satellite spots are now SHAPES: sat1 orbits as squares
-//     (Chebyshev ring), sat2 as diamonds (L1 ring) — both turn
-//     with the global spin because they live in rotated space
-//   - every accent gets its OWN palette-driven color that drifts
-//     with the flow and crossfades with the scheme: ring, square
-//     satellites, diamond satellites, spokes — no more fixed
-//     white/silver/slate. Accents are auto-lightened to pop.
+// Like the original dazzle.exe, the app now runs multiple drawing
+// ROUTINES and switches between them (~34s per mode, hard cut,
+// original style):
+//   mode 1 — COLOR SATELLITES (step 10): calm interference field,
+//            breathing ring, square + diamond satellites
+//   mode 2 — THE TWIST (step 8, resurrected): angle grows with
+//            radius so everything shears into spiral pinwheel
+//            arms; ripple rings crawl through dense bands;
+//            circle satellites
+// Both modes share the step-9/10 toolkit the DOS original never
+// had: interpolated 16-bit clocks (Lsin16), the 6-scheme palette
+// with per-pixel crossfade, and drifting jewel-tone accents.
 //
 // Register pantry (callee-saved, stacked in prologue):
-//   x19 sintab | x20/x21 palette A/B | w25 fade | w27 flow |
-//   w28 256-fade
+//   x19 sintab | x20/x21 palette A/B | w24 D32 (diamond, mode 2)
+//   w25 fade | w26 twist spin Q8 | w27 flow | w28 256-fade
 // FP pantry: s1,s2 sat1 | s3 ring radius | s4/s5 spin cos/sin |
-//   s6,s7 sat2 | s16 ring stash | s20 ring color |
+//   s6,s7 sat2 | s16 in-loop ring stash | s17 twistiness |
+//   s18 ripple phase | s19 mode flag | s20 ring color |
 //   s21 sat1 color | s22 sat2 color | s23 spoke color
 // Loop-persistent: w14 S (square field) | w15 R32
 // ============================================================
@@ -39,6 +40,10 @@ _draw_frame:
 
     adrp    x19, sintab@PAGE
     add     x19, x19, sintab@PAGEOFF
+
+    // ---- mode select: (frame>>11)&1 — ~34s each, hard cut ----
+    ubfx    w9, w3, #11, #1
+    fmov    s19, w9
 
     // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
     lsl     w9, w3, #4
@@ -68,6 +73,28 @@ _draw_frame:
     sub     w14, w10, w16               // S = base - osc
     lsl     w12, w10, #2
     fmov    s3, w12                     // satellite ring radius
+
+    // ---- quarter-phase pulse -> D32 (mode 2 diamond field) ----
+    mov     w17, w10                    // save base across the call
+    lsl     w9, w3, #4
+    movz    w10, #21845
+    add     w9, w9, w10
+    add     w9, w9, #16384
+    bl      Lsin16
+    mul     w12, w12, w11               // oscQ = cos * amp
+    asr     w12, w12, #14
+    add     w12, w17, w12               // D = base + oscQ
+    lsl     w24, w12, #5                // D32
+
+    // ---- twist controls (mode 2) ----
+    lsl     w26, w3, #6                 // twist spin, Q8 idx (~17s/rev)
+    lsl     w9, w3, #1                  // twistiness clock (~9min)
+    bl      Lsin16
+    asr     w12, w12, #11               // -8..8
+    add     w12, w12, #10               // twistiness 2..18
+    fmov    s17, w12
+    lsr     w9, w3, #1                  // ripple phase: crawls at half rate
+    fmov    s18, w9
 
     // ---- satellite 1: orbit=base, ~34s, smooth ----
     lsl     w9, w3, #5
@@ -144,8 +171,6 @@ _draw_frame:
     lsl     w27, w3, #5                 // color flow phase
 
     // ---- accent colors: 4 drifting taps from the JEWELS palette ----
-    // (always scheme 0 = multicolor: guaranteed distinct hues even
-    //  when the field scheme is monochrome like gilded/ember)
     lsl     w10, w3, #2                 // accent drift: 4 idx/frame
     and     w10, w10, #0x7FFF
     bl      Lpalmix
@@ -154,13 +179,13 @@ _draw_frame:
     add     w10, w10, #8192
     and     w10, w10, #0x7FFF
     bl      Lpalmix
-    fmov    s21, w11                    // sat1 (squares) color
+    fmov    s21, w11                    // sat1 color
     lsl     w10, w3, #2
     movz    w12, #16384
     add     w10, w10, w12
     and     w10, w10, #0x7FFF
     bl      Lpalmix
-    fmov    s22, w11                    // sat2 (diamonds) color
+    fmov    s22, w11                    // sat2 color
     lsl     w10, w3, #2
     movz    w12, #24576
     add     w10, w10, w12
@@ -172,13 +197,21 @@ _draw_frame:
     lsr     w6, w2, #1                  // cy
 
     mov     w3, #0                      // y (frame consumed)
-Ly_loop:
+
+    // ================== DISPATCH ==================
+    fmov    w9, s19
+    cbnz    w9, L2y_loop                // mode 2: THE TWIST
+
+// ============================================================
+// MODE 1 — COLOR SATELLITES (step 10 routine)
+// ============================================================
+L1y_loop:
     cmp     w3, w2
     b.ge    Ldone
     mov     w4, #0
-Lx_loop:
+L1x_loop:
     cmp     w4, w1
-    b.ge    Lnext_row
+    b.ge    L1next_row
 
     // ---- rotate (smooth spin) ----
     sub     w7, w4, w5
@@ -259,57 +292,210 @@ Lx_loop:
     add     w10, w10, w7
     sub     w10, w10, w8
     sub     w10, w10, w17
-    asr     w10, w10, #1
+    asr     w10, w10, #1                // calm density
     add     w10, w10, w27
     and     w10, w10, #0x7FFF
 
     // ---- two-scheme palette crossfade ----
-    ldr     w9,  [x20, w10, uxtw #2]    // cA (zero-extends)
-    ldr     w11, [x21, w10, uxtw #2]    // cB
+    ldr     w9,  [x20, w10, uxtw #2]
+    ldr     w11, [x21, w10, uxtw #2]
     and     w12, w9,  #0x00FF00FF
     and     w13, w11, #0x00FF00FF
     mul     x12, x12, x28
     mul     x13, x13, x25
     add     x12, x12, x13
     lsr     x12, x12, #8
-    and     w12, w12, #0x00FF00FF       // blended R|B
+    and     w12, w12, #0x00FF00FF
     and     w9,  w9,  #0x0000FF00
     and     w11, w11, #0x0000FF00
     mul     x9,  x9,  x28
     mul     x11, x11, x25
     add     x9,  x9,  x11
     lsr     x9,  x9,  #8
-    and     w9,  w9,  #0x0000FF00       // blended G
+    and     w9,  w9,  #0x0000FF00
     orr     w11, w12, w9
     orr     w11, w11, #0xFF000000
 
-    // ---- accents: each element in its own drifting color ----
+    // ---- accents: ring + spokes (satellite outlines removed —
+    //      the satellites persist as smooth field-warps only) ----
     fmov    w9, s16
     cmp     w9, #64                     // breathing circle
-    b.gt    Lacc_sat1
+    b.gt    L1acc_spoke
     fmov    w11, s20
-Lacc_sat1:
-    cmp     w7, #48                     // square satellites
-    b.gt    Lacc_sat2
-    fmov    w11, s21
-Lacc_sat2:
-    cmp     w8, #48                     // diamond satellites
-    b.gt    Lacc_spoke
-    fmov    w11, s22
-Lacc_spoke:
+L1acc_spoke:
     cmp     w17, #16                    // spokes
-    b.gt    Lput_pixel
+    b.gt    L1put_pixel
     fmov    w11, s23
 
-Lput_pixel:
+L1put_pixel:
     madd    w13, w3, w1, w4
     str     w11, [x0, w13, uxtw #2]
     add     w4, w4, #1
-    b       Lx_loop
+    b       L1x_loop
 
-Lnext_row:
+L1next_row:
     add     w3, w3, #1
-    b       Ly_loop
+    b       L1y_loop
+
+// ============================================================
+// MODE 2 — THE TWIST (step 8 routine, on the step-10 toolkit)
+// angle = spin + r*twistiness: the center outruns the rim and
+// every field shears into spiral arms. Ripple rings crawl
+// through the bands. Dense mix (no /2). Circle satellites.
+// ============================================================
+L2y_loop:
+    cmp     w3, w2
+    b.ge    Ldone
+    mov     w4, #0
+L2x_loop:
+    cmp     w4, w1
+    b.ge    L2next_row
+
+    sub     w7, w4, w5                  // dx
+    sub     w8, w3, w6                  // dy
+
+    // ---- radius FIRST (rotation-invariant) ----
+    mul     w12, w7, w7
+    madd    w12, w8, w8, w12
+    lsl     w12, w12, #10
+    scvtf   s0, w12
+    fsqrt   s0, s0
+    fcvtzs  w12, s0                     // r32 (keep!)
+
+    // ============ THE TWIST ============
+    fmov    w9, s17                     // twistiness
+    mul     w9, w12, w9
+    asr     w9, w9, #4                  // Q8 angle contribution
+    add     w9, w9, w26                 // + smooth spin Q8
+    lsr     w9, w9, #8
+    and     w9, w9, #255
+    ldr     w10, [x19, w9, uxtw #2]     // sin(angle)
+    add     w9, w9, #64
+    and     w9, w9, #255
+    ldr     w9, [x19, w9, uxtw #2]      // cos(angle)
+    mul     w11, w7, w9
+    mul     w13, w8, w10
+    sub     w11, w11, w13
+    asr     w11, w11, #14               // rx
+    mul     w13, w7, w10
+    madd    w13, w8, w9, w13
+    asr     w13, w13, #14               // ry
+    // ===================================
+
+    // ---- fold into the octant ----
+    cmp     w11, #0
+    cneg    w11, w11, lt
+    cmp     w13, #0
+    cneg    w13, w13, lt
+    cmp     w11, w13
+    csel    w9,  w11, w13, ge           // u
+    csel    w10, w13, w11, ge           // v
+
+    // ---- RIPPLE: sin(r) seeds the mix accumulator ----
+    lsr     w17, w12, #5
+    fmov    w13, s18
+    add     w17, w17, w13
+    and     w17, w17, #255
+    ldr     w17, [x19, w17, uxtw #2]    // -16384..16384
+    asr     w16, w17, #4                // acc = ripple (-1024..1024)
+
+    // ---- circle field (consumes r32) ----
+    sub     w12, w12, w15
+    cmp     w12, #0
+    cneg    w12, w12, lt                // dc32
+    fmov    s16, w12                    // stash for accent
+    add     w16, w16, w12
+
+    // ---- diamond field ----
+    add     w13, w9, w10
+    lsl     w13, w13, #5
+    sub     w13, w13, w24               // - D32
+    cmp     w13, #0
+    cneg    w13, w13, lt
+    add     w16, w16, w13
+
+    // ---- square field ----
+    sub     w13, w9, w14
+    cmp     w13, #0
+    cneg    w13, w13, lt
+    add     w16, w16, w13, lsl #5
+
+    // ---- spokes ----
+    sub     w16, w16, w10, lsl #5
+
+    // ---- satellite 1: circle (L2), original style ----
+    fmov    w7, s1
+    sub     w7, w9, w7
+    fmov    w8, s2
+    sub     w8, w10, w8
+    mul     w7, w7, w7
+    madd    w7, w8, w8, w7
+    lsl     w7, w7, #10
+    scvtf   s0, w7
+    fsqrt   s0, s0
+    fcvtzs  w7, s0
+    fmov    w8, s3
+    sub     w7, w7, w8
+    cmp     w7, #0
+    cneg    w7, w7, lt                  // dsat1
+    add     w16, w16, w7
+
+    // ---- satellite 2: circle ----
+    fmov    w8, s6
+    sub     w8, w9, w8
+    fmov    w17, s7
+    sub     w17, w10, w17
+    mul     w8, w8, w8
+    madd    w8, w17, w17, w8
+    lsl     w8, w8, #10
+    scvtf   s0, w8
+    fsqrt   s0, s0
+    fcvtzs  w8, s0
+    fmov    w17, s3
+    sub     w8, w8, w17
+    cmp     w8, #0
+    cneg    w8, w8, lt                  // dsat2
+    sub     w16, w16, w8
+
+    // ---- dense mix (no /2) + flow -> palette index ----
+    add     w10, w16, w27
+    and     w10, w10, #0x7FFF
+
+    // ---- two-scheme palette crossfade ----
+    ldr     w9,  [x20, w10, uxtw #2]
+    ldr     w11, [x21, w10, uxtw #2]
+    and     w12, w9,  #0x00FF00FF
+    and     w13, w11, #0x00FF00FF
+    mul     x12, x12, x28
+    mul     x13, x13, x25
+    add     x12, x12, x13
+    lsr     x12, x12, #8
+    and     w12, w12, #0x00FF00FF
+    and     w9,  w9,  #0x0000FF00
+    and     w11, w11, #0x0000FF00
+    mul     x9,  x9,  x28
+    mul     x11, x11, x25
+    add     x9,  x9,  x11
+    lsr     x9,  x9,  #8
+    and     w9,  w9,  #0x0000FF00
+    orr     w11, w12, w9
+    orr     w11, w11, #0xFF000000
+
+    // ---- accent: breathing ring only ----
+    fmov    w9, s16
+    cmp     w9, #64
+    b.gt    L2put_pixel
+    fmov    w11, s20
+
+L2put_pixel:
+    madd    w13, w3, w1, w4
+    str     w11, [x0, w13, uxtw #2]
+    add     w4, w4, #1
+    b       L2x_loop
+
+L2next_row:
+    add     w3, w3, #1
+    b       L2y_loop
 
 Ldone:
     ldp     x27, x28, [sp], #16
@@ -343,8 +529,8 @@ Lsin16:
 // clobbers w12, x13.
 // ------------------------------------------------------------
 Lpalmix:
-    adrp    x13, palette@PAGE           // self-contained base: the
-    add     x13, x13, palette@PAGEOFF   //   'mov w9,#256' upstream wipes x9
+    adrp    x13, palette@PAGE           // self-contained base
+    add     x13, x13, palette@PAGEOFF
     ldr     w11, [x13, w10, uxtw #2]    // jewels tap
     movz    w13, #0x7F7F
     movk    w13, #0x007F, lsl #16
