@@ -162,7 +162,7 @@ _draw_frame:
     //      fade ends where the next begins — continuous, random) ----
     adrp    x9, palette@PAGE
     add     x9, x9, palette@PAGEOFF
-    mov     w13, #120                    // JD_SCHEMES: generated, see palette_count.h (scheme count)
+    mov     w13, #180                    // JD_SCHEMES: generated, see palette_count.h (scheme count)
     lsr     w16, w3, #10                // color leg p
     movz    w10, #0x79B1
     movk    w10, #0x9E37, lsl #16

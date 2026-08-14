@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.1-ffb02e?style=flat-square" alt="version 2.1.0">
+  <img src="https://img.shields.io/badge/version-2.3.0-ffb02e?style=flat-square" alt="version 2.1.0">
   <img src="https://img.shields.io/badge/routines-225-52e0ff?style=flat-square" alt="225 routines">
   <img src="https://img.shields.io/badge/audio-reactive-ff7ad9?style=flat-square" alt="audio reactive">
   <img src="https://img.shields.io/badge/patterns-201-ff5ec8?style=flat-square" alt="201 patterns">
-  <img src="https://img.shields.io/badge/palettes-100-a0e060?style=flat-square" alt="100 palettes">
+  <img src="https://img.shields.io/badge/palettes-180-a0e060?style=flat-square" alt="100 palettes">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-lightgrey?style=flat-square" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
 </p>
@@ -105,6 +105,52 @@ or transmitted: audio is analysed in memory, frame by frame, and discarded. With
 no microphone or in silence the values decay to zero and the engine runs on its
 own clocks exactly as before.
 
+## How the audio works
+
+```
+microphone ──► ring buffer ──► 512-point FFT ──► envelopes ──► the engine
+   (SDL)        (callback       (per frame,      (fast attack,   (colour,
+                 copies only)    ~30 µs)          slow release)   layers, timing)
+```
+
+**Capture.** SDL opens a real input device — explicitly by name, because the
+system default is often a virtual device (Teams, Zoom, a disconnected webcam)
+that delivers digital silence forever. `JD_AUDIO_DEV=n` overrides the choice.
+The capture callback does nothing but copy samples into a ring buffer.
+
+**Analysis,** once per frame: a Hann-windowed 512-point FFT, split into
+**bass** (~86–260 Hz), **mid** (~350 Hz–2 kHz) and **treble** (2 kHz+), plus
+overall RMS. Onsets come from **spectral flux** — the sum of positive
+bin-to-bin change — compared against an adaptive running mean, with a
+refractory gap so a sustained note isn't a drum roll. Beat gaps feed a running
+tempo estimate.
+
+**Smoothing.** Every value is enveloped: attack over ~2 frames, release over
+~16. Visuals read them as targets, never as instant jumps. That single decision
+is what makes it *sway* instead of flicker.
+
+**What the numbers drive:**
+
+| Signal | Effect |
+|---|---|
+| treble + level + beats | slides the whole palette forward — colour travels with the track |
+| bass | layer weights surge 0.45×–1.6×; the stack thickens and thins |
+| beat | pulls the next layer's entry forward, up to 1.5 s — never later |
+| bass + beat | brightness, capped at **1.06×**, eased in over ~8 frames and out over ~32 |
+
+The colour rotation is free at draw time: every layer's palette is stored twice
+in memory, so handing a pattern `pal + offset` stays in bounds without copying
+anything.
+
+**Why brightness barely moves.** A screensaver that flashes on the beat is a
+seizure risk, so the music is carried by colour and structure instead. That was
+a deliberate design call, and the cap is enforced in code.
+
+**Privacy.** Audio is analysed in memory, frame by frame, and discarded.
+Nothing is recorded, stored, or transmitted. In silence — or with no microphone
+at all — every value decays to zero and the engine runs on its own clocks
+exactly as it always did.
+
 ## What it is
 
 - **225 routines** — 24 hand-tuned ARM64 assembly modes plus 201 C plug-ins:
@@ -117,7 +163,7 @@ own clocks exactly as before.
   with staggered entry, alpha envelopes and crossfades. Nothing hard-cuts.
 - **Nothing repeats** — shuffled bags rather than dice, re-seeded every launch,
   so a routine plays once before any repeat and no two runs deal the same deck
-- **100 colour schemes** — community palettes and designed harmonies, expanded
+- **180 colour schemes** — community palettes, designed harmonies, and 60 built from colour theory (duotone, monochrome-with-accent, triadic, split-complement, stark, neon-on-ink, metallic, tetradic, earth, pastel wash), expanded
   into 32,768-entry ramps in **OKLab** along a cyclic **Catmull-Rom** spline:
   no grey midpoints, no plateaus, no hairline banding
 - **All integer math in the assembly core** — sine tables, fixed point,
