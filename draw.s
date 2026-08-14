@@ -44,10 +44,10 @@ _draw_frame:
     // ---- mode select: (frame>>11) mod 7 — ~34s each, hard cut ----
     fmov    s28, w3                     // stash TRUE frame (accumulator modes)
     lsr     w9, w3, #11
-    mov     w13, #21
+    mov     w13, #23
     udiv    w10, w9, w13
     msub    w9, w10, w13, w9
-    fmov    s19, w9                     // mode 0..20
+    fmov    s19, w9                     // mode 0..22
 
     // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
     lsl     w9, w3, #4
@@ -240,6 +240,10 @@ _draw_frame:
     b       Luy_loop
 Lacc_dispatch:
     sub     w9, w9, #15
+    cmp     w9, #6
+    b.eq    L10start                    // 21: string-art fans
+    cmp     w9, #7
+    b.eq    L11start                    // 22: vector panels
     and     w12, w9, #1
     fmov    s31, w12                    // variant
     lsr     w10, w9, #1
@@ -796,6 +800,176 @@ L8step:
     b.lt    L8step
     b       Ldone
 
+
+// ============================================================
+// MODE 21 — STRING-ART FANS (video 3: line fans, mirrored)
+// two endpoints orbit on ellipses; 3 lines/frame drawn as 96
+// lerped stamps, 4-way mirrored. Threads accumulate into fans.
+// ============================================================
+L10start:
+    fmov    w9, s28
+    and     w22, w9, #2047
+    cbnz    w22, L10draw
+    mul     w9, w1, w2
+    mov     w10, #0
+    movz    w11, #0x0A12
+    movk    w11, #0xFF0A, lsl #16
+L10clear:
+    str     w11, [x0, w10, uxtw #2]
+    add     w10, w10, #1
+    cmp     w10, w9
+    b.lt    L10clear
+L10draw:
+    mov     w23, #0                     // line index
+L10line:
+    mov     w10, #140                   // endpoint A sweep
+    mul     w9, w22, w10
+    mov     w10, #84
+    madd    w9, w23, w10, w9
+    bl      Lsin16
+    mov     w20, w12
+    mov     w10, #140
+    mul     w9, w22, w10
+    mov     w10, #84
+    madd    w9, w23, w10, w9
+    add     w9, w9, #16384
+    bl      Lsin16
+    lsr     w10, w1, #2
+    mul     w20, w20, w10
+    asr     w20, w20, #14
+    add     w20, w20, w5                // ax
+    lsr     w10, w2, #2
+    mul     w12, w12, w10
+    asr     w12, w12, #14
+    add     w21, w12, w6                // ay
+    mov     w10, #89                    // endpoint B counter-sweep
+    mul     w9, w22, w10
+    mov     w10, #84
+    madd    w9, w23, w10, w9
+    movz    w10, #21845
+    add     w9, w9, w10
+    bl      Lsin16
+    mov     w24, w12
+    mov     w10, #89
+    mul     w9, w22, w10
+    mov     w10, #84
+    madd    w9, w23, w10, w9
+    movz    w10, #21845
+    add     w9, w9, w10
+    add     w9, w9, #16384
+    bl      Lsin16
+    lsr     w10, w1, #1
+    sub     w10, w10, #24
+    mul     w24, w24, w10
+    asr     w24, w24, #14
+    add     w24, w24, w5                // bx (wide orbit)
+    lsr     w10, w2, #1
+    sub     w10, w10, #24
+    mul     w12, w12, w10
+    asr     w12, w12, #14
+    add     w25, w12, w6                // by
+    lsl     w10, w22, #4
+    add     w10, w10, w23, lsl #10
+    and     w10, w10, #0x7FFF
+    bl      Lpalmix                     // thread color
+    sub     w12, w24, w20               // line lerp setup, Q8
+    lsl     w12, w12, #8
+    mov     w13, #96
+    sdiv    w16, w12, w13               // x step
+    sub     w12, w25, w21
+    lsl     w12, w12, #8
+    sdiv    w17, w12, w13               // y step
+    lsl     w20, w20, #8
+    lsl     w21, w21, #8
+    mov     w26, #0
+L10seg:
+    asr     w9, w20, #8
+    asr     w10, w21, #8
+    bl      Lplot22m                    // mirrored threads
+    add     w20, w20, w16
+    add     w21, w21, w17
+    add     w26, w26, #1
+    cmp     w26, #96
+    b.lt    L10seg
+    add     w23, w23, #1
+    cmp     w23, #3
+    b.lt    L10line
+    b       Ldone
+
+// ============================================================
+// MODE 22 — VECTOR PANELS (video 3: bold filled geometry)
+// one solid rectangle per frame in a saturated primary, stamped
+// into all four mirror quadrants. Hard-edged — on purpose.
+// ============================================================
+L11start:
+    fmov    w9, s28
+    and     w22, w9, #2047
+    cbnz    w22, L11draw
+    mul     w9, w1, w2
+    mov     w10, #0
+    movz    w11, #0x0508
+    movk    w11, #0xFF05, lsl #16
+L11clear:
+    str     w11, [x0, w10, uxtw #2]
+    add     w10, w10, #1
+    cmp     w10, w9
+    b.lt    L11clear
+L11draw:
+    fmov    w9, s28
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w20, w9, w10                // panel hash
+    ubfx    w9, w20, #4, #4
+    mul     w21, w9, w5
+    lsr     w21, w21, #4                // x0 in left half
+    ubfx    w9, w20, #12, #4
+    mul     w22, w9, w6
+    lsr     w22, w22, #4                // y0 in top half
+    ubfx    w9, w20, #20, #6
+    lsl     w16, w9, #1
+    add     w16, w16, #28               // width 28..154
+    ubfx    w9, w20, #26, #5
+    add     w17, w9, #14                // height 14..45
+    ubfx    w9, w20, #9, #2             // solid primary select
+    cmp     w9, #0
+    b.ne    L11c1
+    movz    w11, #0x1818
+    movk    w11, #0xFFE0, lsl #16       // red
+    b       L11cd
+L11c1:
+    cmp     w9, #1
+    b.ne    L11c2
+    movz    w11, #0x30E8
+    movk    w11, #0xFF28, lsl #16       // blue
+    b       L11cd
+L11c2:
+    cmp     w9, #2
+    b.ne    L11c3
+    movz    w11, #0x38D8
+    movk    w11, #0xFF90, lsl #16       // violet
+    b       L11cd
+L11c3:
+    movz    w11, #0xE8F0
+    movk    w11, #0xFFF0, lsl #16       // white
+L11cd:
+    mov     w23, w21                    // keep originals
+    mov     w24, w22
+    bl      Lfillrect                   // (x0, y0)
+    sub     w21, w1, w23
+    sub     w21, w21, w16               // mirror x
+    mov     w22, w24
+    bl      Lfillrect
+    mov     w21, w23
+    sub     w22, w2, w24
+    sub     w22, w22, w17               // mirror y
+    bl      Lfillrect
+    sub     w21, w1, w23
+    sub     w21, w21, w16
+    sub     w22, w2, w24
+    sub     w22, w22, w17
+    bl      Lfillrect
+    b       Ldone
+
 Ldone:
     ldp     x27, x28, [sp], #16
     ldp     x25, x26, [sp], #16
@@ -900,6 +1074,41 @@ Lplot22m:
     bl      Lplot22
     add     sp, sp, #16
     ldp     x29, x30, [sp], #16
+    ret
+
+// ------------------------------------------------------------
+// Lfillrect — clipped solid fill. in: w21=x0, w22=y0, w16=wdt,
+// w17=hgt, w11=color. clobbers w9, w10, w12, w13, w25
+// (w25 is fade -- recomputed every frame; accumulator-safe only).
+// ------------------------------------------------------------
+Lfillrect:
+    mov     w9, w22                     // row
+    cmp     w9, #0
+    csel    w9, wzr, w9, lt
+    add     w25, w22, w17               // row limit (w25: accum-safe)
+    cmp     w25, w2
+    csel    w25, w2, w25, gt
+Lfr_row:
+    cmp     w9, w25
+    b.ge    Lfr_ret
+    mov     w10, w21                    // col
+    cmp     w10, #0
+    csel    w10, wzr, w10, lt
+    add     w12, w21, w16               // col limit
+    cmp     w12, w1
+    csel    w12, w1, w12, gt
+    madd    w13, w9, w1, w10            // base idx = row*w + colstart
+Lfr_col:
+    cmp     w10, w12
+    b.ge    Lfr_nextrow
+    str     w11, [x0, w13, uxtw #2]
+    add     w13, w13, #1
+    add     w10, w10, #1
+    b       Lfr_col
+Lfr_nextrow:
+    add     w9, w9, #1
+    b       Lfr_row
+Lfr_ret:
     ret
 
 // ============================================================
