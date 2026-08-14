@@ -41,13 +41,41 @@ _draw_frame:
     adrp    x19, sintab@PAGE
     add     x19, x19, sintab@PAGEOFF
 
-    // ---- mode select: (frame>>11) mod 7 — ~34s each, hard cut ----
+    // ---- mode select: SHUFFLED order via avalanche hash ----
+    // (J: randomize everything — bare multiply hashes are linear
+    //  and read as patterns; murmur-style finalizer actually mixes)
     fmov    s28, w3                     // stash TRUE frame (accumulator modes)
-    lsr     w9, w3, #11
     mov     w13, #24
+    lsr     w16, w3, #11                // seg
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w12, w16, w10
+    eor     w12, w12, w12, lsr #16
+    movz    w10, #0xCA6B
+    movk    w10, #0x85EB, lsl #16
+    mul     w12, w12, w10
+    eor     w12, w12, w12, lsr #13      // mix(seg)
+    udiv    w10, w12, w13
+    msub    w12, w10, w13, w12          // mode(seg)
+    sub     w16, w16, #1
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w9, w16, w10
+    eor     w9, w9, w9, lsr #16
+    movz    w10, #0xCA6B
+    movk    w10, #0x85EB, lsl #16
+    mul     w9, w9, w10
+    eor     w9, w9, w9, lsr #13         // mix(seg-1)
     udiv    w10, w9, w13
-    msub    w9, w10, w13, w9
-    fmov    s19, w9                     // mode 0..23
+    msub    w9, w10, w13, w9            // mode(seg-1)
+    cmp     w12, w9
+    b.ne    Lmode_ok
+    add     w12, w12, #7                // never the same twice running
+    cmp     w12, #24
+    sub     w9, w12, #24
+    csel    w12, w9, w12, ge
+Lmode_ok:
+    fmov    s19, w12                    // mode 0..23
 
     // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
     lsl     w9, w3, #4
@@ -158,20 +186,37 @@ _draw_frame:
     fmov    s6, w13
     fmov    s7, w12
 
-    // ---- color scheme: pseg = frame>>10 (~17s), pair (pseg%6, +1) ----
-    lsr     w9, w3, #10
-    mov     w13, #6
-    udiv    w10, w9, w13
-    msub    w10, w10, w13, w9
-    add     w11, w10, #1
-    cmp     w11, #6
-    csel    w11, wzr, w11, eq
+    // ---- color scheme: RANDOM chained pair (mix-picked; each
+    //      fade ends where the next begins — continuous, random) ----
     adrp    x9, palette@PAGE
     add     x9, x9, palette@PAGEOFF
-    lsl     w10, w10, #17
-    add     x20, x9, x10                // + schemeA*131072
+    mov     w13, #6
+    lsr     w16, w3, #10                // color leg p
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w11, w16, w10
+    eor     w11, w11, w11, lsr #16
+    movz    w10, #0xCA6B
+    movk    w10, #0x85EB, lsl #16
+    mul     w11, w11, w10
+    eor     w11, w11, w11, lsr #13
+    udiv    w10, w11, w13
+    msub    w11, w10, w13, w11          // A = mix(p) % 6
+    add     w16, w16, #1
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w12, w16, w10
+    eor     w12, w12, w12, lsr #16
+    movz    w10, #0xCA6B
+    movk    w10, #0x85EB, lsl #16
+    mul     w12, w12, w10
+    eor     w12, w12, w12, lsr #13
+    udiv    w10, w12, w13
+    msub    w12, w10, w13, w12          // B = mix(p+1): chained
     lsl     w11, w11, #17
-    add     x21, x9, x11
+    add     x20, x9, x11                // + schemeA*131072
+    lsl     w12, w12, #17
+    add     x21, x9, x12
     lsr     w10, w3, #10                // recompute pseg for partner pair
     mov     w13, #6
     udiv    w12, w10, w13
