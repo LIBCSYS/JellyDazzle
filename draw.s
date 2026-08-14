@@ -41,9 +41,13 @@ _draw_frame:
     adrp    x19, sintab@PAGE
     add     x19, x19, sintab@PAGEOFF
 
-    // ---- mode select: (frame>>11)&1 — ~34s each, hard cut ----
-    ubfx    w9, w3, #11, #1
-    fmov    s19, w9
+    // ---- mode select: (frame>>11) mod 7 — ~34s each, hard cut ----
+    fmov    s28, w3                     // stash TRUE frame (accumulator modes)
+    lsr     w9, w3, #11
+    mov     w13, #7
+    udiv    w10, w9, w13
+    msub    w9, w10, w13, w9
+    fmov    s19, w9                     // mode 0..6
 
     // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
     lsl     w9, w3, #4
@@ -112,6 +116,8 @@ _draw_frame:
     asr     w16, w16, #14
     mul     w17, w17, w10
     asr     w17, w17, #14
+    fmov    s24, w16                    // unfolded c1 (moire mode)
+    fmov    s25, w17
     cmp     w16, #0
     cneg    w16, w16, lt
     cmp     w17, #0
@@ -140,6 +146,8 @@ _draw_frame:
     asr     w16, w16, #14
     mul     w17, w17, w10
     asr     w17, w17, #14
+    fmov    s26, w16                    // unfolded c2 (moire mode)
+    fmov    s27, w17
     cmp     w16, #0
     cneg    w16, w16, lt
     cmp     w17, #0
@@ -200,7 +208,18 @@ _draw_frame:
 
     // ================== DISPATCH ==================
     fmov    w9, s19
-    cbnz    w9, L2y_loop                // mode 2: THE TWIST
+    cbz     w9, L1y_loop                // 0: color satellites
+    cmp     w9, #1
+    b.eq    L2y_loop                    // 1: the twist
+    cmp     w9, #2
+    b.eq    L3y_loop                    // 2: tunnel/starburst
+    cmp     w9, #3
+    b.eq    L4y_loop                    // 3: moire eye
+    cmp     w9, #4
+    b.eq    L5start                     // 4: spirograph (accumulator)
+    cmp     w9, #5
+    b.eq    L6y_loop                    // 5: kaleido mirror-tile
+    b       L7start                     // 6: slash canvas (accumulator)
 
 // ============================================================
 // MODE 1 — COLOR SATELLITES (step 10 routine)
@@ -497,6 +516,365 @@ L2next_row:
     add     w3, w3, #1
     b       L2y_loop
 
+
+// ============================================================
+// MODE 3 — TUNNEL / STARBURST (video: orange laser-fan)
+// rays via octant angle param (no atan2: t = v*256/u), bands
+// flow outward fast; breathing ring rides on top.
+// ============================================================
+L3y_loop:
+    cmp     w3, w2
+    b.ge    Ldone
+    mov     w4, #0
+L3x_loop:
+    cmp     w4, w1
+    b.ge    L3next_row
+    sub     w7, w4, w5
+    sub     w8, w3, w6
+    fmov    w9, s4
+    fmov    w10, s5
+    mul     w11, w7, w9
+    mul     w12, w8, w10
+    sub     w11, w11, w12
+    asr     w11, w11, #14
+    mul     w12, w7, w10
+    madd    w12, w8, w9, w12
+    asr     w12, w12, #14
+    cmp     w11, #0
+    cneg    w11, w11, lt
+    cmp     w12, #0
+    cneg    w12, w12, lt
+    cmp     w11, w12
+    csel    w9,  w11, w12, ge           // u
+    csel    w10, w12, w11, ge           // v
+    mul     w12, w9, w9
+    madd    w12, w10, w10, w12
+    lsl     w12, w12, #10
+    scvtf   s0, w12
+    fsqrt   s0, s0
+    fcvtzs  w12, s0                     // r32
+    lsl     w13, w10, #8
+    add     w16, w9, #1
+    udiv    w13, w13, w16               // t = v*256/u : 0..256
+    add     w13, w13, w13, lsl #1       // x3 -> 3 ray pairs/octant
+    and     w13, w13, #255
+    ldr     w13, [x19, w13, uxtw #2]
+    asr     w13, w13, #3                // ray field
+    add     w16, w12, w12, lsl #1
+    lsr     w16, w16, #1                // r*1.5
+    sub     w16, w16, w27, lsl #2       // bands rush outward
+    add     w10, w13, w16
+    sub     w13, w12, w15               // breathing ring
+    cmp     w13, #0
+    cneg    w13, w13, lt
+    fmov    s16, w13
+    add     w10, w10, w13, asr #1
+    and     w10, w10, #0x7FFF
+    ldr     w9,  [x20, w10, uxtw #2]
+    ldr     w11, [x21, w10, uxtw #2]
+    and     w12, w9,  #0x00FF00FF
+    and     w13, w11, #0x00FF00FF
+    mul     x12, x12, x28
+    mul     x13, x13, x25
+    add     x12, x12, x13
+    lsr     x12, x12, #8
+    and     w12, w12, #0x00FF00FF
+    and     w9,  w9,  #0x0000FF00
+    and     w11, w11, #0x0000FF00
+    mul     x9,  x9,  x28
+    mul     x11, x11, x25
+    add     x9,  x9,  x11
+    lsr     x9,  x9,  #8
+    and     w9,  w9,  #0x0000FF00
+    orr     w11, w12, w9
+    orr     w11, w11, #0xFF000000
+    fmov    w9, s16
+    cmp     w9, #64
+    b.gt    L3put
+    fmov    w11, s20
+L3put:
+    madd    w13, w3, w1, w4
+    str     w11, [x0, w13, uxtw #2]
+    add     w4, w4, #1
+    b       L3x_loop
+L3next_row:
+    add     w3, w3, #1
+    b       L3y_loop
+
+// ============================================================
+// MODE 4 — MOIRE EYE (video: blue/green interference eye)
+// two ring systems on the counter-orbiting satellite centers;
+// their beat pattern makes the crawling eye.
+// ============================================================
+L4y_loop:
+    cmp     w3, w2
+    b.ge    Ldone
+    mov     w4, #0
+L4x_loop:
+    cmp     w4, w1
+    b.ge    L4next_row
+    sub     w7, w4, w5
+    sub     w8, w3, w6
+    fmov    w9, s24
+    sub     w9, w7, w9
+    fmov    w10, s25
+    sub     w10, w8, w10
+    mul     w9, w9, w9
+    madd    w9, w10, w10, w9
+    lsl     w9, w9, #10
+    scvtf   s0, w9
+    fsqrt   s0, s0
+    fcvtzs  w9, s0                      // d1
+    fmov    w10, s26
+    sub     w10, w7, w10
+    fmov    w11, s27
+    sub     w11, w8, w11
+    mul     w10, w10, w10
+    madd    w10, w11, w11, w10
+    lsl     w10, w10, #10
+    scvtf   s0, w10
+    fsqrt   s0, s0
+    fcvtzs  w10, s0                     // d2
+    add     w12, w9, w10                // elliptic rings
+    sub     w13, w9, w10
+    cmp     w13, #0
+    cneg    w13, w13, lt                // hyperbolic beat
+    add     w10, w12, w13, lsl #1
+    asr     w10, w10, #2
+    add     w10, w10, w27
+    and     w10, w10, #0x7FFF
+    ldr     w9,  [x20, w10, uxtw #2]
+    ldr     w11, [x21, w10, uxtw #2]
+    and     w12, w9,  #0x00FF00FF
+    and     w13, w11, #0x00FF00FF
+    mul     x12, x12, x28
+    mul     x13, x13, x25
+    add     x12, x12, x13
+    lsr     x12, x12, #8
+    and     w12, w12, #0x00FF00FF
+    and     w9,  w9,  #0x0000FF00
+    and     w11, w11, #0x0000FF00
+    mul     x9,  x9,  x28
+    mul     x11, x11, x25
+    add     x9,  x9,  x11
+    lsr     x9,  x9,  #8
+    and     w9,  w9,  #0x0000FF00
+    orr     w11, w12, w9
+    orr     w11, w11, #0xFF000000
+    madd    w13, w3, w1, w4
+    str     w11, [x0, w13, uxtw #2]
+    add     w4, w4, #1
+    b       L4x_loop
+L4next_row:
+    add     w3, w3, #1
+    b       L4y_loop
+
+// ============================================================
+// MODE 5 — SPIROGRAPH (accumulator: the video's line-art trick)
+// clears to deep ink on entry, then lays down 256 curve points
+// per frame — the drawing grows for the whole ~34s segment.
+// Curve constants come from the segment hash: new every visit.
+// ============================================================
+L5start:
+    fmov    w9, s28                     // true frame
+    and     w22, w9, #2047              // segment-local frame
+    lsr     w23, w9, #11
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w23, w23, w10               // segment hash
+    cbnz    w22, L5draw
+    mul     w9, w1, w2                  // entry: clear to deep ink
+    mov     w10, #0
+    movz    w11, #0x0A12
+    movk    w11, #0xFF0A, lsl #16
+L5clear:
+    str     w11, [x0, w10, uxtw #2]
+    add     w10, w10, #1
+    cmp     w10, w9
+    b.lt    L5clear
+L5draw:
+    and     w16, w23, #31
+    add     w16, w16, #23               // angular step 1
+    ubfx    w17, w23, #5, #6
+    add     w17, w17, #97               // angular step 2
+    cmp     w1, w2
+    csel    w9, w1, w2, lt
+    lsr     w24, w9, #2
+    lsr     w25, w9, #3
+    add     w24, w24, w25               // R1 = 3/8 min
+    lsr     w25, w9, #3                 // R2 = 1/8 min
+    mov     w26, #0
+L5k:
+    lsl     w9, w22, #8
+    add     w21, w9, w26                // t = sl*256 + k
+    mul     w9, w21, w16
+    bl      Lsin16
+    mov     w20, w12                    // sinA
+    mul     w9, w21, w16
+    add     w9, w9, #16384
+    bl      Lsin16
+    mul     w7, w20, w24                // x acc = sinA*R1
+    mul     w8, w12, w24                // y acc = cosA*R1
+    mul     w9, w21, w17
+    bl      Lsin16
+    madd    w7, w12, w25, w7            // + sinB*R2
+    mul     w9, w21, w17
+    add     w9, w9, #16384
+    bl      Lsin16
+    msub    w8, w12, w25, w8            // - cosB*R2
+    asr     w7, w7, #14
+    add     w7, w7, w5
+    asr     w8, w8, #14
+    add     w8, w8, w6
+    lsl     w10, w21, #3
+    and     w10, w10, #0x7FFF
+    bl      Lpalmix                     // jewel color drifts along curve
+    mov     w9, w7
+    mov     w10, w8
+    bl      Lplot22
+    add     w26, w26, #1
+    cmp     w26, #256
+    b.lt    L5k
+    b       Ldone
+
+// ============================================================
+// MODE 6 — KALEIDO MIRROR-TILE (video: dense mirrored tiling)
+// rotated plane folded into 1024px mirrored tiles; diamond,
+// cross and square-ring fields interfere inside each tile.
+// ============================================================
+L6y_loop:
+    cmp     w3, w2
+    b.ge    Ldone
+    mov     w4, #0
+L6x_loop:
+    cmp     w4, w1
+    b.ge    L6next_row
+    sub     w7, w4, w5
+    sub     w8, w3, w6
+    fmov    w9, s4
+    fmov    w10, s5
+    mul     w11, w7, w9
+    mul     w12, w8, w10
+    sub     w11, w11, w12
+    asr     w11, w11, #14
+    mul     w12, w7, w10
+    madd    w12, w8, w9, w12
+    asr     w12, w12, #14
+    and     w9, w11, #1023              // mirror-tile fold
+    sub     w9, w9, #512
+    cmp     w9, #0
+    cneg    w9, w9, lt                  // tx 0..512
+    and     w10, w12, #1023
+    sub     w10, w10, #512
+    cmp     w10, #0
+    cneg    w10, w10, lt                // ty 0..512
+    add     w12, w9, w10                // diamond
+    sub     w13, w9, w10
+    cmp     w13, #0
+    cneg    w13, w13, lt                // cross
+    mul     w16, w9, w9
+    madd    w16, w10, w10, w16
+    lsr     w16, w16, #9                // soft square-law rings
+    lsl     w17, w12, #3
+    add     w17, w17, w16
+    sub     w17, w17, w13, lsl #2
+    add     w17, w17, w27, lsl #1
+    and     w10, w17, #0x7FFF
+    ldr     w9,  [x20, w10, uxtw #2]
+    ldr     w11, [x21, w10, uxtw #2]
+    and     w12, w9,  #0x00FF00FF
+    and     w13, w11, #0x00FF00FF
+    mul     x12, x12, x28
+    mul     x13, x13, x25
+    add     x12, x12, x13
+    lsr     x12, x12, #8
+    and     w12, w12, #0x00FF00FF
+    and     w9,  w9,  #0x0000FF00
+    and     w11, w11, #0x0000FF00
+    mul     x9,  x9,  x28
+    mul     x11, x11, x25
+    add     x9,  x9,  x11
+    lsr     x9,  x9,  #8
+    and     w9,  w9,  #0x0000FF00
+    orr     w11, w12, w9
+    orr     w11, w11, #0xFF000000
+    madd    w13, w3, w1, w4
+    str     w11, [x0, w13, uxtw #2]
+    add     w4, w4, #1
+    b       L6x_loop
+L6next_row:
+    add     w3, w3, #1
+    b       L6y_loop
+
+// ============================================================
+// MODE 7 — SLASH CANVAS (accumulator: red strokes on white)
+// the video's only light-background routine. Clears to warm
+// white on entry; every frame carves one jittering dark-red
+// stroke. ~2000 strokes by segment end.
+// ============================================================
+L7start:
+    fmov    w9, s28
+    and     w22, w9, #2047
+    cbnz    w22, L7draw
+    mul     w9, w1, w2                  // entry: clear to warm white
+    mov     w10, #0
+    movz    w11, #0xEEF2
+    movk    w11, #0xFFF2, lsl #16
+L7clear:
+    str     w11, [x0, w10, uxtw #2]
+    add     w10, w10, #1
+    cmp     w10, w9
+    b.lt    L7clear
+L7draw:
+    fmov    w9, s28
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w20, w9, w10                // per-frame stroke hash
+    ubfx    w9, w20, #7, #10            // start anywhere on canvas
+    mul     w21, w9, w1
+    lsr     w21, w21, #10               // start x = h10 * w / 1024
+    ubfx    w9, w20, #17, #10
+    mul     w22, w9, w2
+    lsr     w22, w22, #10               // start y
+    ubfx    w9, w20, #27, #5
+    lsl     w9, w9, #3
+    and     w9, w9, #255
+    ldr     w16, [x19, w9, uxtw #2]
+    asr     w16, w16, #9                // step dx (Q4, ~2px/step)
+    add     w9, w9, #64
+    and     w9, w9, #255
+    ldr     w17, [x19, w9, uxtw #2]
+    asr     w17, w17, #9                // step dy
+    and     w9, w20, #0x3F
+    add     w9, w9, #96                 // dark red 96..159
+    lsl     w11, w9, #16
+    movk    w11, #0x1414
+    orr     w11, w11, #0xFF000000
+    lsl     w21, w21, #4                // pos in Q4
+    lsl     w22, w22, #4
+    mov     w26, #0
+L7step:
+    add     w9, w26, w26, lsl #2        // jitter walks the sine table
+    add     w9, w9, w20, lsr #3
+    and     w9, w9, #255
+    ldr     w12, [x19, w9, uxtw #2]
+    asr     w12, w12, #12               // gentle jitter: slash, not scribble
+    add     w21, w21, w16
+    add     w21, w21, w12
+    add     w9, w9, #85
+    and     w9, w9, #255
+    ldr     w12, [x19, w9, uxtw #2]
+    asr     w12, w12, #12
+    add     w22, w22, w17
+    add     w22, w22, w12
+    asr     w9, w21, #4
+    asr     w10, w22, #4
+    bl      Lplot22
+    add     w26, w26, #1
+    cmp     w26, #340
+    b.lt    L7step
+    b       Ldone
+
 Ldone:
     ldp     x27, x28, [sp], #16
     ldp     x25, x26, [sp], #16
@@ -543,6 +921,32 @@ Lpalmix:
     movk    w12, #0x0040, lsl #16
     add     w11, w11, w12               // + 0x404040
     orr     w11, w11, #0xFF000000
+    ret
+
+// ------------------------------------------------------------
+// Lplot22 — clipped 2x2 dot. in: w9=x, w10=y, w11=color.
+// clobbers w12, w13. needs x0 fb, w1 width, w2 height.
+// ------------------------------------------------------------
+Lplot22:
+    cmp     w9, #0
+    b.lt    Lplot22_ret
+    cmp     w10, #0
+    b.lt    Lplot22_ret
+    sub     w12, w1, #1
+    cmp     w9, w12
+    b.ge    Lplot22_ret
+    sub     w12, w2, #1
+    cmp     w10, w12
+    b.ge    Lplot22_ret
+    madd    w12, w10, w1, w9
+    str     w11, [x0, w12, uxtw #2]
+    add     w13, w12, #1
+    str     w11, [x0, w13, uxtw #2]
+    add     w13, w12, w1
+    str     w11, [x0, w13, uxtw #2]
+    add     w13, w13, #1
+    str     w11, [x0, w13, uxtw #2]
+Lplot22_ret:
     ret
 
 // ============================================================
