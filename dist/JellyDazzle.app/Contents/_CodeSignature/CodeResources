@@ -6,14 +6,23 @@
 	<dict/>
 	<key>files2</key>
 	<dict>
-		<key>Frameworks/libSDL2.dylib</key>
+		<key>Frameworks/libSDL2-2.0.0.dylib</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			OJbYuAFOgRZbTUjApA1H5XYOfTI=
+			bAX1LFp0Yp6XBiXR90nTRFWqVY4=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"3896d8b8014e81165b4d48c0a40d47e5760e7d32"</string>
+			<string>cdhash H"6c05f52c5a74629e970625d1f749d34455aa558e"</string>
+		</dict>
+		<key>Frameworks/libSDL3.dylib</key>
+		<dict>
+			<key>cdhash</key>
+			<data>
+			s/ZuCe5sxo5FQPgVcWG5/cw52z0=
+			</data>
+			<key>requirement</key>
+			<string>cdhash H"b3f66e09ee6cc68e4540f8157161b9fdcc39db3d"</string>
 		</dict>
 	</dict>
 	<key>rules</key>
