@@ -41,40 +41,12 @@ _draw_frame:
     adrp    x19, sintab@PAGE
     add     x19, x19, sintab@PAGEOFF
 
-    // ---- mode select: SHUFFLED order via avalanche hash ----
-    // (J: randomize everything — bare multiply hashes are linear
-    //  and read as patterns; murmur-style finalizer actually mixes)
+    // ---- mode select: the C bridge (bridge.c) rolls the dice
+    //      across asm modes + lab patterns and hands us ours ----
     fmov    s28, w3                     // stash TRUE frame (accumulator modes)
-    mov     w13, #24
-    lsr     w16, w3, #11                // seg
-    movz    w10, #0x79B1
-    movk    w10, #0x9E37, lsl #16
-    mul     w12, w16, w10
-    eor     w12, w12, w12, lsr #16
-    movz    w10, #0xCA6B
-    movk    w10, #0x85EB, lsl #16
-    mul     w12, w12, w10
-    eor     w12, w12, w12, lsr #13      // mix(seg)
-    udiv    w10, w12, w13
-    msub    w12, w10, w13, w12          // mode(seg)
-    sub     w16, w16, #1
-    movz    w10, #0x79B1
-    movk    w10, #0x9E37, lsl #16
-    mul     w9, w16, w10
-    eor     w9, w9, w9, lsr #16
-    movz    w10, #0xCA6B
-    movk    w10, #0x85EB, lsl #16
-    mul     w9, w9, w10
-    eor     w9, w9, w9, lsr #13         // mix(seg-1)
-    udiv    w10, w9, w13
-    msub    w9, w10, w13, w9            // mode(seg-1)
-    cmp     w12, w9
-    b.ne    Lmode_ok
-    add     w12, w12, #7                // never the same twice running
-    cmp     w12, #24
-    sub     w9, w12, #24
-    csel    w12, w9, w12, ge
-Lmode_ok:
+    adrp    x9, _g_mode@PAGE
+    add     x9, x9, _g_mode@PAGEOFF
+    ldr     w12, [x9]
     fmov    s19, w12                    // mode 0..23
 
     // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
@@ -1228,5 +1200,7 @@ Lfr_ret:
 sintab:
     .incbin "sintab.bin"
 .p2align 2
+.globl _jd_palette
+_jd_palette:
 palette:
     .incbin "palette.bin"

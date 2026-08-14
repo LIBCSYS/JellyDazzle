@@ -18,7 +18,7 @@
 #define H 960
 
 /* implemented in draw.s */
-extern void draw_frame(uint32_t *fb, int width, int height, int frame);
+extern void jd_frame(uint32_t *fb, int width, int height, int frame);
 
 static uint32_t framebuffer[W * H];   /* our A000:0000 */
 
@@ -50,7 +50,7 @@ int main(void)
                 running = 0;
         }
 
-        draw_frame(framebuffer, W, H, frame++);  /* <-- your assembly */
+        jd_frame(framebuffer, W, H, frame++);  /* <-- your assembly */
 
         SDL_UpdateTexture(tex, NULL, framebuffer, W * sizeof(uint32_t));
         SDL_RenderClear(ren);

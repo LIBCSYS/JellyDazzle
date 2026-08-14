@@ -7,7 +7,7 @@ CC      = clang
 SDLFLAGS = $(shell sdl2-config --cflags --libs)
 
 dazzle64: main.c draw.s palette.bin sintab.bin shapes.bin
-	$(CC) main.c draw.s -o $@ $(SDLFLAGS)
+	$(CC) -O2 main.c bridge.c patterns_c/*.c draw.s -o $@ $(SDLFLAGS)
 
 palette.bin sintab.bin shapes.bin: gen_tables.py
 	python3 gen_tables.py
