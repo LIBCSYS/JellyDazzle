@@ -108,6 +108,16 @@ h2{font-family:var(--mono);font-size:1.05rem;letter-spacing:.2em;text-transform:
 .ramp i{flex:1}
 .pal p{font-size:.83rem;color:#b6b3ab;margin:0}
 
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;max-width:760px;
+  display:grid;gap:10px}
+.steps li{counter-increment:s;position:relative;padding:13px 16px 13px 54px;
+  border:1px solid var(--line);background:var(--panel);font-size:.95rem}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;bottom:0;width:40px;
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  font-weight:600;color:var(--void);background:var(--amber)}
+.steps b{color:var(--amber);font-weight:600}
+.steps i{color:var(--beam);font-style:normal}
+.cmd.big{display:block;max-width:760px;font-size:.92rem;padding:13px 16px}
 footer{border-top:1px solid var(--line);margin-top:56px;padding:30px 0 60px;
        font-family:var(--mono);font-size:.8rem;color:var(--dim)}
 footer a{color:var(--amber)}
@@ -189,26 +199,28 @@ HTML = f"""<!doctype html>
 <div class="wrap">
 
 <section id="open">
-  <h2>Opening it the first time</h2>
-  <p class="sub">macOS says “Apple could not verify JellyDazzle is free of malware.” That is
-    Gatekeeper flagging any app without a paid Apple notarization certificate — the whole
-    source is public. You do this once:</p>
-  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
-    <article class="card"><div class="body">
-      <h3 class="name">1 · Right-click → Open</h3>
-      <p class="look">Unzip the download, right-click (or Control-click) the JellyDazzle app,
-        choose <b>Open</b>, then click <b>Open</b> in the warning. It opens normally after that.</p></div></article>
-    <article class="card"><div class="body">
-      <h3 class="name">2 · Or: Open Anyway</h3>
-      <p class="look">No Open option? Double-click once, then go to
-        <b>System Settings → Privacy &amp; Security</b>, scroll down, click <b>Open Anyway</b>.</p></div></article>
-    <article class="card"><div class="body">
-      <h3 class="name">3 · Or: one command</h3>
-      <p class="look">Prefer the terminal? Strip the download flag:</p>
-      <code class="cmd">xattr -dr com.apple.quarantine JellyDazzle.app</code></div></article>
-  </div>
+  <h2>First launch — 30 seconds, once</h2>
+  <p class="sub">macOS says <b>“Apple could not verify JellyDazzle is free of malware.”</b>
+    That is Gatekeeper flagging any app without a paid Apple notarization certificate.
+    Nothing is wrong with the app — every line of source is public. Here is the way through,
+    and you only do it the first time:</p>
+
+  <ol class="steps">
+    <li><b>Double-click</b> the app once and let it get refused.</li>
+    <li>Open <b>System Settings → Privacy &amp; Security</b>.</li>
+    <li>Scroll to the bottom — there is a line saying
+        <i>“JellyDazzle was blocked to protect your Mac.”</i></li>
+    <li>Click <b>Open Anyway</b>, confirm with Touch ID or your password.</li>
+    <li>It launches. Every launch after that is a normal double-click.</li>
+  </ol>
+
+  <p class="sub" style="margin:22px 0 8px">Or the one-liner, which works regardless —
+    paste it in Terminal after downloading:</p>
+  <code class="cmd big">xattr -dr com.apple.quarantine ~/Downloads/JellyDazzle.app</code>
+
   <p class="sub" style="margin-top:22px">Apple Silicon Macs (M1 or newer) · ESC quits ·
-    nothing to install, SDL is bundled inside.</p>
+    nothing to install, SDL is bundled inside · this whole dance disappears once the
+    Developer ID certificate is in place.</p>
 </section>
 
 <section id="modes">

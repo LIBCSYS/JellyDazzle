@@ -1,868 +1,1403 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DAZZLE LAB — 100 Patterns / 30 Palettes</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JellyDazzle — Pattern Lab</title>
+<meta name="description" content="100 kaleidoscope pattern modes and 30 palettes from JellyDazzle, a DAZZLE.EXE homage written in ARM64 assembly.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
 <style>
-:root { --bg:#0b0b10; --panel:#14141c; --edge:#26262f; --ink:#e8e8f0; --dim:#9a9aac; --hot:#ffd23c; --acc:#5ee0d0; }
-* { box-sizing:border-box; margin:0; padding:0; }
-body { background:var(--bg); color:var(--ink); font:15px/1.45 -apple-system,"Helvetica Neue",Segoe UI,sans-serif; padding:2rem 1.2rem 4rem; }
-header { max-width:1400px; margin:0 auto 1.6rem; }
-h1 { font-size:1.9rem; letter-spacing:.06em; }
-h1 b { color:var(--hot); }
-header p { color:var(--dim); margin-top:.4rem; }
-header .top10 { margin-top:.6rem; font-size:.95rem; }
-header .top10 a { color:var(--acc); text-decoration:none; margin-right:.55rem; font-weight:700; font-variant-numeric:tabular-nums; }
-h2 { max-width:1400px; margin:2.4rem auto 1rem; font-size:1.3rem; letter-spacing:.08em; color:var(--hot); border-bottom:1px solid var(--edge); padding-bottom:.4rem; }
-.grid { max-width:1400px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(400px,1fr)); gap:1rem; }
-.card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:.8rem; }
-.card img { width:100%; height:auto; border-radius:6px; display:block; image-rendering:auto; background:#000; }
-.head { display:flex; align-items:baseline; gap:.6rem; margin-bottom:.55rem; }
-.num { font-size:1.5rem; font-weight:800; color:var(--hot); font-variant-numeric:tabular-nums; }
-.name { font-weight:700; font-size:1.05rem; }
-.fam { margin-left:auto; font-size:.72rem; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
-.desc { color:var(--dim); font-size:.86rem; margin-top:.55rem; }
-.scores { display:flex; gap:.5rem; margin-top:.55rem; font-size:.78rem; font-weight:700; }
-.scores span { background:#1e1e28; border:1px solid var(--edge); border-radius:5px; padding:.15rem .5rem; color:var(--acc); }
-.scores .tot { color:var(--hot); margin-left:auto; }
-.chips { display:flex; height:22px; border-radius:5px; overflow:hidden; margin-top:.55rem; border:1px solid var(--edge); }
-.chips i { flex:1; }
-@media (max-width:480px) { .grid { grid-template-columns:1fr; } }
-</style></head><body>
-<div style="background:#111;font-family:system-ui,sans-serif;padding:18px 14px;margin:0;border-bottom:1px solid #2a2a2a">
-  <p style="text-align:center;margin:0 0 10px"><a href="https://github.com/LIBCSYS/JellyDazzle/releases/latest" style="color:#7fd0ff;text-decoration:none;font-size:1.05rem">&#11088; <b>Download JellyDazzle</b> &mdash; free &amp; open source, Apple&nbsp;Silicon Macs</a></p>
-  <details style="max-width:760px;margin:0 auto;color:#bbb;font-size:.92rem;line-height:1.6">
-    <summary style="cursor:pointer;color:#e0b24a">First launch: macOS says &ldquo;Apple could not verify JellyDazzle is free of malware&rdquo; &mdash; here&rsquo;s how to open it</summary>
-    <ul style="margin:.7rem 0 .3rem 1.1rem;padding:0">
-      <li>Unzip the download, then <b>right-click</b> (or Control-click) the JellyDazzle app and choose <b>Open</b></li>
-      <li>When the warning appears, click <b>Open</b> again &mdash; once only; after that it opens normally</li>
-      <li>If no <i>Open</i> option appears: double-click it once, then go to <b>System Settings &rarr; Privacy &amp; Security</b>, scroll down, and click <b>Open Anyway</b></li>
-      <li>Terminal alternative: <code style="color:#9fe0a0">xattr -dr com.apple.quarantine /path/to/JellyDazzle.app</code></li>
-      <li>Press <b>ESC</b> to quit. Requires Apple Silicon (M1 or newer)</li>
-    </ul>
-    <p style="margin:.6rem 0 0">The warning means the app hasn&rsquo;t been through Apple&rsquo;s paid notarization service &mdash; not that anything is wrong with it. Every line of source is public on <a href="https://github.com/LIBCSYS/JellyDazzle" style="color:#7fd0ff">GitHub</a>.</p>
-  </details>
+:root{
+  --void:#06070c; --panel:#0c0e16; --line:#1b2030;
+  --amber:#ffb02e; --beam:#52e0ff; --hot:#ff5ec8;
+  --paper:#edeae2; --dim:#7c839a;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--void);color:var(--paper);font-family:var(--sans);
+     font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--beam)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+
+/* ---------- boot header ---------- */
+.boot{border-bottom:1px solid var(--line);background:
+   radial-gradient(120% 90% at 50% -20%,rgba(255,176,46,.10),transparent 60%),var(--void)}
+.boot .wrap{padding-top:34px;padding-bottom:30px}
+.tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.34em;text-transform:uppercase;
+     color:var(--amber);margin:0 0 14px}
+h1{font-family:var(--mono);font-weight:600;font-size:clamp(2.1rem,6vw,3.6rem);
+   letter-spacing:-.02em;margin:0 0 6px;line-height:1.05}
+h1 .dim{color:var(--dim)}
+.lede{max-width:62ch;color:#c9c6bd;margin:.4rem 0 0}
+.lede b{color:var(--paper);font-weight:600}
+.statline{font-family:var(--mono);font-size:.82rem;color:var(--dim);margin-top:18px;
+     display:flex;flex-wrap:wrap;gap:8px 22px}
+.statline b{color:var(--amber);font-weight:600}
+.cta{display:inline-flex;align-items:center;gap:9px;margin-top:22px;padding:11px 20px;
+     border:1px solid var(--amber);color:var(--amber);text-decoration:none;
+     font-family:var(--mono);font-size:.9rem;background:rgba(255,176,46,.06)}
+.cta:hover{background:var(--amber);color:var(--void)}
+.cta.ghost{border-color:var(--line);color:var(--paper);background:none;margin-left:10px}
+.cta.ghost:hover{border-color:var(--beam);color:var(--beam);background:rgba(82,224,255,.06)}
+
+/* ---------- contact sheet ---------- */
+.sheet{margin:26px 0 0;border:1px solid var(--line);position:relative;overflow:hidden;
+       background:#000;line-height:0}
+.sheet img{width:100%;display:block;opacity:.96}
+.sheet::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,.22) 0 1px,transparent 1px 3px)}
+.sheetcap{font-family:var(--mono);font-size:.72rem;color:var(--dim);
+  padding:8px 2px 0;line-height:1.5}
+
+/* ---------- section chrome ---------- */
+section{padding:54px 0 10px;border-top:1px solid var(--line);margin-top:44px}
+h2{font-family:var(--mono);font-size:1.05rem;letter-spacing:.2em;text-transform:uppercase;
+   color:var(--amber);margin:0 0 4px;font-weight:600}
+.sub{color:var(--dim);font-size:.92rem;margin:0 0 26px;max-width:70ch}
+.jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 30px;font-family:var(--mono);font-size:.78rem}
+.jump a{border:1px solid var(--line);padding:5px 10px;text-decoration:none;color:var(--dim)}
+.jump a:hover{border-color:var(--amber);color:var(--amber)}
+.fam{font-family:var(--mono);font-size:.74rem;letter-spacing:.22em;text-transform:uppercase;
+     color:var(--dim);margin:38px 0 14px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
+
+/* ---------- mode cards ---------- */
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(292px,1fr))}
+.card{border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;
+      transition:border-color .18s,transform .18s}
+.card:hover{border-color:var(--amber);transform:translateY(-2px)}
+.card.star{border-color:rgba(255,176,46,.45)}
+.shot{position:relative;line-height:0;background:#000;border-bottom:1px solid var(--line)}
+.shot img{width:100%;display:block}
+.shot::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,.28) 0 1px,transparent 1px 3px)}
+.num{position:absolute;top:0;left:0;z-index:2;font-family:var(--mono);font-weight:600;
+     font-size:.86rem;letter-spacing:.06em;color:var(--void);background:var(--amber);
+     padding:3px 9px;line-height:1.4}
+.card.star .num::after{content:" ★"}
+.body{padding:13px 15px 15px;display:flex;flex-direction:column;gap:8px;flex:1}
+.name{font-weight:600;font-size:1.02rem;letter-spacing:-.01em;margin:0}
+.look{font-size:.86rem;color:#b6b3ab;margin:0;flex:1}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:10px;
+      font-family:var(--mono);font-size:.72rem;color:var(--dim);
+      border-top:1px dashed var(--line);padding-top:9px}
+.score{color:var(--beam)}
+.cmd{font-family:var(--mono);font-size:.76rem;color:var(--amber);
+     background:rgba(255,176,46,.07);border:1px dashed rgba(255,176,46,.35);
+     padding:5px 8px;user-select:all}
+.cmd::before{content:"$ ";color:var(--dim)}
+
+/* ---------- palettes ---------- */
+.pals{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.pal{border:1px solid var(--line);background:var(--panel);padding:14px 15px}
+.pal h3{font-size:.98rem;margin:0 0 3px;font-weight:600}
+.pal .pid{font-family:var(--mono);color:var(--hot);font-size:.78rem}
+.ramp{display:flex;height:34px;margin:11px 0 9px;border:1px solid var(--line)}
+.ramp i{flex:1}
+.pal p{font-size:.83rem;color:#b6b3ab;margin:0}
+
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;max-width:760px;
+  display:grid;gap:10px}
+.steps li{counter-increment:s;position:relative;padding:13px 16px 13px 54px;
+  border:1px solid var(--line);background:var(--panel);font-size:.95rem}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;bottom:0;width:40px;
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  font-weight:600;color:var(--void);background:var(--amber)}
+.steps b{color:var(--amber);font-weight:600}
+.steps i{color:var(--beam);font-style:normal}
+.cmd.big{display:block;max-width:760px;font-size:.92rem;padding:13px 16px}
+footer{border-top:1px solid var(--line);margin-top:56px;padding:30px 0 60px;
+       font-family:var(--mono);font-size:.8rem;color:var(--dim)}
+footer a{color:var(--amber)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head><body>
+
+<header class="boot"><div class="wrap">
+  <p class="tag">LIBCSystems · jelia.nyc</p>
+  <h1>JellyDazzle <span class="dim">Pattern Lab</span></h1>
+  <p class="lede">Thirty years after the DOS kaleidoscope <b>DAZZLE.EXE</b>, every routine
+    rebuilt in hand-written ARMv9.2-A assembly and C — <b>100 pattern modes</b>
+    and <b>30 palettes</b>, shuffled so it never repeats itself.
+    Each mode below runs on its own by number.</p>
+  <p class="statline">
+    <span><b>100</b> modes</span>
+    <span><b>30</b> palettes</span>
+    <span><b>124</b> routines shipping</span>
+    <span><b>~175</b> fps, single thread</span>
+    <span><b>0</b> floating-point in the assembly core</span>
+  </p>
+  <a class="cta" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download for macOS</a>
+  <a class="cta ghost" href="https://github.com/LIBCSYS/JellyDazzle">Source on GitHub</a>
+
+  <div class="sheet"><img src="patterns_montage.png"
+      alt="Contact sheet of all 100 JellyDazzle patterns"></div>
+  <p class="sheetcap">All 100 modes, one frame each · full catalogue below</p>
+</div></header>
+
+<div class="wrap">
+
+<section id="open">
+  <h2>First launch — 30 seconds, once</h2>
+  <p class="sub">macOS says <b>“Apple could not verify JellyDazzle is free of malware.”</b>
+    That is Gatekeeper flagging any app without a paid Apple notarization certificate.
+    Nothing is wrong with the app — every line of source is public. Here is the way through,
+    and you only do it the first time:</p>
+
+  <ol class="steps">
+    <li><b>Double-click</b> the app once and let it get refused.</li>
+    <li>Open <b>System Settings → Privacy &amp; Security</b>.</li>
+    <li>Scroll to the bottom — there is a line saying
+        <i>“JellyDazzle was blocked to protect your Mac.”</i></li>
+    <li>Click <b>Open Anyway</b>, confirm with Touch ID or your password.</li>
+    <li>It launches. Every launch after that is a normal double-click.</li>
+  </ol>
+
+  <p class="sub" style="margin:22px 0 8px">Or the one-liner, which works regardless —
+    paste it in Terminal after downloading:</p>
+  <code class="cmd big">xattr -dr com.apple.quarantine ~/Downloads/JellyDazzle.app</code>
+
+  <p class="sub" style="margin-top:22px">Apple Silicon Macs (M1 or newer) · ESC quits ·
+    nothing to install, SDL is bundled inside · this whole dance disappears once the
+    Developer ID certificate is in place.</p>
+</section>
+
+<section id="modes">
+  <h2>Mode index</h2>
+  <p class="sub">Every pattern runs standalone — set <code style="color:var(--amber)">JD_MODE</code>
+    to its number and that mode fills the screen. ★ marks the ten the curators scored highest.
+    Scores are dazzle-vibe + cohesion + motion, out of 30.</p>
+  <nav class="jump"><a href="#f0">Kaleido &amp; Tiling</a><a href="#f1">Demoscene Classics</a><a href="#f2">Moire &amp; Op-Art</a><a href="#f3">Spirograph &amp; Curves</a><a href="#f4">Cellular &amp; Reaction</a><a href="#f5">Particles &amp; Orbits</a><a href="#f6">Tunnels &amp; Vortex</a><a href="#f7">Organic &amp; Growth</a><a href="#f8">Original Footage Remakes</a></nav>
+  <h3 class="fam" id="f0">Kaleido &amp; Tiling <span style="color:#3a4256">· 001–010</span></h3><div class="grid"><article class="card" id="p001">
+  <div class="shot"><span class="num">001</span>
+    <img loading="lazy" src="patterns/001_kaleido_rose/preview.png" alt="Pattern 001 — Kaleido Rose"></div>
+  <div class="body">
+    <h3 class="name">Kaleido Rose</h3>
+    <p class="look">A full-screen dihedral kaleidoscope whose fold count steps through 4, 6, 8, 10, 12, 14, 16 sections, each stage crossfading into the next.</p>
+    <code class="cmd">JD_MODE=1 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p002">
+  <div class="shot"><span class="num">002</span>
+    <img loading="lazy" src="patterns/002_p4m_quilt/preview.png" alt="Pattern 002 — P4M Quilt"></div>
+  <div class="body">
+    <h3 class="name">P4M Quilt</h3>
+    <p class="look">A &quot;bathroom-tile kaleidoscope&quot;: the p4m wallpaper group folds a drifting four-wave plasma into a perfectly mirrored quilt of clover-and-star tiles.</p>
+    <code class="cmd">JD_MODE=2 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p003">
+  <div class="shot"><span class="num">003</span>
+    <img loading="lazy" src="patterns/003_hex_snowfold/preview.png" alt="Pattern 003 — Hex Snowfold"></div>
+  <div class="body">
+    <h3 class="name">Hex Snowfold</h3>
+    <p class="look">A p6m-flavored hexagonal wallpaper: every cell of a triangular lattice holds a 12-petal snowflake rosette built by a D6 mirror fold, tiled edge to edge like stained...</p>
+    <code class="cmd">JD_MODE=3 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card star" id="p004">
+  <div class="shot"><span class="num">004</span>
+    <img loading="lazy" src="patterns/004_mirror_truchet/preview.png" alt="Pattern 004 — Mirror Truchet"></div>
+  <div class="body">
+    <h3 class="name">Mirror Truchet</h3>
+    <p class="look">Neon Truchet ribbons — glowing quarter-circle arcs that link into meandering paths — seen through an 8-fold mirror fold, so the random tile field becomes a perfectly...</p>
+    <code class="cmd">JD_MODE=4 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">26/30</span></div>
+  </div>
+</article><article class="card" id="p005">
+  <div class="shot"><span class="num">005</span>
+    <img loading="lazy" src="patterns/005_breathing_fold/preview.png" alt="Pattern 005 — Breathing Fold"></div>
+  <div class="body">
+    <h3 class="name">Breathing Fold</h3>
+    <p class="look">A tie-dye sun mandala whose number of spokes is never constant: the fold count N glides continuously between 4 and 16, so petals split and merge like a living iris while...</p>
+    <code class="cmd">JD_MODE=5 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p006">
+  <div class="shot"><span class="num">006</span>
+    <img loading="lazy" src="patterns/006_tri_morph/preview.png" alt="Pattern 006 — Tri Morph"></div>
+  <div class="body">
+    <h3 class="name">Tri Morph</h3>
+    <p class="look">A hexagonal wallpaper that morphs between two symmetry groups live: chiral pinwheels (rotation-only, p6 flavor) melt into mirrored six-point stars (p6m flavor) and back,...</p>
+    <code class="cmd">JD_MODE=6 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p007">
+  <div class="shot"><span class="num">007</span>
+    <img loading="lazy" src="patterns/007_pinwheel_spiral/preview.png" alt="Pattern 007 — Pinwheel Spiral"></div>
+  <div class="body">
+    <h3 class="name">Pinwheel Spiral</h3>
+    <p class="look">A smooth-shaded log-spiral pinwheel — the direct heir of the original&#x27;s R16 tile — whose arm count steps through 6, 9, 12, 8, 10 with soft crossfades, while spiral...</p>
+    <code class="cmd">JD_MODE=7 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p008">
+  <div class="shot"><span class="num">008</span>
+    <img loading="lazy" src="patterns/008_octa_mandala/preview.png" alt="Pattern 008 — Octa Mandala"></div>
+  <div class="body">
+    <h3 class="name">Octa Mandala</h3>
+    <p class="look">Concentric polygon rings — square, octagon, diamond — pulse outward from the center while the ring shape itself morphs between the three norms and an 8-petal angular...</p>
+    <code class="cmd">JD_MODE=8 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p009">
+  <div class="shot"><span class="num">009</span>
+    <img loading="lazy" src="patterns/009_lissa_web/preview.png" alt="Pattern 009 — Lissa Web"></div>
+  <div class="body">
+    <h3 class="name">Lissa Web</h3>
+    <p class="look">A glowing Lissajous ribbon stamped N times around the center (N steps through 5, 7, 9, 12, 8, 6), weaving a luminous guilloche rosette on near-black — like spirograph...</p>
+    <code class="cmd">JD_MODE=9 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p010">
+  <div class="shot"><span class="num">010</span>
+    <img loading="lazy" src="patterns/010_mosaic_quilt/preview.png" alt="Pattern 010 — Mosaic Quilt"></div>
+  <div class="body">
+    <h3 class="name">Mosaic Quilt</h3>
+    <p class="look">A wall of hand-glazed tiles: every 60-px cell is its own tiny 4-fold mirror kaleidoscope, alternate cells add a diagonal fold (p4g-style checkering), and per-cell phase...</p>
+    <code class="cmd">JD_MODE=10 ./dazzle64</code>
+    <div class="meta"><span>Kaleido &amp; Tiling</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f1">Demoscene Classics <span style="color:#3a4256">· 011–020</span></h3><div class="grid"><article class="card star" id="p011">
+  <div class="shot"><span class="num">011</span>
+    <img loading="lazy" src="patterns/011_plasma_mandala/preview.png" alt="Pattern 011 — Plasma Mandala"></div>
+  <div class="body">
+    <h3 class="name">Plasma Mandala</h3>
+    <p class="look">The canonical four-sine demoscene plasma folded six ways, so its blobs become breathing petals around a slowly turning center.</p>
+    <code class="cmd">JD_MODE=11 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">27/30</span></div>
+  </div>
+</article><article class="card" id="p012">
+  <div class="shot"><span class="num">012</span>
+    <img loading="lazy" src="patterns/012_rotozoom_kaleido/preview.png" alt="Pattern 012 — Rotozoom Kaleido"></div>
+  <div class="body">
+    <h3 class="name">Rotozoom Kaleido</h3>
+    <p class="look">A rotozoomed procedural tile texture seen through an 8-fold mirror: mirrored copies counter-rotate against each other at every seam exactly like a physical kaleidoscope...</p>
+    <code class="cmd">JD_MODE=12 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p013">
+  <div class="shot"><span class="num">013</span>
+    <img loading="lazy" src="patterns/013_tunnel_bloom/preview.png" alt="Pattern 013 — Tunnel Bloom"></div>
+  <div class="body">
+    <h3 class="name">Tunnel Bloom</h3>
+    <p class="look">A classic fly-through tunnel whose mouth orbits off-center behind a 4-fold mirror, so four (then eight, by reflection) tunnel mouths bloom, merge, and drift apart while...</p>
+    <code class="cmd">JD_MODE=13 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card star" id="p014">
+  <div class="shot"><span class="num">014</span>
+    <img loading="lazy" src="patterns/014_copper_octarings/preview.png" alt="Pattern 014 — Copper Octarings"></div>
+  <div class="body">
+    <h3 class="name">Copper Octarings</h3>
+    <p class="look">Amiga copper bars promoted from scanlines to radius: six neon gradient bars ride independent sine paths in and out as crisp concentric octagon rings on a midnight-blue...</p>
+    <code class="cmd">JD_MODE=14 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p015">
+  <div class="shot"><span class="num">015</span>
+    <img loading="lazy" src="patterns/015_twister_star/preview.png" alt="Pattern 015 — Twister Star"></div>
+  <div class="body">
+    <h3 class="name">Twister Star</h3>
+    <p class="look">The demoscene twister run over radius instead of scanlines: a five-armed braid of jewel-toned ribbons (ruby, amber, emerald, sapphire) that twists sinusoidally along its...</p>
+    <code class="cmd">JD_MODE=15 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p016">
+  <div class="shot"><span class="num">016</span>
+    <img loading="lazy" src="patterns/016_shadebob_rosette/preview.png" alt="Pattern 016 — Shadebob Rosette"></div>
+  <div class="body">
+    <h3 class="name">Shadebob Rosette</h3>
+    <p class="look">A single Lissajous shadebob whose additive trail is folded six ways: on screen, twelve synchronized bobs weave a glowing rosette whose self-crossings bloom into hot...</p>
+    <code class="cmd">JD_MODE=16 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p017">
+  <div class="shot"><span class="num">017</span>
+    <img loading="lazy" src="patterns/017_metaball_kiss/preview.png" alt="Pattern 017 — Metaball Kiss"></div>
+  <div class="body">
+    <h3 class="name">Metaball Kiss</h3>
+    <p class="look">Four metaballs folded six ways so every ball kisses and fuses with its own reflections across the wedge seams, forming soft lobed mandalas that continuously merge and...</p>
+    <code class="cmd">JD_MODE=17 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card star" id="p018">
+  <div class="shot"><span class="num">018</span>
+    <img loading="lazy" src="patterns/018_kefrens_spiral/preview.png" alt="Pattern 018 — Kefrens Spiral"></div>
+  <div class="body">
+    <h3 class="name">Kefrens Spiral</h3>
+    <p class="look">Kefrens/Alcatraz bars with the scanline axis swapped for radius: a never-cleared angular line buffer is stamped and re-stamped as radius grows outward, so the bar&#x27;s...</p>
+    <code class="cmd">JD_MODE=18 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card star" id="p019">
+  <div class="shot"><span class="num">019</span>
+    <img loading="lazy" src="patterns/019_moire_silk/preview.png" alt="Pattern 019 — Moiré Silk"></div>
+  <div class="body">
+    <h3 class="name">Moiré Silk</h3>
+    <p class="look">Two interference-ring sources orbiting inside an 8-fold wedge — sixteen mirrored wave sources on screen — whose beat patterns weave silky teal-and-ember moiré fabric...</p>
+    <code class="cmd">JD_MODE=19 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">26/30</span></div>
+  </div>
+</article><article class="card" id="p020">
+  <div class="shot"><span class="num">020</span>
+    <img loading="lazy" src="patterns/020_feedback_fractal/preview.png" alt="Pattern 020 — Feedback Fractal"></div>
+  <div class="body">
+    <h3 class="name">Feedback Fractal</h3>
+    <p class="look">Fold-aware video feedback — the king of dazzle effects: a glowing orbit-blob and a breathing ring are stamped into a 7-fold wedge, and every generation of the feedback...</p>
+    <code class="cmd">JD_MODE=20 ./dazzle64</code>
+    <div class="meta"><span>Demoscene Classics</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f2">Moire &amp; Op-Art <span style="color:#3a4256">· 021–030</span></h3><div class="grid"><article class="card" id="p021">
+  <div class="shot"><span class="num">021</span>
+    <img loading="lazy" src="patterns/021_ripple_duet/preview.png" alt="Pattern 021 — Ripple Duet"></div>
+  <div class="body">
+    <h3 class="name">Ripple Duet</h3>
+    <p class="look">Two invisible pebbles orbit the center of a lagoon-teal pond, their expanding ring waves overlapping into slowly turning hyperbolic fringe families.</p>
+    <code class="cmd">JD_MODE=21 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p022">
+  <div class="shot"><span class="num">022</span>
+    <img loading="lazy" src="patterns/022_xor_rings/preview.png" alt="Pattern 022 — XOR Rings"></div>
+  <div class="body">
+    <h3 class="name">XOR Rings</h3>
+    <p class="look">Two invisible ring emitters wander the screen and their bands XOR into crisp lens-and-eye interference figures — hard-edged fringes stepped from midnight indigo up...</p>
+    <code class="cmd">JD_MODE=22 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p023">
+  <div class="shot"><span class="num">023</span>
+    <img loading="lazy" src="patterns/023_silk_gratings/preview.png" alt="Pattern 023 — Silk Gratings"></div>
+  <div class="body">
+    <h3 class="name">Silk Gratings</h3>
+    <p class="look">Two sheets of fine diagonal thread — like layered silk — slide across each other, and their beat pattern blooms into wide soft bands of rose, magenta and violet that bow...</p>
+    <code class="cmd">JD_MODE=23 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">16/30</span></div>
+  </div>
+</article><article class="card" id="p024">
+  <div class="shot"><span class="num">024</span>
+    <img loading="lazy" src="patterns/024_munch_frost/preview.png" alt="Pattern 024 — Munch Frost"></div>
+  <div class="body">
+    <h3 class="name">Munch Frost</h3>
+    <p class="look">The HAKMEM munching-squares lattice (x XOR y) rendered as crystalline rainbow frost: nested diamond mouths and Sierpinski steps in full-spectrum bands that slowly rotate...</p>
+    <code class="cmd">JD_MODE=24 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p025">
+  <div class="shot"><span class="num">025</span>
+    <img loading="lazy" src="patterns/025_ember_triad/preview.png" alt="Pattern 025 — Ember Triad"></div>
+  <div class="body">
+    <h3 class="name">Ember Triad</h3>
+    <p class="look">Three wave sources ride the corners of a slowly turning triangle, each ringing at a slightly detuned frequency; where their wavefronts agree the screen ignites in...</p>
+    <code class="cmd">JD_MODE=25 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p026">
+  <div class="shot"><span class="num">026</span>
+    <img loading="lazy" src="patterns/026_spoke_moire/preview.png" alt="Pattern 026 — Spoke Moire"></div>
+  <div class="body">
+    <h3 class="name">Spoke Moire</h3>
+    <p class="look">Two fans of spiral spokes — nine arms against eleven — counter-rotate around the center, and their angular beat sweeps a two-lobed brightness wave around a full rainbow...</p>
+    <code class="cmd">JD_MODE=26 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p027">
+  <div class="shot"><span class="num">027</span>
+    <img loading="lazy" src="patterns/027_wedge_ripples/preview.png" alt="Pattern 027 — Wedge Ripples"></div>
+  <div class="body">
+    <h3 class="name">Wedge Ripples</h3>
+    <p class="look">An eight-petal jade-and-emerald mandala: two wave sources ripple inside a single kaleidoscope wedge and the fold mirrors them into sixteen phantom emitters whose fringes...</p>
+    <code class="cmd">JD_MODE=27 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p028">
+  <div class="shot"><span class="num">028</span>
+    <img loading="lazy" src="patterns/028_quasicrystal/preview.png" alt="Pattern 028 — Quasicrystal"></div>
+  <div class="body">
+    <h3 class="name">Quasicrystal</h3>
+    <p class="look">Seven plane waves at seventh-turn angles superpose into an aperiodic quasicrystal — a lattice of seven-fold rosettes that never exactly repeats, shimmering in peacock...</p>
+    <code class="cmd">JD_MODE=28 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p029">
+  <div class="shot"><span class="num">029</span>
+    <img loading="lazy" src="patterns/029_tartan_beat/preview.png" alt="Pattern 029 — Tartan Beat"></div>
+  <div class="body">
+    <h3 class="name">Tartan Beat</h3>
+    <p class="look">Two woven square lattices — one turning clockwise, one counter, at slightly different scales — interfere into a giant slow moire plaid: broad diagonal bands of jade...</p>
+    <code class="cmd">JD_MODE=29 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">17/30</span></div>
+  </div>
+</article><article class="card" id="p030">
+  <div class="shot"><span class="num">030</span>
+    <img loading="lazy" src="patterns/030_octa_facets/preview.png" alt="Pattern 030 — Octa Facets"></div>
+  <div class="body">
+    <h3 class="name">Octa Facets</h3>
+    <p class="look">Two trains of concentric octagon rings glide from a pair of wandering centers and interfere into a faceted crystal lattice — bright ice-white ridge lines over deep blue...</p>
+    <code class="cmd">JD_MODE=30 ./dazzle64</code>
+    <div class="meta"><span>Moire &amp; Op-Art</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f3">Spirograph &amp; Curves <span style="color:#3a4256">· 031–040</span></h3><div class="grid"><article class="card" id="p031">
+  <div class="shot"><span class="num">031</span>
+    <img loading="lazy" src="patterns/031_spirograph_bloom/preview.png" alt="Pattern 031 — Spirograph Bloom"></div>
+  <div class="body">
+    <h3 class="name">Spirograph Bloom</h3>
+    <p class="look">A luminous spirograph rosette fills the screen, its petal count and loop depth slowly breathing as the gear ratio drifts, the whole figure cycling through saturated...</p>
+    <code class="cmd">JD_MODE=31 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p032">
+  <div class="shot"><span class="num">032</span>
+    <img loading="lazy" src="patterns/032_harmonograph_veil/preview.png" alt="Pattern 032 — Harmonograph Veil"></div>
+  <div class="body">
+    <h3 class="name">Harmonograph Veil</h3>
+    <p class="look">A gauzy four-pendulum harmonograph web in teal-to-violet, mirrored four ways so it reads as folded silk; the detuned second pendulum makes the veil slowly precess and...</p>
+    <code class="cmd">JD_MODE=32 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p033">
+  <div class="shot"><span class="num">033</span>
+    <img loading="lazy" src="patterns/033_rose_engine/preview.png" alt="Pattern 033 — Rose Engine"></div>
+  <div class="body">
+    <h3 class="name">Rose Engine</h3>
+    <p class="look">A molten guilloché rose — crimson core rays fading through orange into a gold-green engine-turned rim — spun to 7-fold dihedral symmetry.</p>
+    <code class="cmd">JD_MODE=33 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p034">
+  <div class="shot"><span class="num">034</span>
+    <img loading="lazy" src="patterns/034_lissajous_weave/preview.png" alt="Pattern 034 — Lissajous Weave"></div>
+  <div class="body">
+    <h3 class="name">Lissajous Weave</h3>
+    <p class="look">A dense 3:4 Lissajous basket that fills the frame edge-to-edge, woven from a single saturated hue that slowly walks the color wheel; the sweeping phase makes the figure...</p>
+    <code class="cmd">JD_MODE=34 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p035">
+  <div class="shot"><span class="num">035</span>
+    <img loading="lazy" src="patterns/035_string_cardioid/preview.png" alt="Pattern 035 — String Cardioid"></div>
+  <div class="body">
+    <h3 class="name">String Cardioid</h3>
+    <p class="look">Times-table string art on a circle of 180 pins: thousands of rainbow chords whose envelope morphs from cardioid through nephroid into higher epicycloids as the...</p>
+    <code class="cmd">JD_MODE=35 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p036">
+  <div class="shot"><span class="num">036</span>
+    <img loading="lazy" src="patterns/036_epicycle_lace/preview.png" alt="Pattern 036 — Epicycle Lace"></div>
+  <div class="body">
+    <h3 class="name">Epicycle Lace</h3>
+    <p class="look">Three stacked epicycles trace a scalloped, snowflake-like lace medallion with 5-fold dihedral symmetry, in cyan-blue-violet with green-gold accents as the band LFO...</p>
+    <code class="cmd">JD_MODE=36 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p037">
+  <div class="shot"><span class="num">037</span>
+    <img loading="lazy" src="patterns/037_pendulum_web/preview.png" alt="Pattern 037 — Pendulum Web"></div>
+  <div class="body">
+    <h3 class="name">Pendulum Web</h3>
+    <p class="look">String art strung between two invisible Lissajous curves: every few ticks a rung is stretched from a point on curve A to the matching point on curve B, each rung a...</p>
+    <code class="cmd">JD_MODE=37 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">18/30</span></div>
+  </div>
+</article><article class="card" id="p038">
+  <div class="shot"><span class="num">038</span>
+    <img loading="lazy" src="patterns/038_guilloche_rings/preview.png" alt="Pattern 038 — Guilloche Rings"></div>
+  <div class="body">
+    <h3 class="name">Guilloche Rings</h3>
+    <p class="look">Five concentric engine-turned bands — gold, copper, teal, ivory, steel-blue — each a wavy 11-and-17-lobed guilloché ribbon, like the security lathework on a banknote.</p>
+    <code class="cmd">JD_MODE=38 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p039">
+  <div class="shot"><span class="num">039</span>
+    <img loading="lazy" src="patterns/039_butterfly_lace/preview.png" alt="Pattern 039 — Butterfly Lace"></div>
+  <div class="body">
+    <h3 class="name">Butterfly Lace</h3>
+    <p class="look">Temple Fay&#x27;s butterfly curve drawn over and over with slowly sliding internal phases, so nested translucent butterflies of amethyst, orchid and ice-blue open their wings...</p>
+    <code class="cmd">JD_MODE=39 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p040">
+  <div class="shot"><span class="num">040</span>
+    <img loading="lazy" src="patterns/040_maurer_rose/preview.png" alt="Pattern 040 — Maurer Rose"></div>
+  <div class="body">
+    <h3 class="name">Maurer Rose</h3>
+    <p class="look">A Maurer-rose walk — straight chords hopping around a sine rose at a drifting step angle — piles up into a granular mandala with concentric hue bands: magenta core, gold...</p>
+    <code class="cmd">JD_MODE=40 ./dazzle64</code>
+    <div class="meta"><span>Spirograph &amp; Curves</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f4">Cellular &amp; Reaction <span style="color:#3a4256">· 041–050</span></h3><div class="grid"><article class="card" id="p041">
+  <div class="shot"><span class="num">041</span>
+    <img loading="lazy" src="patterns/041_cyclic_bloom/preview.png" alt="Pattern 041 — Cyclic Bloom"></div>
+  <div class="body">
+    <h3 class="name">Cyclic Bloom</h3>
+    <p class="look">A rainbow cyclic-cellular-automaton quilt: interlocking rectilinear wavefronts and spiral cores in full-spectrum ramps, mirrored 4-fold so it reads as a woven mandala.</p>
+    <code class="cmd">JD_MODE=41 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card star" id="p042">
+  <div class="shot"><span class="num">042</span>
+    <img loading="lazy" src="patterns/042_bz_pinwheel/preview.png" alt="Pattern 042 — BZ Pinwheel"></div>
+  <div class="body">
+    <h3 class="name">BZ Pinwheel</h3>
+    <p class="look">A gold/teal chemical mandala: six-fold folded spiral wavefronts rotate around a starburst core like a Belousov–Zhabotinsky dish viewed through a kaleidoscope.</p>
+    <code class="cmd">JD_MODE=42 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">26/30</span></div>
+  </div>
+</article><article class="card" id="p043">
+  <div class="shot"><span class="num">043</span>
+    <img loading="lazy" src="patterns/043_turing_labyrinth/preview.png" alt="Pattern 043 — Turing Labyrinth"></div>
+  <div class="body">
+    <h3 class="name">Turing Labyrinth</h3>
+    <p class="look">A fingerprint / brain-coral labyrinth in indigo and amber: reaction-diffusion stripes locked into a 4-fold symmetric maze, with bright seams glowing along the stripe...</p>
+    <code class="cmd">JD_MODE=43 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p044">
+  <div class="shot"><span class="num">044</span>
+    <img loading="lazy" src="patterns/044_majority_quilt/preview.png" alt="Pattern 044 — Majority Quilt"></div>
+  <div class="body">
+    <h3 class="name">Majority Quilt</h3>
+    <p class="look">Bold two-tone amoeba patches — dusty rose, amber, aubergine, chartreuse — melting into and out of each other like a living pueblo quilt, mirrored 4-fold.</p>
+    <code class="cmd">JD_MODE=44 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p045">
+  <div class="shot"><span class="num">045</span>
+    <img loading="lazy" src="patterns/045_lenia_bloom/preview.png" alt="Pattern 045 — Lenia Bloom"></div>
+  <div class="body">
+    <h3 class="name">Lenia Bloom</h3>
+    <p class="look">A colony of glowing ring-shaped &quot;orbium&quot; cells — cream, sage, and cyan on near-black — orbiting in three concentric symmetric rings.</p>
+    <code class="cmd">JD_MODE=45 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p046">
+  <div class="shot"><span class="num">046</span>
+    <img loading="lazy" src="patterns/046_rps_trichrome/preview.png" alt="Pattern 046 — RPS Trichrome"></div>
+  <div class="body">
+    <h3 class="name">RPS Trichrome</h3>
+    <p class="look">Three species — magenta, lime, azure — locked in a rock-paper-scissors chase, their territories drawn as bold six-petaled flower rings that spiral slowly inward.</p>
+    <code class="cmd">JD_MODE=46 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p047">
+  <div class="shot"><span class="num">047</span>
+    <img loading="lazy" src="patterns/047_target_choir/preview.png" alt="Pattern 047 — Target Choir"></div>
+  <div class="body">
+    <h3 class="name">Target Choir</h3>
+    <p class="look">Seven BZ pacemakers — one center, six on a hexagon — each pumping out target rings that interfere into a lace of crimson, teal, and gold rosettes.</p>
+    <code class="cmd">JD_MODE=47 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p048">
+  <div class="shot"><span class="num">048</span>
+    <img loading="lazy" src="patterns/048_excitable_spirals/preview.png" alt="Pattern 048 — Excitable Spirals"></div>
+  <div class="body">
+    <h3 class="name">Excitable Spirals</h3>
+    <p class="look">A Greenberg–Hastings excitable medium: neon wavefronts crawl through a dark field, curling at their broken ends into greek-key spiral cores — like luminous circuitry...</p>
+    <code class="cmd">JD_MODE=48 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p049">
+  <div class="shot"><span class="num">049</span>
+    <img loading="lazy" src="patterns/049_voronoi_breath/preview.png" alt="Pattern 049 — Voronoi Breath"></div>
+  <div class="body">
+    <h3 class="name">Voronoi Breath</h3>
+    <p class="look">Stained glass alive: jewel-toned Worley cells — emerald, violet, ruby, gold — separated by dark leading that slithers as nineteen seed points orbit in three symmetric...</p>
+    <code class="cmd">JD_MODE=49 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p050">
+  <div class="shot"><span class="num">050</span>
+    <img loading="lazy" src="patterns/050_turing_spots/preview.png" alt="Pattern 050 — Turing Spots"></div>
+  <div class="body">
+    <h3 class="name">Turing Spots</h3>
+    <p class="look">A leopard-skin reaction-diffusion field built from two hexagonal spot lattices — big soft cells carrying small counter-rotating freckles — in blues, olives, and hot...</p>
+    <code class="cmd">JD_MODE=50 ./dazzle64</code>
+    <div class="meta"><span>Cellular &amp; Reaction</span>
+      <span class="score">18/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f5">Particles &amp; Orbits <span style="color:#3a4256">· 051–060</span></h3><div class="grid"><article class="card" id="p051">
+  <div class="shot"><span class="num">051</span>
+    <img loading="lazy" src="patterns/051_firework_garden/preview.png" alt="Pattern 051 — Firework Garden"></div>
+  <div class="body">
+    <h3 class="name">Firework Garden</h3>
+    <p class="look">Classic dazzle fireworks (footage R11): radial particle bursts with gravity-drooped trails accumulating over a deep plum gradient, each burst a single saturated hue with...</p>
+    <code class="cmd">JD_MODE=51 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p052">
+  <div class="shot"><span class="num">052</span>
+    <img loading="lazy" src="patterns/052_orbit_weave/preview.png" alt="Pattern 052 — Orbit Weave"></div>
+  <div class="body">
+    <h3 class="name">Orbit Weave</h3>
+    <p class="look">Seven nested electron ellipses (the c06 atom, grown up) precess at different rates so their comet-bright heads weave a rotating rosette; each orbit keeps a faint dotted...</p>
+    <code class="cmd">JD_MODE=52 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p053">
+  <div class="shot"><span class="num">053</span>
+    <img loading="lazy" src="patterns/053_gravity_rose/preview.png" alt="Pattern 053 — Gravity Rose"></div>
+  <div class="body">
+    <h3 class="name">Gravity Rose</h3>
+    <p class="look">Eight comet particles ride precessing Kepler ellipses around a glowing gold core, each dragging a long fading tail; stamped through the 4-fold mirror the tails braid...</p>
+    <code class="cmd">JD_MODE=53 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p054">
+  <div class="shot"><span class="num">054</span>
+    <img loading="lazy" src="patterns/054_starfield_warp/preview.png" alt="Pattern 054 — Starfield Warp"></div>
+  <div class="body">
+    <h3 class="name">Starfield Warp</h3>
+    <p class="look">A gentle hyperspace cruise: 520 stars stream outward from a vanishing point that itself drifts on a slow Lissajous, leaving short radial streaks whose hue is set by...</p>
+    <code class="cmd">JD_MODE=54 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">16/30</span></div>
+  </div>
+</article><article class="card" id="p055">
+  <div class="shot"><span class="num">055</span>
+    <img loading="lazy" src="patterns/055_comet_carousel/preview.png" alt="Pattern 055 — Comet Carousel"></div>
+  <div class="body">
+    <h3 class="name">Comet Carousel</h3>
+    <p class="look">Three comets on breathing circular orbits, each stamped through a 6-fold rotational kaleidoscope: eighteen white-hot heads towing rainbow-shifting tails braid into a...</p>
+    <code class="cmd">JD_MODE=55 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p056">
+  <div class="shot"><span class="num">056</span>
+    <img loading="lazy" src="patterns/056_ribbon_swarm/preview.png" alt="Pattern 056 — Ribbon Swarm"></div>
+  <div class="body">
+    <h3 class="name">Ribbon Swarm</h3>
+    <p class="look">Three hundred particles strung along a phase gradient of a 2:3 Lissajous form a single rainbow ribbon that folds, twists and unfolds like a starling murmuration;...</p>
+    <code class="cmd">JD_MODE=56 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p057">
+  <div class="shot"><span class="num">057</span>
+    <img loading="lazy" src="patterns/057_galaxy_pinwheel/preview.png" alt="Pattern 057 — Galaxy Pinwheel"></div>
+  <div class="body">
+    <h3 class="name">Galaxy Pinwheel</h3>
+    <p class="look">A two-armed spiral galaxy of 3000 stars seen at a tilt: molten gold-white core melting outward through rose to blue-violet arm tips, turning with true differential...</p>
+    <code class="cmd">JD_MODE=57 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p058">
+  <div class="shot"><span class="num">058</span>
+    <img loading="lazy" src="patterns/058_fountain_arcs/preview.png" alt="Pattern 058 — Fountain Arcs"></div>
+  <div class="body">
+    <h3 class="name">Fountain Arcs</h3>
+    <p class="look">A garden-sprinkler fountain at bottom center launches droplets whose full parabolic arcs stay painted, mirrored left/right into a peacock fan; the launch angle sweeps...</p>
+    <code class="cmd">JD_MODE=58 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p059">
+  <div class="shot"><span class="num">059</span>
+    <img loading="lazy" src="patterns/059_binary_dance/preview.png" alt="Pattern 059 — Binary Dance"></div>
+  <div class="body">
+    <h3 class="name">Binary Dance</h3>
+    <p class="look">A gold sun and a cyan sun waltz around their barycenter dragging interlocking spiral trails; each carries four counter-rotating moons with their own short tails, and a...</p>
+    <code class="cmd">JD_MODE=59 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">16/30</span></div>
+  </div>
+</article><article class="card" id="p060">
+  <div class="shot"><span class="num">060</span>
+    <img loading="lazy" src="patterns/060_meteor_veil/preview.png" alt="Pattern 060 — Meteor Veil"></div>
+  <div class="body">
+    <h3 class="name">Meteor Veil</h3>
+    <p class="look">A night sky of 300 tinted twinkling stars over a teal horizon glow; slow meteors drift down in mirrored left/right pairs, each towing a long pastel ion trail that keeps...</p>
+    <code class="cmd">JD_MODE=60 ./dazzle64</code>
+    <div class="meta"><span>Particles &amp; Orbits</span>
+      <span class="score">15/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f6">Tunnels &amp; Vortex <span style="color:#3a4256">· 061–070</span></h3><div class="grid"><article class="card" id="p061">
+  <div class="shot"><span class="num">061</span>
+    <img loading="lazy" src="patterns/061_checker_tunnel/preview.png" alt="Pattern 061 — Checker Tunnel"></div>
+  <div class="body">
+    <h3 class="name">Checker Tunnel</h3>
+    <p class="look">A classic demoscene tunnel: rainbow spiral bands rush past the viewer down a dark throat at screen center, with a soft checkerboard dimming that gives the walls tile...</p>
+    <code class="cmd">JD_MODE=61 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p062">
+  <div class="shot"><span class="num">062</span>
+    <img loading="lazy" src="patterns/062_twist_corridor/preview.png" alt="Pattern 062 — Twist Corridor"></div>
+  <div class="body">
+    <h3 class="name">Twist Corridor</h3>
+    <p class="look">Nested glowing squares recede to a dark vanishing point — a square air-shaft you are falling down — while the whole shaft slowly torques, the deep end twisting faster...</p>
+    <code class="cmd">JD_MODE=62 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p063">
+  <div class="shot"><span class="num">063</span>
+    <img loading="lazy" src="patterns/063_spiral_zoom/preview.png" alt="Pattern 063 — Spiral Zoom"></div>
+  <div class="body">
+    <h3 class="name">Spiral Zoom</h3>
+    <p class="look">Two interlocked logarithmic spirals — a 3-arm falling inward and a 2-arm slowly winding the other way — interfere into curling paisley whorls that pour endlessly into...</p>
+    <code class="cmd">JD_MODE=63 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card star" id="p064">
+  <div class="shot"><span class="num">064</span>
+    <img loading="lazy" src="patterns/064_starburst_forge/preview.png" alt="Pattern 064 — Starburst Forge"></div>
+  <div class="body">
+    <h3 class="name">Starburst Forge</h3>
+    <p class="look">Twenty-four molten rays fan out from a dark core like a blacksmith&#x27;s starburst, bending gently as they go, while glowing copper rings race down the rays into the center...</p>
+    <code class="cmd">JD_MODE=64 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p065">
+  <div class="shot"><span class="num">065</span>
+    <img loading="lazy" src="patterns/065_echo_mandala/preview.png" alt="Pattern 065 — Echo Mandala"></div>
+  <div class="body">
+    <h3 class="name">Echo Mandala</h3>
+    <p class="look">The camera-pointed-at-its-own-monitor effect, stateless: a 5-petal flower is echoed at eight nested scales, each echo rotated half a radian deeper and dimmer, and the...</p>
+    <code class="cmd">JD_MODE=65 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">18/30</span></div>
+  </div>
+</article><article class="card" id="p066">
+  <div class="shot"><span class="num">066</span>
+    <img loading="lazy" src="patterns/066_hex_tunnel/preview.png" alt="Pattern 066 — Hex Tunnel"></div>
+  <div class="body">
+    <h3 class="name">Hex Tunnel</h3>
+    <p class="look">A honeycomb throat: crisp neon hexagon hoops recede toward a black vanishing point, drifting outward toward the viewer while the whole shaft rotates almost...</p>
+    <code class="cmd">JD_MODE=66 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card star" id="p067">
+  <div class="shot"><span class="num">067</span>
+    <img loading="lazy" src="patterns/067_twin_tunnels/preview.png" alt="Pattern 067 — Twin Tunnels"></div>
+  <div class="body">
+    <h3 class="name">Twin Tunnels</h3>
+    <p class="look">Eight tunnel mouths (two real, mirrored 4-fold) wander slowly around the screen, their ring systems flying in opposite directions and beating against each other into...</p>
+    <code class="cmd">JD_MODE=67 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p068">
+  <div class="shot"><span class="num">068</span>
+    <img loading="lazy" src="patterns/068_wormhole_pond/preview.png" alt="Pattern 068 — Wormhole Pond"></div>
+  <div class="body">
+    <h3 class="name">Wormhole Pond</h3>
+    <p class="look">A pond drains into a wormhole: the throat is not round but alive, its rim slowly flexing through kidney and trefoil shapes, while rings pour down it, swells radiate back...</p>
+    <code class="cmd">JD_MODE=68 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p069">
+  <div class="shot"><span class="num">069</span>
+    <img loading="lazy" src="patterns/069_pillar_hall/preview.png" alt="Pattern 069 — Pillar Hall"></div>
+  <div class="body">
+    <h3 class="name">Pillar Hall</h3>
+    <p class="look">A first-person glide down an endless amber-and-mahogany hall: checkered floor and ceiling scroll toward you, side walls carry the same checker in a warmer key, and dark...</p>
+    <code class="cmd">JD_MODE=69 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p070">
+  <div class="shot"><span class="num">070</span>
+    <img loading="lazy" src="patterns/070_vortex_petals/preview.png" alt="Pattern 070 — Vortex Petals"></div>
+  <div class="body">
+    <h3 class="name">Vortex Petals</h3>
+    <p class="look">Six broad petal arms — moss green through chartreuse to gold and vermilion — curl into a black gravitational core, and the spiral&#x27;s tightness slowly breathes: the flower...</p>
+    <code class="cmd">JD_MODE=70 ./dazzle64</code>
+    <div class="meta"><span>Tunnels &amp; Vortex</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f7">Organic &amp; Growth <span style="color:#3a4256">· 071–080</span></h3><div class="grid"><article class="card" id="p071">
+  <div class="shot"><span class="num">071</span>
+    <img loading="lazy" src="patterns/071_silk_currents/preview.png" alt="Pattern 071 — Silk Currents"></div>
+  <div class="body">
+    <h3 class="name">Silk Currents</h3>
+    <p class="look">Hundreds of silk threads drift along invisible currents, braiding into glowing violet-to-green rivers over a deep indigo vignette.</p>
+    <code class="cmd">JD_MODE=71 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p072">
+  <div class="shot"><span class="num">072</span>
+    <img loading="lazy" src="patterns/072_vine_waltz/preview.png" alt="Pattern 072 — Vine Waltz"></div>
+  <div class="body">
+    <h3 class="name">Vine Waltz</h3>
+    <p class="look">A hedge of emerald vines climbs from the bottom of a plum-purple dusk, each stem shading green→gold as it rises, sprouting thorn-leaf fronds and finally curling into...</p>
+    <code class="cmd">JD_MODE=72 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p073">
+  <div class="shot"><span class="num">073</span>
+    <img loading="lazy" src="patterns/073_frost_court/preview.png" alt="Pattern 073 — Frost Court"></div>
+  <div class="body">
+    <h3 class="name">Frost Court</h3>
+    <p class="look">A six-fold snowflake of frost dendrites grows outward from a hexagonal seed plate on a midnight-navy pane, arms feathering into cyan-teal side spurs that whiten near the...</p>
+    <code class="cmd">JD_MODE=73 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p074">
+  <div class="shot"><span class="num">074</span>
+    <img loading="lazy" src="patterns/074_slow_lightning/preview.png" alt="Pattern 074 — Slow Lightning"></div>
+  <div class="body">
+    <h3 class="name">Slow Lightning</h3>
+    <p class="look">Two Lichtenberg bolts — one violet, one electric blue — crawl down a near-black sky in slow motion, forking into ragged branches wrapped in soft neon glow.</p>
+    <code class="cmd">JD_MODE=74 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">16/30</span></div>
+  </div>
+</article><article class="card" id="p075">
+  <div class="shot"><span class="num">075</span>
+    <img loading="lazy" src="patterns/075_coral_lace/preview.png" alt="Pattern 075 — Coral Lace"></div>
+  <div class="body">
+    <h3 class="name">Coral Lace</h3>
+    <p class="look">Nested growth rings bloom from a drifting center like a coral polyp or lettuce edge, each new ring more ruffled than the last, sweeping the full hue wheel from magenta...</p>
+    <code class="cmd">JD_MODE=75 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p076">
+  <div class="shot"><span class="num">076</span>
+    <img loading="lazy" src="patterns/076_kelp_cathedral/preview.png" alt="Pattern 076 — Kelp Cathedral"></div>
+  <div class="body">
+    <h3 class="name">Kelp Cathedral</h3>
+    <p class="look">A kelp forest grows toward the surface through teal water, god-rays slanting down between green and crimson stalks ringed with curved fronds and gold shimmer tips; faint...</p>
+    <code class="cmd">JD_MODE=76 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p077">
+  <div class="shot"><span class="num">077</span>
+    <img loading="lazy" src="patterns/077_mycelium_veil/preview.png" alt="Pattern 077 — Mycelium Veil"></div>
+  <div class="body">
+    <h3 class="name">Mycelium Veil</h3>
+    <p class="look">A radial web of amber and rose hyphae wanders outward from a warm-glowing heart, filaments meandering like living threads with bright growing tips and pulsing spore...</p>
+    <code class="cmd">JD_MODE=77 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">16/30</span></div>
+  </div>
+</article><article class="card" id="p078">
+  <div class="shot"><span class="num">078</span>
+    <img loading="lazy" src="patterns/078_turing_garden/preview.png" alt="Pattern 078 — Turing Garden"></div>
+  <div class="body">
+    <h3 class="name">Turing Garden</h3>
+    <p class="look">Bold reaction-diffusion colonies — solid vermilion continents on cobalt seas, edged everywhere with crawling gold rims — slowly deform, split and merge like living coral...</p>
+    <code class="cmd">JD_MODE=78 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p079">
+  <div class="shot"><span class="num">079</span>
+    <img loading="lazy" src="patterns/079_golden_bloom/preview.png" alt="Pattern 079 — Golden Bloom"></div>
+  <div class="body">
+    <h3 class="name">Golden Bloom</h3>
+    <p class="look">A sunflower head assembles itself floret by floret on the golden angle, rainbow seeds spiraling out from the center until they fill the frame in interlocking phyllotaxis...</p>
+    <code class="cmd">JD_MODE=79 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">20/30</span></div>
+  </div>
+</article><article class="card" id="p080">
+  <div class="shot"><span class="num">080</span>
+    <img loading="lazy" src="patterns/080_tendril_rose/preview.png" alt="Pattern 080 — Tendril Rose"></div>
+  <div class="body">
+    <h3 class="name">Tendril Rose</h3>
+    <p class="look">Two counter-rotating rose-curve tendrils draw themselves onto a deep violet ground with four-fold mirrored symmetry — an outer wide-petaled rosette and a tighter inner...</p>
+    <code class="cmd">JD_MODE=80 ./dazzle64</code>
+    <div class="meta"><span>Organic &amp; Growth</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article></div><h3 class="fam" id="f8">Original Footage Remakes <span style="color:#3a4256">· 081–100</span></h3><div class="grid"><article class="card" id="p081">
+  <div class="shot"><span class="num">081</span>
+    <img loading="lazy" src="patterns/081_poly_morph/preview.png" alt="Pattern 081 — Poly Morph"></div>
+  <div class="body">
+    <h3 class="name">Poly Morph</h3>
+    <p class="look">Five glowing medallions — one large center, four mirrored satellites — float over a dim violet ring-field; each medallion is a filled regular polygon that slowly melts...</p>
+    <code class="cmd">JD_MODE=81 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p082">
+  <div class="shot"><span class="num">082</span>
+    <img loading="lazy" src="patterns/082_greek_key/preview.png" alt="Pattern 082 — Greek Key"></div>
+  <div class="body">
+    <h3 class="name">Greek Key</h3>
+    <p class="look">A central rectangular panel packed with interlocking greek-key / meander hooks (alternating chirality per cell, exactly the a02–a04 maze-panel reference) framed in gold,...</p>
+    <code class="cmd">JD_MODE=82 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p083">
+  <div class="shot"><span class="num">083</span>
+    <img loading="lazy" src="patterns/083_patch_quilt/preview.png" alt="Pattern 083 — Patch Quilt"></div>
+  <div class="body">
+    <h3 class="name">Patch Quilt</h3>
+    <p class="look">A stitched quilt of 48-px patches, each patch owning ONE distinct motif — nested diamonds, target rings, cross bands, or a woven checker — in its own hue, separated by...</p>
+    <code class="cmd">JD_MODE=83 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p084">
+  <div class="shot"><span class="num">084</span>
+    <img loading="lazy" src="patterns/084_gear_rosettes/preview.png" alt="Pattern 084 — Gear Rosettes"></div>
+  <div class="body">
+    <h3 class="name">Gear Rosettes</h3>
+    <p class="look">Four large sunflower-gear rosettes in a 2x2 array — toothed golden discs with dotted seed cores — sitting on a slow blue diagonal-stripe ground, with a chain of small...</p>
+    <code class="cmd">JD_MODE=84 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p085">
+  <div class="shot"><span class="num">085</span>
+    <img loading="lazy" src="patterns/085_vector_machine/preview.png" alt="Pattern 085 — Vector Machine"></div>
+  <div class="body">
+    <h3 class="name">Vector Machine</h3>
+    <p class="look">A bold CGA-poster machine on black (the c01–c05 &quot;H-frame&quot; reference): giant red concentric arc stacks open left and right like parentheses, a blue-to-magenta gradient...</p>
+    <code class="cmd">JD_MODE=85 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p086">
+  <div class="shot"><span class="num">086</span>
+    <img loading="lazy" src="patterns/086_gem_orbit/preview.png" alt="Pattern 086 — Gem Orbit"></div>
+  <div class="body">
+    <h3 class="name">Gem Orbit</h3>
+    <p class="look">Nine faceted hexagonal gems — a big one at center, eight smaller ones on an elliptical orbit — glide over a deep-blue pond of faint breathing rings.</p>
+    <code class="cmd">JD_MODE=86 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p087">
+  <div class="shot"><span class="num">087</span>
+    <img loading="lazy" src="patterns/087_chevron_court/preview.png" alt="Pattern 087 — Chevron Court"></div>
+  <div class="body">
+    <h3 class="name">Chevron Court</h3>
+    <p class="look">A four-fold mirrored court of emerald-and-gold chevrons marching diagonally from every corner toward a cream-framed violet striped core at center (the d19–d21...</p>
+    <code class="cmd">JD_MODE=87 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p088">
+  <div class="shot"><span class="num">088</span>
+    <img loading="lazy" src="patterns/088_star_cross/preview.png" alt="Pattern 088 — Star Cross"></div>
+  <div class="body">
+    <h3 class="name">Star Cross</h3>
+    <p class="look">The classic Islamic star-and-cross tiling as living objects: gold-rimmed 8-point stars filled with concentric rainbow layers alternate with cool plus-shaped crosses on a...</p>
+    <code class="cmd">JD_MODE=88 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card star" id="p089">
+  <div class="shot"><span class="num">089</span>
+    <img loading="lazy" src="patterns/089_oval_drums/preview.png" alt="Pattern 089 — Oval Drums"></div>
+  <div class="body">
+    <h3 class="name">Oval Drums</h3>
+    <p class="look">Full-screen concentric racetrack (stadium) rings in rolling rainbow bands radiate from a pair of white-framed striped drums that sit side by side at center, their stripe...</p>
+    <code class="cmd">JD_MODE=89 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">25/30</span></div>
+  </div>
+</article><article class="card" id="p090">
+  <div class="shot"><span class="num">090</span>
+    <img loading="lazy" src="patterns/090_diamond_burst/preview.png" alt="Pattern 090 — Diamond Burst"></div>
+  <div class="body">
+    <h3 class="name">Diamond Burst</h3>
+    <p class="look">One huge diamond dominates the screen (the a01 rhombus-kaleidoscope): a magenta-rimmed confetti-mosaic heart wrapped in expanding concentric diamond bands that cycle...</p>
+    <code class="cmd">JD_MODE=90 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card" id="p091">
+  <div class="shot"><span class="num">091</span>
+    <img loading="lazy" src="patterns/091_diamond_confetti/preview.png" alt="Pattern 091 — Diamond Confetti"></div>
+  <div class="body">
+    <h3 class="name">Diamond Confetti</h3>
+    <p class="look">A single huge rhombus fills the screen: thick cyan and magenta rims, an interior packed with a 4-fold-mirrored quilt of tiny rainbow confetti cells, and faint concentric...</p>
+    <code class="cmd">JD_MODE=91 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">21/30</span></div>
+  </div>
+</article><article class="card" id="p092">
+  <div class="shot"><span class="num">092</span>
+    <img loading="lazy" src="patterns/092_greek_key_panel/preview.png" alt="Pattern 092 — Greek Key Panel"></div>
+  <div class="body">
+    <h3 class="name">Greek Key Panel</h3>
+    <p class="look">A big central panel covered edge-to-edge in interlocking greek-key maze motifs, framed by a border of blue kaleidoscope wedges with small six-lobed rosettes, while thin...</p>
+    <code class="cmd">JD_MODE=92 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p093">
+  <div class="shot"><span class="num">093</span>
+    <img loading="lazy" src="patterns/093_cathedral_fan/preview.png" alt="Pattern 093 — Cathedral Fan"></div>
+  <div class="body">
+    <h3 class="name">Cathedral Fan</h3>
+    <p class="look">A red/pink sunburst pinched flat at a glowing horizontal centerline, its rays sweeping like a slowly opening fan; blocky stair-stepped blue spires with green step-seams...</p>
+    <code class="cmd">JD_MODE=93 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p094">
+  <div class="shot"><span class="num">094</span>
+    <img loading="lazy" src="patterns/094_thread_web/preview.png" alt="Pattern 094 — Thread Web"></div>
+  <div class="body">
+    <h3 class="name">Thread Web</h3>
+    <p class="look">A flat violet flood on which fine, gently-curved rainbow threads accumulate one by one, always sweeping corner-to-center through a 4-fold mirror so the whole screen...</p>
+    <code class="cmd">JD_MODE=94 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">16/30</span></div>
+  </div>
+</article><article class="card" id="p095">
+  <div class="shot"><span class="num">095</span>
+    <img loading="lazy" src="patterns/095_ring_machine/preview.png" alt="Pattern 095 — Ring Machine"></div>
+  <div class="body">
+    <h3 class="name">Ring Machine</h3>
+    <p class="look">A bold CGA-poster machine: two stacks of red concentric arcs bow outward left and right like giant parentheses, framing an &quot;H&quot; of blue→magenta gradient rectangles with a...</p>
+    <code class="cmd">JD_MODE=95 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">22/30</span></div>
+  </div>
+</article><article class="card" id="p096">
+  <div class="shot"><span class="num">096</span>
+    <img loading="lazy" src="patterns/096_scanline_butterfly/preview.png" alt="Pattern 096 — Scanline Butterfly"></div>
+  <div class="body">
+    <h3 class="name">Scanline Butterfly</h3>
+    <p class="look">The whole field is closely spaced horizontal scanlines whose spacing bulges around two wing lobes, producing a big green-to-yellow moiré butterfly with a cyan diamond...</p>
+    <code class="cmd">JD_MODE=96 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">23/30</span></div>
+  </div>
+</article><article class="card" id="p097">
+  <div class="shot"><span class="num">097</span>
+    <img loading="lazy" src="patterns/097_magenta_fireworks/preview.png" alt="Pattern 097 — Magenta Fireworks"></div>
+  <div class="body">
+    <h3 class="name">Magenta Fireworks</h3>
+    <p class="look">Radial particle bursts pop every few frames across a hot magenta flood, each in one or two hues, their thin trails drooping under gravity and staying on screen forever —...</p>
+    <code class="cmd">JD_MODE=97 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">13/30</span></div>
+  </div>
+</article><article class="card" id="p098">
+  <div class="shot"><span class="num">098</span>
+    <img loading="lazy" src="patterns/098_gear_flower_quad/preview.png" alt="Pattern 098 — Gear Flower Quad"></div>
+  <div class="body">
+    <h3 class="name">Gear Flower Quad</h3>
+    <p class="look">Four big toothed gear/sunflower rosettes in a 2×2 array — yellow-green discs with dark rims and dotted navy seed cores — sit on a ground of drifting diagonal blue/cyan...</p>
+    <code class="cmd">JD_MODE=98 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">19/30</span></div>
+  </div>
+</article><article class="card" id="p099">
+  <div class="shot"><span class="num">099</span>
+    <img loading="lazy" src="patterns/099_racetrack_drums/preview.png" alt="Pattern 099 — Racetrack Drums"></div>
+  <div class="body">
+    <h3 class="name">Racetrack Drums</h3>
+    <p class="look">The entire screen is concentric stadium/racetrack ovals — thick multicolor bands with dark seams — slowly shimmering outward from the center while their hues roll...</p>
+    <code class="cmd">JD_MODE=99 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">24/30</span></div>
+  </div>
+</article><article class="card star" id="p100">
+  <div class="shot"><span class="num">100</span>
+    <img loading="lazy" src="patterns/100_pinwheel_swirl/preview.png" alt="Pattern 100 — Pinwheel Swirl"></div>
+  <div class="body">
+    <h3 class="name">Pinwheel Swirl</h3>
+    <p class="look">Six smooth-shaded comma arms spiral out of the center over black, turning slowly clockwise while the spiral&#x27;s tightness breathes in and out; the shading ramp rolls from...</p>
+    <code class="cmd">JD_MODE=100 ./dazzle64</code>
+    <div class="meta"><span>Original Footage Remakes</span>
+      <span class="score">26/30</span></div>
+  </div>
+</article></div>
+</section>
+
+<section id="palettes">
+  <h2>Palette bank</h2>
+  <p class="sub">Color schemes the engine crossfades between — curated from community
+    palettes and designed harmonies. The running app carries 30 of them.</p>
+  <div class="pals"><article class="pal">
+  <span class="pid">P01</span>
+  <h3>Chasm</h3>
+  <div class="ramp"><i style="background:#85daeb"></i><i style="background:#5fc9e7"></i><i style="background:#5fa1e7"></i><i style="background:#5f6ee7"></i><i style="background:#4c60aa"></i><i style="background:#444774"></i><i style="background:#32313b"></i><i style="background:#463c5e"></i><i style="background:#5d4776"></i><i style="background:#855395"></i><i style="background:#ab58a8"></i><i style="background:#ca60ae"></i><i style="background:#f3a787"></i><i style="background:#f5daa7"></i><i style="background:#8dd894"></i><i style="background:#5dc190"></i><i style="background:#4ab9a3"></i><i style="background:#4593a5"></i><i style="background:#5efdf7"></i><i style="background:#ff5dcc"></i><i style="background:#fdfe89"></i><i style="background:#ffffff"></i></div>
+  <p>Neon aurora over a deep indigo chasm: cyan and cobalt sink into near-black violet, then climb back out through orchid, magenta, peach and mint to electric accents...</p>
+  <div class="meta"><span>22 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P02</span>
+  <h3>Funkyfuture 8</h3>
+  <div class="ramp"><i style="background:#2b0f54"></i><i style="background:#ab1f65"></i><i style="background:#ff4f69"></i><i style="background:#fff7f8"></i><i style="background:#ff8142"></i><i style="background:#ffda45"></i><i style="background:#3368dc"></i><i style="background:#49e7ec"></i></div>
+  <p>Eight bold retrowave tones: deep violet ground, hot magenta and pink, cream highlight, orange and banana yellow, cobalt and sky cyan.</p>
+  <div class="meta"><span>8 colors</span>
+    <span class="score">24/30</span></div>
+</article><article class="pal">
+  <span class="pid">P03</span>
+  <h3>Technogarten</h3>
+  <div class="ramp"><i style="background:#0e0a2e"></i><i style="background:#30286d"></i><i style="background:#924fdc"></i><i style="background:#9a60ff"></i><i style="background:#9d7cff"></i><i style="background:#fd75ca"></i><i style="background:#fba7db"></i><i style="background:#ffc6fe"></i><i style="background:#b295ff"></i><i style="background:#1e34c1"></i><i style="background:#534ed9"></i><i style="background:#2bffd2"></i><i style="background:#60fffa"></i><i style="background:#5fc5ff"></i><i style="background:#60ff64"></i><i style="background:#22c278"></i><i style="background:#000000"></i><i style="background:#fffcc8"></i><i style="background:#ff9e8b"></i><i style="background:#ffec83"></i><i style="background:#d53c6a"></i><i style="background:#f81ca6"></i><i style="background:#fffdeb"></i></div>
+  <p>An electric garden: violet and periwinkle beds, blue-to-teal-to-green vines, with rose and blush blooms and a black void row.</p>
+  <div class="meta"><span>23 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P04</span>
+  <h3>Cyberpunk Neons</h3>
+  <div class="ramp"><i style="background:#53ebe4"></i><i style="background:#0f9595"></i><i style="background:#084f64"></i><i style="background:#03274c"></i><i style="background:#08173d"></i><i style="background:#0b001b"></i><i style="background:#4d004f"></i><i style="background:#c1115a"></i><i style="background:#e13a6a"></i><i style="background:#e46a87"></i><i style="background:#eca6c0"></i></div>
+  <p>Teal-to-cyan ramp on near-black navy, opposed by a crimson-to-rose ramp: two enemy gradients sharing one dark city sky.</p>
+  <div class="meta"><span>11 colors</span>
+    <span class="score">23/30</span></div>
+</article><article class="pal">
+  <span class="pid">P05</span>
+  <h3>Sunraze</h3>
+  <div class="ramp"><i style="background:#27032a"></i><i style="background:#4b083d"></i><i style="background:#731144"></i><i style="background:#890c38"></i><i style="background:#ab0a2a"></i><i style="background:#be2028"></i><i style="background:#cf492c"></i><i style="background:#e36433"></i><i style="background:#e3884e"></i><i style="background:#ecb55f"></i><i style="background:#eed67b"></i><i style="background:#f4efae"></i><i style="background:#fffdd9"></i><i style="background:#fbfbf2"></i></div>
+  <p>A pure dusk ramp: near-black plum through wine, crimson, vermilion, orange, gold, peach, to pale cream.</p>
+  <div class="meta"><span>14 colors</span>
+    <span class="score">22/30</span></div>
+</article><article class="pal">
+  <span class="pid">P06</span>
+  <h3>Fireball 32</h3>
+  <div class="ramp"><i style="background:#29131a"></i><i style="background:#daaea6"></i><i style="background:#ffffff"></i><i style="background:#ffeb6f"></i><i style="background:#ffc355"></i><i style="background:#ff8846"></i><i style="background:#f4103c"></i><i style="background:#c41e2d"></i><i style="background:#572b39"></i><i style="background:#68393d"></i><i style="background:#a24a37"></i><i style="background:#df7b4d"></i><i style="background:#4f30d9"></i><i style="background:#0672f8"></i><i style="background:#3ab3ff"></i><i style="background:#85eaff"></i><i style="background:#77ff92"></i><i style="background:#60d173"></i><i style="background:#2e674d"></i><i style="background:#054030"></i><i style="background:#4e2a61"></i><i style="background:#62168b"></i><i style="background:#ad51c9"></i><i style="background:#f296ff"></i><i style="background:#7c4af9"></i><i style="background:#ab6aff"></i><i style="background:#ff5d9b"></i><i style="background:#ff356b"></i><i style="background:#d8dde5"></i><i style="background:#878ea1"></i><i style="background:#4b5168"></i><i style="background:#3f3b5f"></i></div>
+  <p>Fire and its afterimage: white-hot core through yellow, orange, crimson and ember browns, answered by a cool half of cobalt, sky blue, mint green and violet-purple.</p>
+  <div class="meta"><span>32 colors</span>
+    <span class="score">25/30</span></div>
+</article><article class="pal">
+  <span class="pid">P07</span>
+  <h3>Bubblegum 16</h3>
+  <div class="ramp"><i style="background:#16171a"></i><i style="background:#7f0622"></i><i style="background:#d62411"></i><i style="background:#ff8426"></i><i style="background:#ffd100"></i><i style="background:#fafdff"></i><i style="background:#ff80a4"></i><i style="background:#ff2674"></i><i style="background:#94216a"></i><i style="background:#430067"></i><i style="background:#234975"></i><i style="background:#68aed4"></i><i style="background:#bfff3c"></i><i style="background:#10d275"></i><i style="background:#007899"></i><i style="background:#002859"></i></div>
+  <p>Arcade candy: black licorice ground, cherry red, orange, lemon, white, then bubblegum pinks, grape purples, blueberry blues and a lime accent.</p>
+  <div class="meta"><span>16 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P08</span>
+  <h3>Pop Rox</h3>
+  <div class="ramp"><i style="background:#ffc888"></i><i style="background:#ff8667"></i><i style="background:#c11c3a"></i><i style="background:#64172d"></i><i style="background:#bb4310"></i><i style="background:#f27e0d"></i><i style="background:#ffc405"></i><i style="background:#faffce"></i><i style="background:#bef318"></i><i style="background:#79c12d"></i><i style="background:#2d7a29"></i><i style="background:#123e3d"></i><i style="background:#0d041a"></i><i style="background:#6b3d66"></i><i style="background:#c8667c"></i><i style="background:#ffb4b8"></i><i style="background:#ff6ca8"></i><i style="background:#d036a9"></i><i style="background:#6d1b81"></i><i style="background:#240e55"></i><i style="background:#253a91"></i><i style="background:#1366bc"></i><i style="background:#12a0b0"></i><i style="background:#31f8aa"></i></div>
+  <p>Candy jewels: coral-red through salmon and cream on the warm side, midnight navy through violet, magenta and rose on the cool side.</p>
+  <div class="meta"><span>24 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P09</span>
+  <h3>Vaporsthetic</h3>
+  <div class="ramp"><i style="background:#ffe0f7"></i><i style="background:#f5c9eb"></i><i style="background:#f5c1e5"></i><i style="background:#fc92fa"></i><i style="background:#fb6cff"></i><i style="background:#ff7dcb"></i><i style="background:#ff4aa7"></i><i style="background:#feffbe"></i><i style="background:#ffd08a"></i><i style="background:#ff8370"></i><i style="background:#cbffe6"></i><i style="background:#83ded2"></i><i style="background:#66b9c1"></i><i style="background:#afe9ff"></i><i style="background:#94c4ff"></i><i style="background:#8f8cf3"></i><i style="background:#a453f5"></i><i style="background:#764ead"></i><i style="background:#6a1483"></i><i style="background:#482254"></i></div>
+  <p>Miami dusk: rose, salmon and cream sands against seafoam, teal and mint waters, grounded by plum-mauve shadows.</p>
+  <div class="meta"><span>20 colors</span>
+    <span class="score">23/30</span></div>
+</article><article class="pal">
+  <span class="pid">P10</span>
+  <h3>Berry Nebula</h3>
+  <div class="ramp"><i style="background:#6ceded"></i><i style="background:#6cb9c9"></i><i style="background:#6d85a5"></i><i style="background:#6e5181"></i><i style="background:#6f1d5c"></i><i style="background:#4f1446"></i><i style="background:#2e0a30"></i><i style="background:#0d001a"></i></div>
+  <p>Eight-step space ramp: bright cyan sinking through teal into blackberry darkness, then rising through royal purple and orchid to hot pink.</p>
+  <div class="meta"><span>8 colors</span>
+    <span class="score">20/30</span></div>
+</article><article class="pal">
+  <span class="pid">P11</span>
+  <h3>Azure Abyss</h3>
+  <div class="ramp"><i style="background:#10022a"></i><i style="background:#0e033e"></i><i style="background:#04055d"></i><i style="background:#002c7b"></i><i style="background:#004a9b"></i><i style="background:#0076af"></i><i style="background:#00a3ca"></i><i style="background:#00c6bf"></i><i style="background:#69f0c7"></i></div>
+  <p>A nine-step descent: pale seafoam and aqua down through azure and cobalt into abyssal navy-black.</p>
+  <div class="meta"><span>9 colors</span>
+    <span class="score">19/30</span></div>
+</article><article class="pal">
+  <span class="pid">P12</span>
+  <h3>Unstable</h3>
+  <div class="ramp"><i style="background:#0b0c31"></i><i style="background:#541191"></i><i style="background:#4915be"></i><i style="background:#2357d5"></i><i style="background:#5b98f4"></i><i style="background:#489c73"></i><i style="background:#6fc25a"></i><i style="background:#8ed73d"></i><i style="background:#c2ed51"></i><i style="background:#3a0737"></i><i style="background:#a70e62"></i><i style="background:#e10e3c"></i><i style="background:#f4402a"></i><i style="background:#f47140"></i><i style="background:#f0b932"></i><i style="background:#ffd95a"></i><i style="background:#8d25a7"></i><i style="background:#d141c7"></i><i style="background:#e170c0"></i><i style="background:#c52a91"></i><i style="background:#dd7f6c"></i><i style="background:#e8b994"></i><i style="background:#b72d61"></i><i style="background:#7e1950"></i><i style="background:#630f4f"></i><i style="background:#6ecad5"></i><i style="background:#5892be"></i><i style="background:#455894"></i><i style="background:#2e337e"></i><i style="background:#9ec6bf"></i><i style="background:#d4eceb"></i><i style="background:#faffff"></i></div>
+  <p>A 32-color jewel riot in ordered ramps: violet-&gt;grape, cobalt-&gt;sky, jade-&gt;lime, wine-&gt;scarlet-&gt;amber-&gt;gold, magenta-&gt;blush, rose-&gt;salmon, teal-&gt;ice, slate-&gt;white.</p>
+  <div class="meta"><span>32 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P13</span>
+  <h3>Wlk44 V2</h3>
+  <div class="ramp"><i style="background:#020918"></i><i style="background:#424e66"></i><i style="background:#93a5be"></i><i style="background:#f2f2f2"></i><i style="background:#ffff99"></i><i style="background:#ffc61a"></i><i style="background:#a2b20a"></i><i style="background:#459201"></i><i style="background:#4d0a00"></i><i style="background:#9d2c07"></i><i style="background:#ea7d10"></i><i style="background:#f8be49"></i><i style="background:#c3f787"></i><i style="background:#47d163"></i><i style="background:#107a68"></i><i style="background:#01253c"></i><i style="background:#082525"></i><i style="background:#03683e"></i><i style="background:#21b039"></i><i style="background:#8df34f"></i><i style="background:#99e7f4"></i><i style="background:#12c2f8"></i><i style="background:#0341b5"></i><i style="background:#020a55"></i><i style="background:#030d30"></i><i style="background:#0b6f9d"></i><i style="background:#22e2d5"></i><i style="background:#d878ed"></i><i style="background:#9232ec"></i><i style="background:#30008f"></i><i style="background:#160132"></i><i style="background:#46024b"></i><i style="background:#830165"></i><i style="background:#b9138d"></i><i style="background:#e057c9"></i><i style="background:#faa3ab"></i><i style="background:#ef5d7f"></i><i style="background:#ee113d"></i><i style="background:#980b1c"></i><i style="background:#3f0409"></i><i style="background:#190400"></i><i style="background:#ba5017"></i><i style="background:#f4964e"></i><i style="background:#fecc81"></i></div>
+  <p>The master spectrum: 44 colors covering full-value ramps of red, orange, gold, green, teal, blue, violet and magenta plus clean neutrals.</p>
+  <div class="meta"><span>44 colors</span>
+    <span class="score">25/30</span></div>
+</article><article class="pal">
+  <span class="pid">P14</span>
+  <h3>Ink Crimson</h3>
+  <div class="ramp"><i style="background:#ff0546"></i><i style="background:#9c173b"></i><i style="background:#660f31"></i><i style="background:#450327"></i><i style="background:#270022"></i><i style="background:#17001d"></i><i style="background:#09010d"></i><i style="background:#0ce6f2"></i><i style="background:#0098db"></i><i style="background:#1e579c"></i></div>
+  <p>Crimson noir: scarlet through blood red and wine into violet-black ink, with a three-step ice counterstrike (0ce6f2 cyan, 0098db azure, 1e579c steel blue) at the deep...</p>
+  <div class="meta"><span>10 colors</span>
+    <span class="score">22/30</span></div>
+</article><article class="pal">
+  <span class="pid">P15</span>
+  <h3>Holographic Mode</h3>
+  <div class="ramp"><i style="background:#e7e0e4"></i><i style="background:#efcaa7"></i><i style="background:#a1d5b4"></i><i style="background:#84b5e5"></i><i style="background:#e19bd9"></i><i style="background:#9779d1"></i><i style="background:#5f65b5"></i><i style="background:#1c1529"></i></div>
+  <p>Eight iridescent pastels: pearl white through mint, sky, periwinkle and lilac — a soap-bubble sheen ramp.</p>
+  <div class="meta"><span>8 colors</span>
+    <span class="score">23/30</span></div>
+</article><article class="pal">
+  <span class="pid">P16</span>
+  <h3>Cathedral Glass</h3>
+  <div class="ramp"><i style="background:#0d0b10"></i><i style="background:#1b1722"></i><i style="background:#4a0d20"></i><i style="background:#7c1230"></i><i style="background:#b01c3c"></i><i style="background:#e63a55"></i><i style="background:#ff7a8a"></i><i style="background:#5c3a08"></i><i style="background:#9c6510"></i><i style="background:#d9960f"></i><i style="background:#ffc93c"></i><i style="background:#ffe9a0"></i><i style="background:#101c4a"></i><i style="background:#1c3a8c"></i><i style="background:#2f62d9"></i><i style="background:#5f9dff"></i><i style="background:#aacdff"></i><i style="background:#0e4d2e"></i><i style="background:#1f9e5a"></i><i style="background:#5ee08a"></i><i style="background:#f5f0ff"></i></div>
+  <p>Rich saturated jewel ramps separated by near-black leading; every hue reads against the dark ground.</p>
+  <div class="meta"><span>21 colors</span>
+    <span class="score">27/30</span></div>
+</article><article class="pal">
+  <span class="pid">P17</span>
+  <h3>Peacock Court</h3>
+  <div class="ramp"><i style="background:#04121a"></i><i style="background:#07293a"></i><i style="background:#0a4a5c"></i><i style="background:#0f7280"></i><i style="background:#12a0a0"></i><i style="background:#3cd3c0"></i><i style="background:#8ff2df"></i><i style="background:#123a7a"></i><i style="background:#1c5fc0"></i><i style="background:#4a8fe6"></i><i style="background:#8fc2ff"></i><i style="background:#0d4a2a"></i><i style="background:#1f8a48"></i><i style="background:#55c46a"></i><i style="background:#a8e88a"></i><i style="background:#6b3014"></i><i style="background:#a8542a"></i><i style="background:#e08a3c"></i><i style="background:#ffc27a"></i><i style="background:#f2fff4"></i></div>
+  <p>Cool analogous wash that flows hue-to-hue seamlessly; copper is ~15% of usage and lands like eyespots.</p>
+  <div class="meta"><span>20 colors</span>
+    <span class="score">24/30</span></div>
+</article><article class="pal">
+  <span class="pid">P18</span>
+  <h3>Aurora Veil</h3>
+  <div class="ramp"><i style="background:#050810"></i><i style="background:#0a1226"></i><i style="background:#101c3a"></i><i style="background:#0c5a3c"></i><i style="background:#12996b"></i><i style="background:#27d98a"></i><i style="background:#7dffb0"></i><i style="background:#ccffd9"></i><i style="background:#2a1454"></i><i style="background:#4a2496"></i><i style="background:#7a44d9"></i><i style="background:#ab7aff"></i><i style="background:#8a1a6a"></i><i style="background:#cc2fa0"></i><i style="background:#ff6ad5"></i><i style="background:#1c4a8a"></i><i style="background:#3f83c9"></i><i style="background:#eef4ff"></i></div>
+  <p>Green dominates, magenta/violet fringe it — the classic split-complement tension of real aurora photos.</p>
+  <div class="meta"><span>18 colors</span>
+    <span class="score">25/30</span></div>
+</article><article class="pal">
+  <span class="pid">P19</span>
+  <h3>Macaw Riot</h3>
+  <div class="ramp"><i style="background:#140806"></i><i style="background:#26100a"></i><i style="background:#0a1a10"></i><i style="background:#8a1010"></i><i style="background:#cc2418"></i><i style="background:#ff4a2a"></i><i style="background:#ff8a5a"></i><i style="background:#b87f00"></i><i style="background:#f2b705"></i><i style="background:#ffe14a"></i><i style="background:#2a6a10"></i><i style="background:#4fa524"></i><i style="background:#8ad93c"></i><i style="background:#ccf07a"></i><i style="background:#0f2a7a"></i><i style="background:#1c50c4"></i><i style="background:#3f8ce6"></i><i style="background:#85c8ff"></i><i style="background:#12b0a0"></i><i style="background:#fff8e8"></i></div>
+  <p>Maximum-chroma triad kept cohesive by shared dark jungle grounds and matched ramp lengths.</p>
+  <div class="meta"><span>20 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P20</span>
+  <h3>Koi Pond Dusk</h3>
+  <div class="ramp"><i style="background:#06131c"></i><i style="background:#0a2433"></i><i style="background:#10394a"></i><i style="background:#1a5a66"></i><i style="background:#2f8a86"></i><i style="background:#5ec4ac"></i><i style="background:#a8e8cf"></i><i style="background:#2a1440"></i><i style="background:#1e5a34"></i><i style="background:#3f8a4f"></i><i style="background:#7ec46a"></i><i style="background:#7a2410"></i><i style="background:#c44514"></i><i style="background:#f2712a"></i><i style="background:#ffa04f"></i><i style="background:#ffd08f"></i><i style="background:#f5f2e8"></i></div>
+  <p>Seven-step water ramp carries the field; koi orange is the exact complement of the teal center.</p>
+  <div class="meta"><span>17 colors</span>
+    <span class="score">25/30</span></div>
+</article><article class="pal">
+  <span class="pid">P21</span>
+  <h3>Blacklight Lounge</h3>
+  <div class="ramp"><i style="background:#0a0514"></i><i style="background:#160a2e"></i><i style="background:#241452"></i><i style="background:#3a1f8a"></i><i style="background:#5a35cc"></i><i style="background:#8a5fff"></i><i style="background:#bfa0ff"></i><i style="background:#7a1060"></i><i style="background:#c41f9e"></i><i style="background:#ff3fd4"></i><i style="background:#ff8ae8"></i><i style="background:#1f7a2a"></i><i style="background:#3fd44f"></i><i style="background:#8aff7a"></i><i style="background:#c4b800"></i><i style="background:#f2ee3f"></i><i style="background:#ffff9e"></i><i style="background:#e8e0ff"></i></div>
+  <p>Everything floats on violet-black; the two complement pairs give four glow inks that all pop equally.</p>
+  <div class="meta"><span>18 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P22</span>
+  <h3>Byzantine Mosaic</h3>
+  <div class="ramp"><i style="background:#12080a"></i><i style="background:#241408"></i><i style="background:#5c3c10"></i><i style="background:#8f6314"></i><i style="background:#c49224"></i><i style="background:#ecc45a"></i><i style="background:#ffe9a8"></i><i style="background:#0f1c4a"></i><i style="background:#1c3a8c"></i><i style="background:#3563c4"></i><i style="background:#6a95e0"></i><i style="background:#4a1428"></i><i style="background:#7c2148"></i><i style="background:#b03a6a"></i><i style="background:#143c2e"></i><i style="background:#2a7a58"></i><i style="background:#5ab88a"></i><i style="background:#f2e8d4"></i></div>
+  <p>Warm gold field vs cool lapis, tempered by wine-purple and oxidized green — imperial and heavy.</p>
+  <div class="meta"><span>18 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P23</span>
+  <h3>Holi Burst</h3>
+  <div class="ramp"><i style="background:#1a0a1e"></i><i style="background:#2e1035"></i><i style="background:#8a1058"></i><i style="background:#cc1f7e"></i><i style="background:#ff4aa8"></i><i style="background:#ff9ad0"></i><i style="background:#b8480a"></i><i style="background:#f2751f"></i><i style="background:#ffa84a"></i><i style="background:#e8c414"></i><i style="background:#fff06a"></i><i style="background:#0c7a8a"></i><i style="background:#18bcc4"></i><i style="background:#6ae8e0"></i><i style="background:#4a1f9e"></i><i style="background:#7a4ae0"></i><i style="background:#ab8aff"></i><i style="background:#3fb83f"></i><i style="background:#fff4f8"></i></div>
+  <p>Six powder hues at matched brightness over one shared dark — chaotic joy that still coheres.</p>
+  <div class="meta"><span>19 colors</span>
+    <span class="score">27/30</span></div>
+</article><article class="pal">
+  <span class="pid">P24</span>
+  <h3>Obsidian Magma</h3>
+  <div class="ramp"><i style="background:#070608"></i><i style="background:#141018"></i><i style="background:#231a24"></i><i style="background:#3a2a33"></i><i style="background:#40101c"></i><i style="background:#5c0f0a"></i><i style="background:#9e1c0c"></i><i style="background:#e03a10"></i><i style="background:#ff6b1f"></i><i style="background:#ff8a54"></i><i style="background:#ffa03a"></i><i style="background:#ffd970"></i><i style="background:#1c2a3f"></i><i style="background:#3a5a7a"></i><i style="background:#7a9cb8"></i><i style="background:#e8ddd0"></i></div>
+  <p>One long incandescent ramp from black to near-white; steel blue is the cold complement whisper.</p>
+  <div class="meta"><span>16 colors</span>
+    <span class="score">24/30</span></div>
+</article><article class="pal">
+  <span class="pid">P25</span>
+  <h3>Orchid Greenhouse</h3>
+  <div class="ramp"><i style="background:#100a14"></i><i style="background:#1f1226"></i><i style="background:#3a1f5c"></i><i style="background:#5c2f8a"></i><i style="background:#8a4ac0"></i><i style="background:#b87ae0"></i><i style="background:#7a1454"></i><i style="background:#b02585"></i><i style="background:#e84aae"></i><i style="background:#ff8ad0"></i><i style="background:#ffc2e8"></i><i style="background:#143a1f"></i><i style="background:#2a7a3a"></i><i style="background:#5cb85c"></i><i style="background:#a8e08a"></i><i style="background:#ff8a70"></i><i style="background:#fff0c4"></i></div>
+  <p>Warm purple-to-pink flow (the mood the pool&#x27;s pastels miss: saturated + dark-grounded florals).</p>
+  <div class="meta"><span>17 colors</span>
+    <span class="score">25/30</span></div>
+</article><article class="pal">
+  <span class="pid">P26</span>
+  <h3>Thunderhead</h3>
+  <div class="ramp"><i style="background:#0a0c12"></i><i style="background:#151a26"></i><i style="background:#232c3f"></i><i style="background:#36445c"></i><i style="background:#55688a"></i><i style="background:#8399b8"></i><i style="background:#bccbe0"></i><i style="background:#2a2260"></i><i style="background:#4a3fa0"></i><i style="background:#7a6fd9"></i><i style="background:#1f5c66"></i><i style="background:#3f9ea0"></i><i style="background:#e0a01f"></i><i style="background:#ffdf5c"></i><i style="background:#fff2a8"></i><i style="background:#ffffff"></i></div>
+  <p>A seven-step neutral-blue cloud ramp does the heavy lifting; amber appears rarely and reads electric.</p>
+  <div class="meta"><span>16 colors</span>
+    <span class="score">23/30</span></div>
+</article><article class="pal">
+  <span class="pid">P27</span>
+  <h3>Carnival Glass</h3>
+  <div class="ramp"><i style="background:#140c0a"></i><i style="background:#261410"></i><i style="background:#8a4a14"></i><i style="background:#cc7a1f"></i><i style="background:#f2a83f"></i><i style="background:#ffd98a"></i><i style="background:#8a2440"></i><i style="background:#cc4a70"></i><i style="background:#ff8aa0"></i><i style="background:#0f4a5c"></i><i style="background:#1f8a9e"></i><i style="background:#5cc4d4"></i><i style="background:#3f7a2a"></i><i style="background:#7ab84a"></i><i style="background:#c4e07a"></i><i style="background:#5c2a7a"></i><i style="background:#9e5cc4"></i><i style="background:#fce8f0"></i></div>
+  <p>Five hue families all with a bright &#x27;sheen&#x27; step — cycle through them in order for oil-slick motion.</p>
+  <div class="meta"><span>18 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P28</span>
+  <h3>Absinthe Hour</h3>
+  <div class="ramp"><i style="background:#0a0f08"></i><i style="background:#141f10"></i><i style="background:#20301a"></i><i style="background:#2f5c1f"></i><i style="background:#4a8a24"></i><i style="background:#74b82a"></i><i style="background:#a8dd3f"></i><i style="background:#def27a"></i><i style="background:#8a6a14"></i><i style="background:#c49c24"></i><i style="background:#edcc5c"></i><i style="background:#0f4a3a"></i><i style="background:#1f8a66"></i><i style="background:#8a1424"></i><i style="background:#cc2a3a"></i><i style="background:#ff5c5c"></i><i style="background:#f8f2d8"></i></div>
+  <p>A poison-green world warmed by brass; red is the direct complement, used at candle-flame scale.</p>
+  <div class="meta"><span>17 colors</span>
+    <span class="score">24/30</span></div>
+</article><article class="pal">
+  <span class="pid">P29</span>
+  <h3>Nebula Reef</h3>
+  <div class="ramp"><i style="background:#03060e"></i><i style="background:#071226"></i><i style="background:#0c1f3f"></i><i style="background:#0f5c7a"></i><i style="background:#14a0b8"></i><i style="background:#2fe0e0"></i><i style="background:#9afff2"></i><i style="background:#8a2f1a"></i><i style="background:#e05c24"></i><i style="background:#ff9a4a"></i><i style="background:#3a1a6a"></i><i style="background:#6a35b0"></i><i style="background:#a86ae8"></i><i style="background:#d9aaff"></i><i style="background:#c41f8a"></i><i style="background:#ff6ad0"></i><i style="background:#e8faff"></i></div>
+  <p>Cold cyan/violet field with warm coral counterweight — the triad keeps deep-sea from going monochrome.</p>
+  <div class="meta"><span>17 colors</span>
+    <span class="score">26/30</span></div>
+</article><article class="pal">
+  <span class="pid">P30</span>
+  <h3>Spice Bazaar</h3>
+  <div class="ramp"><i style="background:#1a0e0a"></i><i style="background:#2e180f"></i><i style="background:#6a1f14"></i><i style="background:#9e3520"></i><i style="background:#cc5c2a"></i><i style="background:#e8834a"></i><i style="background:#b87a10"></i><i style="background:#e8a81f"></i><i style="background:#ffd45c"></i><i style="background:#1f2a8a"></i><i style="background:#3547cc"></i><i style="background:#5c78e8"></i><i style="background:#93a8ff"></i><i style="background:#0f6a66"></i><i style="background:#1fa89a"></i><i style="background:#62d9c4"></i><i style="background:#1f5c3a"></i><i style="background:#a8e8c4"></i><i style="background:#4a1f3f"></i><i style="background:#f8ecd4"></i></div>
+  <p>Warm spice ramps against the famous majorelle blue — two complement pairs, market-stall energy.</p>
+  <div class="meta"><span>20 colors</span>
+    <span class="score">26/30</span></div>
+</article></div>
+</section>
+
 </div>
 
-<header>
-<h1>DAZZLE LAB — <b>100 Patterns</b> / <b>30 Palettes</b></h1>
-<p>Prototype gallery for the dazzle.exe recreation. Every entry is addressed by its number — test by number. Scores: DZ dazzle-vibe · CO cohesion · MO motion-promise (patterns); RICH · RANGE · MOOD (palettes). Composed 2026-08-13.</p>
-<p class="top10"><b style="color:var(--ink)">TOP 10:</b> <a href="#p011">011</a> <a href="#p042">042</a> <a href="#p004">004</a> <a href="#p019">019</a> <a href="#p100">100</a> <a href="#p018">018</a> <a href="#p067">067</a> <a href="#p089">089</a> <a href="#p014">014</a> <a href="#p064">064</a></p>
-</header>
-<h2>PATTERNS 001–100</h2>
-<div class="grid">
-<div class="card" id="p001">
-<div class="head"><span class="num">001</span><span class="name">Kaleido Rose</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/001_kaleido_rose/preview.png" alt="001 Kaleido Rose preview" loading="lazy">
-<p class="desc">A full-screen dihedral kaleidoscope whose fold count steps through 4, 6, 8, 10, 12, 14, 16 sections, each stage crossfading into the next.</p>
-<div class="scores"><span>DZ 6</span><span>CO 5</span><span>MO 9</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p002">
-<div class="head"><span class="num">002</span><span class="name">P4M Quilt</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/002_p4m_quilt/preview.png" alt="002 P4M Quilt preview" loading="lazy">
-<p class="desc">A &quot;bathroom-tile kaleidoscope&quot;: the p4m wallpaper group folds a drifting four-wave plasma into a perfectly mirrored quilt of clover-and-star tiles.</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 9</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p003">
-<div class="head"><span class="num">003</span><span class="name">Hex Snowfold</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/003_hex_snowfold/preview.png" alt="003 Hex Snowfold preview" loading="lazy">
-<p class="desc">A p6m-flavored hexagonal wallpaper: every cell of a triangular lattice holds a 12-petal snowflake rosette built by a D6 mirror fold, tiled edge to edge like stained...</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p004">
-<div class="head"><span class="num">004</span><span class="name">Mirror Truchet</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/004_mirror_truchet/preview.png" alt="004 Mirror Truchet preview" loading="lazy">
-<p class="desc">Neon Truchet ribbons — glowing quarter-circle arcs that link into meandering paths — seen through an 8-fold mirror fold, so the random tile field becomes a perfectly...</p>
-<div class="scores"><span>DZ 8</span><span>CO 9</span><span>MO 9</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card" id="p005">
-<div class="head"><span class="num">005</span><span class="name">Breathing Fold</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/005_breathing_fold/preview.png" alt="005 Breathing Fold preview" loading="lazy">
-<p class="desc">A tie-dye sun mandala whose number of spokes is never constant: the fold count N glides continuously between 4 and 16, so petals split and merge like a living iris while...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p006">
-<div class="head"><span class="num">006</span><span class="name">Tri Morph</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/006_tri_morph/preview.png" alt="006 Tri Morph preview" loading="lazy">
-<p class="desc">A hexagonal wallpaper that morphs between two symmetry groups live: chiral pinwheels (rotation-only, p6 flavor) melt into mirrored six-point stars (p6m flavor) and back,...</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p007">
-<div class="head"><span class="num">007</span><span class="name">Pinwheel Spiral</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/007_pinwheel_spiral/preview.png" alt="007 Pinwheel Spiral preview" loading="lazy">
-<p class="desc">A smooth-shaded log-spiral pinwheel — the direct heir of the original&#x27;s R16 tile — whose arm count steps through 6, 9, 12, 8, 10 with soft crossfades, while spiral...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p008">
-<div class="head"><span class="num">008</span><span class="name">Octa Mandala</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/008_octa_mandala/preview.png" alt="008 Octa Mandala preview" loading="lazy">
-<p class="desc">Concentric polygon rings — square, octagon, diamond — pulse outward from the center while the ring shape itself morphs between the three norms and an 8-petal angular...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 9</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p009">
-<div class="head"><span class="num">009</span><span class="name">Lissa Web</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/009_lissa_web/preview.png" alt="009 Lissa Web preview" loading="lazy">
-<p class="desc">A glowing Lissajous ribbon stamped N times around the center (N steps through 5, 7, 9, 12, 8, 6), weaving a luminous guilloche rosette on near-black — like spirograph...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p010">
-<div class="head"><span class="num">010</span><span class="name">Mosaic Quilt</span><span class="fam">Kaleido &amp; Tiling</span></div>
-<img src="patterns/010_mosaic_quilt/preview.png" alt="010 Mosaic Quilt preview" loading="lazy">
-<p class="desc">A wall of hand-glazed tiles: every 60-px cell is its own tiny 4-fold mirror kaleidoscope, alternate cells add a diagonal fold (p4g-style checkering), and per-cell phase...</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p011">
-<div class="head"><span class="num">011</span><span class="name">Plasma Mandala</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/011_plasma_mandala/preview.png" alt="011 Plasma Mandala preview" loading="lazy">
-<p class="desc">The canonical four-sine demoscene plasma folded six ways, so its blobs become breathing petals around a slowly turning center.</p>
-<div class="scores"><span>DZ 9</span><span>CO 9</span><span>MO 9</span><span class="tot">TOTAL 27</span></div>
-</div>
-<div class="card" id="p012">
-<div class="head"><span class="num">012</span><span class="name">Rotozoom Kaleido</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/012_rotozoom_kaleido/preview.png" alt="012 Rotozoom Kaleido preview" loading="lazy">
-<p class="desc">A rotozoomed procedural tile texture seen through an 8-fold mirror: mirrored copies counter-rotate against each other at every seam exactly like a physical kaleidoscope...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p013">
-<div class="head"><span class="num">013</span><span class="name">Tunnel Bloom</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/013_tunnel_bloom/preview.png" alt="013 Tunnel Bloom preview" loading="lazy">
-<p class="desc">A classic fly-through tunnel whose mouth orbits off-center behind a 4-fold mirror, so four (then eight, by reflection) tunnel mouths bloom, merge, and drift apart while...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p014">
-<div class="head"><span class="num">014</span><span class="name">Copper Octarings</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/014_copper_octarings/preview.png" alt="014 Copper Octarings preview" loading="lazy">
-<p class="desc">Amiga copper bars promoted from scanlines to radius: six neon gradient bars ride independent sine paths in and out as crisp concentric octagon rings on a midnight-blue...</p>
-<div class="scores"><span>DZ 8</span><span>CO 9</span><span>MO 8</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p015">
-<div class="head"><span class="num">015</span><span class="name">Twister Star</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/015_twister_star/preview.png" alt="015 Twister Star preview" loading="lazy">
-<p class="desc">The demoscene twister run over radius instead of scanlines: a five-armed braid of jewel-toned ribbons (ruby, amber, emerald, sapphire) that twists sinusoidally along its...</p>
-<div class="scores"><span>DZ 8</span><span>CO 7</span><span>MO 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p016">
-<div class="head"><span class="num">016</span><span class="name">Shadebob Rosette</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/016_shadebob_rosette/preview.png" alt="016 Shadebob Rosette preview" loading="lazy">
-<p class="desc">A single Lissajous shadebob whose additive trail is folded six ways: on screen, twelve synchronized bobs weave a glowing rosette whose self-crossings bloom into hot...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p017">
-<div class="head"><span class="num">017</span><span class="name">Metaball Kiss</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/017_metaball_kiss/preview.png" alt="017 Metaball Kiss preview" loading="lazy">
-<p class="desc">Four metaballs folded six ways so every ball kisses and fuses with its own reflections across the wedge seams, forming soft lobed mandalas that continuously merge and...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p018">
-<div class="head"><span class="num">018</span><span class="name">Kefrens Spiral</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/018_kefrens_spiral/preview.png" alt="018 Kefrens Spiral preview" loading="lazy">
-<p class="desc">Kefrens/Alcatraz bars with the scanline axis swapped for radius: a never-cleared angular line buffer is stamped and re-stamped as radius grows outward, so the bar&#x27;s...</p>
-<div class="scores"><span>DZ 9</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p019">
-<div class="head"><span class="num">019</span><span class="name">Moiré Silk</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/019_moire_silk/preview.png" alt="019 Moiré Silk preview" loading="lazy">
-<p class="desc">Two interference-ring sources orbiting inside an 8-fold wedge — sixteen mirrored wave sources on screen — whose beat patterns weave silky teal-and-ember moiré fabric...</p>
-<div class="scores"><span>DZ 8</span><span>CO 9</span><span>MO 9</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card" id="p020">
-<div class="head"><span class="num">020</span><span class="name">Feedback Fractal</span><span class="fam">Demoscene Classics</span></div>
-<img src="patterns/020_feedback_fractal/preview.png" alt="020 Feedback Fractal preview" loading="lazy">
-<p class="desc">Fold-aware video feedback — the king of dazzle effects: a glowing orbit-blob and a breathing ring are stamped into a 7-fold wedge, and every generation of the feedback...</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 9</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p021">
-<div class="head"><span class="num">021</span><span class="name">Ripple Duet</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/021_ripple_duet/preview.png" alt="021 Ripple Duet preview" loading="lazy">
-<p class="desc">Two invisible pebbles orbit the center of a lagoon-teal pond, their expanding ring waves overlapping into slowly turning hyperbolic fringe families.</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 9</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p022">
-<div class="head"><span class="num">022</span><span class="name">XOR Rings</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/022_xor_rings/preview.png" alt="022 XOR Rings preview" loading="lazy">
-<p class="desc">Two invisible ring emitters wander the screen and their bands XOR into crisp lens-and-eye interference figures — hard-edged fringes stepped from midnight indigo up...</p>
-<div class="scores"><span>DZ 6</span><span>CO 5</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p023">
-<div class="head"><span class="num">023</span><span class="name">Silk Gratings</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/023_silk_gratings/preview.png" alt="023 Silk Gratings preview" loading="lazy">
-<p class="desc">Two sheets of fine diagonal thread — like layered silk — slide across each other, and their beat pattern blooms into wide soft bands of rose, magenta and violet that bow...</p>
-<div class="scores"><span>DZ 4</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 16</span></div>
-</div>
-<div class="card" id="p024">
-<div class="head"><span class="num">024</span><span class="name">Munch Frost</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/024_munch_frost/preview.png" alt="024 Munch Frost preview" loading="lazy">
-<p class="desc">The HAKMEM munching-squares lattice (x XOR y) rendered as crystalline rainbow frost: nested diamond mouths and Sierpinski steps in full-spectrum bands that slowly rotate...</p>
-<div class="scores"><span>DZ 6</span><span>CO 5</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p025">
-<div class="head"><span class="num">025</span><span class="name">Ember Triad</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/025_ember_triad/preview.png" alt="025 Ember Triad preview" loading="lazy">
-<p class="desc">Three wave sources ride the corners of a slowly turning triangle, each ringing at a slightly detuned frequency; where their wavefronts agree the screen ignites in...</p>
-<div class="scores"><span>DZ 5</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p026">
-<div class="head"><span class="num">026</span><span class="name">Spoke Moire</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/026_spoke_moire/preview.png" alt="026 Spoke Moire preview" loading="lazy">
-<p class="desc">Two fans of spiral spokes — nine arms against eleven — counter-rotate around the center, and their angular beat sweeps a two-lobed brightness wave around a full rainbow...</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p027">
-<div class="head"><span class="num">027</span><span class="name">Wedge Ripples</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/027_wedge_ripples/preview.png" alt="027 Wedge Ripples preview" loading="lazy">
-<p class="desc">An eight-petal jade-and-emerald mandala: two wave sources ripple inside a single kaleidoscope wedge and the fold mirrors them into sixteen phantom emitters whose fringes...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p028">
-<div class="head"><span class="num">028</span><span class="name">Quasicrystal</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/028_quasicrystal/preview.png" alt="028 Quasicrystal preview" loading="lazy">
-<p class="desc">Seven plane waves at seventh-turn angles superpose into an aperiodic quasicrystal — a lattice of seven-fold rosettes that never exactly repeats, shimmering in peacock...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p029">
-<div class="head"><span class="num">029</span><span class="name">Tartan Beat</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/029_tartan_beat/preview.png" alt="029 Tartan Beat preview" loading="lazy">
-<p class="desc">Two woven square lattices — one turning clockwise, one counter, at slightly different scales — interfere into a giant slow moire plaid: broad diagonal bands of jade...</p>
-<div class="scores"><span>DZ 4</span><span>CO 5</span><span>MO 8</span><span class="tot">TOTAL 17</span></div>
-</div>
-<div class="card" id="p030">
-<div class="head"><span class="num">030</span><span class="name">Octa Facets</span><span class="fam">Moire &amp; Op-Art</span></div>
-<img src="patterns/030_octa_facets/preview.png" alt="030 Octa Facets preview" loading="lazy">
-<p class="desc">Two trains of concentric octagon rings glide from a pair of wandering centers and interfere into a faceted crystal lattice — bright ice-white ridge lines over deep blue...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p031">
-<div class="head"><span class="num">031</span><span class="name">Spirograph Bloom</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/031_spirograph_bloom/preview.png" alt="031 Spirograph Bloom preview" loading="lazy">
-<p class="desc">A luminous spirograph rosette fills the screen, its petal count and loop depth slowly breathing as the gear ratio drifts, the whole figure cycling through saturated...</p>
-<div class="scores"><span>DZ 7</span><span>CO 9</span><span>MO 9</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p032">
-<div class="head"><span class="num">032</span><span class="name">Harmonograph Veil</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/032_harmonograph_veil/preview.png" alt="032 Harmonograph Veil preview" loading="lazy">
-<p class="desc">A gauzy four-pendulum harmonograph web in teal-to-violet, mirrored four ways so it reads as folded silk; the detuned second pendulum makes the veil slowly precess and...</p>
-<div class="scores"><span>DZ 6</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p033">
-<div class="head"><span class="num">033</span><span class="name">Rose Engine</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/033_rose_engine/preview.png" alt="033 Rose Engine preview" loading="lazy">
-<p class="desc">A molten guilloché rose — crimson core rays fading through orange into a gold-green engine-turned rim — spun to 7-fold dihedral symmetry.</p>
-<div class="scores"><span>DZ 5</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p034">
-<div class="head"><span class="num">034</span><span class="name">Lissajous Weave</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/034_lissajous_weave/preview.png" alt="034 Lissajous Weave preview" loading="lazy">
-<p class="desc">A dense 3:4 Lissajous basket that fills the frame edge-to-edge, woven from a single saturated hue that slowly walks the color wheel; the sweeping phase makes the figure...</p>
-<div class="scores"><span>DZ 5</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p035">
-<div class="head"><span class="num">035</span><span class="name">String Cardioid</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/035_string_cardioid/preview.png" alt="035 String Cardioid preview" loading="lazy">
-<p class="desc">Times-table string art on a circle of 180 pins: thousands of rainbow chords whose envelope morphs from cardioid through nephroid into higher epicycloids as the...</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p036">
-<div class="head"><span class="num">036</span><span class="name">Epicycle Lace</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/036_epicycle_lace/preview.png" alt="036 Epicycle Lace preview" loading="lazy">
-<p class="desc">Three stacked epicycles trace a scalloped, snowflake-like lace medallion with 5-fold dihedral symmetry, in cyan-blue-violet with green-gold accents as the band LFO...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p037">
-<div class="head"><span class="num">037</span><span class="name">Pendulum Web</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/037_pendulum_web/preview.png" alt="037 Pendulum Web preview" loading="lazy">
-<p class="desc">String art strung between two invisible Lissajous curves: every few ticks a rung is stretched from a point on curve A to the matching point on curve B, each rung a...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 7</span><span class="tot">TOTAL 18</span></div>
-</div>
-<div class="card" id="p038">
-<div class="head"><span class="num">038</span><span class="name">Guilloche Rings</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/038_guilloche_rings/preview.png" alt="038 Guilloche Rings preview" loading="lazy">
-<p class="desc">Five concentric engine-turned bands — gold, copper, teal, ivory, steel-blue — each a wavy 11-and-17-lobed guilloché ribbon, like the security lathework on a banknote.</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p039">
-<div class="head"><span class="num">039</span><span class="name">Butterfly Lace</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/039_butterfly_lace/preview.png" alt="039 Butterfly Lace preview" loading="lazy">
-<p class="desc">Temple Fay&#x27;s butterfly curve drawn over and over with slowly sliding internal phases, so nested translucent butterflies of amethyst, orchid and ice-blue open their wings...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p040">
-<div class="head"><span class="num">040</span><span class="name">Maurer Rose</span><span class="fam">Spirograph &amp; Curves</span></div>
-<img src="patterns/040_maurer_rose/preview.png" alt="040 Maurer Rose preview" loading="lazy">
-<p class="desc">A Maurer-rose walk — straight chords hopping around a sine rose at a drifting step angle — piles up into a granular mandala with concentric hue bands: magenta core, gold...</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 7</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p041">
-<div class="head"><span class="num">041</span><span class="name">Cyclic Bloom</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/041_cyclic_bloom/preview.png" alt="041 Cyclic Bloom preview" loading="lazy">
-<p class="desc">A rainbow cyclic-cellular-automaton quilt: interlocking rectilinear wavefronts and spiral cores in full-spectrum ramps, mirrored 4-fold so it reads as a woven mandala.</p>
-<div class="scores"><span>DZ 7</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p042">
-<div class="head"><span class="num">042</span><span class="name">BZ Pinwheel</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/042_bz_pinwheel/preview.png" alt="042 BZ Pinwheel preview" loading="lazy">
-<p class="desc">A gold/teal chemical mandala: six-fold folded spiral wavefronts rotate around a starburst core like a Belousov–Zhabotinsky dish viewed through a kaleidoscope.</p>
-<div class="scores"><span>DZ 9</span><span>CO 9</span><span>MO 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card" id="p043">
-<div class="head"><span class="num">043</span><span class="name">Turing Labyrinth</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/043_turing_labyrinth/preview.png" alt="043 Turing Labyrinth preview" loading="lazy">
-<p class="desc">A fingerprint / brain-coral labyrinth in indigo and amber: reaction-diffusion stripes locked into a 4-fold symmetric maze, with bright seams glowing along the stripe...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 6</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p044">
-<div class="head"><span class="num">044</span><span class="name">Majority Quilt</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/044_majority_quilt/preview.png" alt="044 Majority Quilt preview" loading="lazy">
-<p class="desc">Bold two-tone amoeba patches — dusty rose, amber, aubergine, chartreuse — melting into and out of each other like a living pueblo quilt, mirrored 4-fold.</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 7</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p045">
-<div class="head"><span class="num">045</span><span class="name">Lenia Bloom</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/045_lenia_bloom/preview.png" alt="045 Lenia Bloom preview" loading="lazy">
-<p class="desc">A colony of glowing ring-shaped &quot;orbium&quot; cells — cream, sage, and cyan on near-black — orbiting in three concentric symmetric rings.</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p046">
-<div class="head"><span class="num">046</span><span class="name">RPS Trichrome</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/046_rps_trichrome/preview.png" alt="046 RPS Trichrome preview" loading="lazy">
-<p class="desc">Three species — magenta, lime, azure — locked in a rock-paper-scissors chase, their territories drawn as bold six-petaled flower rings that spiral slowly inward.</p>
-<div class="scores"><span>DZ 8</span><span>CO 7</span><span>MO 7</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p047">
-<div class="head"><span class="num">047</span><span class="name">Target Choir</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/047_target_choir/preview.png" alt="047 Target Choir preview" loading="lazy">
-<p class="desc">Seven BZ pacemakers — one center, six on a hexagon — each pumping out target rings that interfere into a lace of crimson, teal, and gold rosettes.</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p048">
-<div class="head"><span class="num">048</span><span class="name">Excitable Spirals</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/048_excitable_spirals/preview.png" alt="048 Excitable Spirals preview" loading="lazy">
-<p class="desc">A Greenberg–Hastings excitable medium: neon wavefronts crawl through a dark field, curling at their broken ends into greek-key spiral cores — like luminous circuitry...</p>
-<div class="scores"><span>DZ 7</span><span>CO 7</span><span>MO 6</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p049">
-<div class="head"><span class="num">049</span><span class="name">Voronoi Breath</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/049_voronoi_breath/preview.png" alt="049 Voronoi Breath preview" loading="lazy">
-<p class="desc">Stained glass alive: jewel-toned Worley cells — emerald, violet, ruby, gold — separated by dark leading that slithers as nineteen seed points orbit in three symmetric...</p>
-<div class="scores"><span>DZ 8</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p050">
-<div class="head"><span class="num">050</span><span class="name">Turing Spots</span><span class="fam">Cellular &amp; Reaction</span></div>
-<img src="patterns/050_turing_spots/preview.png" alt="050 Turing Spots preview" loading="lazy">
-<p class="desc">A leopard-skin reaction-diffusion field built from two hexagonal spot lattices — big soft cells carrying small counter-rotating freckles — in blues, olives, and hot...</p>
-<div class="scores"><span>DZ 6</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 18</span></div>
-</div>
-<div class="card" id="p051">
-<div class="head"><span class="num">051</span><span class="name">Firework Garden</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/051_firework_garden/preview.png" alt="051 Firework Garden preview" loading="lazy">
-<p class="desc">Classic dazzle fireworks (footage R11): radial particle bursts with gravity-drooped trails accumulating over a deep plum gradient, each burst a single saturated hue with...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p052">
-<div class="head"><span class="num">052</span><span class="name">Orbit Weave</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/052_orbit_weave/preview.png" alt="052 Orbit Weave preview" loading="lazy">
-<p class="desc">Seven nested electron ellipses (the c06 atom, grown up) precess at different rates so their comet-bright heads weave a rotating rosette; each orbit keeps a faint dotted...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p053">
-<div class="head"><span class="num">053</span><span class="name">Gravity Rose</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/053_gravity_rose/preview.png" alt="053 Gravity Rose preview" loading="lazy">
-<p class="desc">Eight comet particles ride precessing Kepler ellipses around a glowing gold core, each dragging a long fading tail; stamped through the 4-fold mirror the tails braid...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p054">
-<div class="head"><span class="num">054</span><span class="name">Starfield Warp</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/054_starfield_warp/preview.png" alt="054 Starfield Warp preview" loading="lazy">
-<p class="desc">A gentle hyperspace cruise: 520 stars stream outward from a vanishing point that itself drifts on a slow Lissajous, leaving short radial streaks whose hue is set by...</p>
-<div class="scores"><span>DZ 4</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 16</span></div>
-</div>
-<div class="card" id="p055">
-<div class="head"><span class="num">055</span><span class="name">Comet Carousel</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/055_comet_carousel/preview.png" alt="055 Comet Carousel preview" loading="lazy">
-<p class="desc">Three comets on breathing circular orbits, each stamped through a 6-fold rotational kaleidoscope: eighteen white-hot heads towing rainbow-shifting tails braid into a...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p056">
-<div class="head"><span class="num">056</span><span class="name">Ribbon Swarm</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/056_ribbon_swarm/preview.png" alt="056 Ribbon Swarm preview" loading="lazy">
-<p class="desc">Three hundred particles strung along a phase gradient of a 2:3 Lissajous form a single rainbow ribbon that folds, twists and unfolds like a starling murmuration;...</p>
-<div class="scores"><span>DZ 7</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p057">
-<div class="head"><span class="num">057</span><span class="name">Galaxy Pinwheel</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/057_galaxy_pinwheel/preview.png" alt="057 Galaxy Pinwheel preview" loading="lazy">
-<p class="desc">A two-armed spiral galaxy of 3000 stars seen at a tilt: molten gold-white core melting outward through rose to blue-violet arm tips, turning with true differential...</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p058">
-<div class="head"><span class="num">058</span><span class="name">Fountain Arcs</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/058_fountain_arcs/preview.png" alt="058 Fountain Arcs preview" loading="lazy">
-<p class="desc">A garden-sprinkler fountain at bottom center launches droplets whose full parabolic arcs stay painted, mirrored left/right into a peacock fan; the launch angle sweeps...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p059">
-<div class="head"><span class="num">059</span><span class="name">Binary Dance</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/059_binary_dance/preview.png" alt="059 Binary Dance preview" loading="lazy">
-<p class="desc">A gold sun and a cyan sun waltz around their barycenter dragging interlocking spiral trails; each carries four counter-rotating moons with their own short tails, and a...</p>
-<div class="scores"><span>DZ 4</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 16</span></div>
-</div>
-<div class="card" id="p060">
-<div class="head"><span class="num">060</span><span class="name">Meteor Veil</span><span class="fam">Particles &amp; Orbits</span></div>
-<img src="patterns/060_meteor_veil/preview.png" alt="060 Meteor Veil preview" loading="lazy">
-<p class="desc">A night sky of 300 tinted twinkling stars over a teal horizon glow; slow meteors drift down in mirrored left/right pairs, each towing a long pastel ion trail that keeps...</p>
-<div class="scores"><span>DZ 3</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 15</span></div>
-</div>
-<div class="card" id="p061">
-<div class="head"><span class="num">061</span><span class="name">Checker Tunnel</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/061_checker_tunnel/preview.png" alt="061 Checker Tunnel preview" loading="lazy">
-<p class="desc">A classic demoscene tunnel: rainbow spiral bands rush past the viewer down a dark throat at screen center, with a soft checkerboard dimming that gives the walls tile...</p>
-<div class="scores"><span>DZ 8</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p062">
-<div class="head"><span class="num">062</span><span class="name">Twist Corridor</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/062_twist_corridor/preview.png" alt="062 Twist Corridor preview" loading="lazy">
-<p class="desc">Nested glowing squares recede to a dark vanishing point — a square air-shaft you are falling down — while the whole shaft slowly torques, the deep end twisting faster...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p063">
-<div class="head"><span class="num">063</span><span class="name">Spiral Zoom</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/063_spiral_zoom/preview.png" alt="063 Spiral Zoom preview" loading="lazy">
-<p class="desc">Two interlocked logarithmic spirals — a 3-arm falling inward and a 2-arm slowly winding the other way — interfere into curling paisley whorls that pour endlessly into...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p064">
-<div class="head"><span class="num">064</span><span class="name">Starburst Forge</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/064_starburst_forge/preview.png" alt="064 Starburst Forge preview" loading="lazy">
-<p class="desc">Twenty-four molten rays fan out from a dark core like a blacksmith&#x27;s starburst, bending gently as they go, while glowing copper rings race down the rays into the center...</p>
-<div class="scores"><span>DZ 8</span><span>CO 9</span><span>MO 8</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p065">
-<div class="head"><span class="num">065</span><span class="name">Echo Mandala</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/065_echo_mandala/preview.png" alt="065 Echo Mandala preview" loading="lazy">
-<p class="desc">The camera-pointed-at-its-own-monitor effect, stateless: a 5-petal flower is echoed at eight nested scales, each echo rotated half a radian deeper and dimmer, and the...</p>
-<div class="scores"><span>DZ 6</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 18</span></div>
-</div>
-<div class="card" id="p066">
-<div class="head"><span class="num">066</span><span class="name">Hex Tunnel</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/066_hex_tunnel/preview.png" alt="066 Hex Tunnel preview" loading="lazy">
-<p class="desc">A honeycomb throat: crisp neon hexagon hoops recede toward a black vanishing point, drifting outward toward the viewer while the whole shaft rotates almost...</p>
-<div class="scores"><span>DZ 6</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p067">
-<div class="head"><span class="num">067</span><span class="name">Twin Tunnels</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/067_twin_tunnels/preview.png" alt="067 Twin Tunnels preview" loading="lazy">
-<p class="desc">Eight tunnel mouths (two real, mirrored 4-fold) wander slowly around the screen, their ring systems flying in opposite directions and beating against each other into...</p>
-<div class="scores"><span>DZ 9</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p068">
-<div class="head"><span class="num">068</span><span class="name">Wormhole Pond</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/068_wormhole_pond/preview.png" alt="068 Wormhole Pond preview" loading="lazy">
-<p class="desc">A pond drains into a wormhole: the throat is not round but alive, its rim slowly flexing through kidney and trefoil shapes, while rings pour down it, swells radiate back...</p>
-<div class="scores"><span>DZ 6</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p069">
-<div class="head"><span class="num">069</span><span class="name">Pillar Hall</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/069_pillar_hall/preview.png" alt="069 Pillar Hall preview" loading="lazy">
-<p class="desc">A first-person glide down an endless amber-and-mahogany hall: checkered floor and ceiling scroll toward you, side walls carry the same checker in a warmer key, and dark...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p070">
-<div class="head"><span class="num">070</span><span class="name">Vortex Petals</span><span class="fam">Tunnels &amp; Vortex</span></div>
-<img src="patterns/070_vortex_petals/preview.png" alt="070 Vortex Petals preview" loading="lazy">
-<p class="desc">Six broad petal arms — moss green through chartreuse to gold and vermilion — curl into a black gravitational core, and the spiral&#x27;s tightness slowly breathes: the flower...</p>
-<div class="scores"><span>DZ 7</span><span>CO 7</span><span>MO 9</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p071">
-<div class="head"><span class="num">071</span><span class="name">Silk Currents</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/071_silk_currents/preview.png" alt="071 Silk Currents preview" loading="lazy">
-<p class="desc">Hundreds of silk threads drift along invisible currents, braiding into glowing violet-to-green rivers over a deep indigo vignette.</p>
-<div class="scores"><span>DZ 5</span><span>CO 8</span><span>MO 9</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p072">
-<div class="head"><span class="num">072</span><span class="name">Vine Waltz</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/072_vine_waltz/preview.png" alt="072 Vine Waltz preview" loading="lazy">
-<p class="desc">A hedge of emerald vines climbs from the bottom of a plum-purple dusk, each stem shading green→gold as it rises, sprouting thorn-leaf fronds and finally curling into...</p>
-<div class="scores"><span>DZ 4</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p073">
-<div class="head"><span class="num">073</span><span class="name">Frost Court</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/073_frost_court/preview.png" alt="073 Frost Court preview" loading="lazy">
-<p class="desc">A six-fold snowflake of frost dendrites grows outward from a hexagonal seed plate on a midnight-navy pane, arms feathering into cyan-teal side spurs that whiten near the...</p>
-<div class="scores"><span>DZ 5</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p074">
-<div class="head"><span class="num">074</span><span class="name">Slow Lightning</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/074_slow_lightning/preview.png" alt="074 Slow Lightning preview" loading="lazy">
-<p class="desc">Two Lichtenberg bolts — one violet, one electric blue — crawl down a near-black sky in slow motion, forking into ragged branches wrapped in soft neon glow.</p>
-<div class="scores"><span>DZ 3</span><span>CO 6</span><span>MO 7</span><span class="tot">TOTAL 16</span></div>
-</div>
-<div class="card" id="p075">
-<div class="head"><span class="num">075</span><span class="name">Coral Lace</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/075_coral_lace/preview.png" alt="075 Coral Lace preview" loading="lazy">
-<p class="desc">Nested growth rings bloom from a drifting center like a coral polyp or lettuce edge, each new ring more ruffled than the last, sweeping the full hue wheel from magenta...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p076">
-<div class="head"><span class="num">076</span><span class="name">Kelp Cathedral</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/076_kelp_cathedral/preview.png" alt="076 Kelp Cathedral preview" loading="lazy">
-<p class="desc">A kelp forest grows toward the surface through teal water, god-rays slanting down between green and crimson stalks ringed with curved fronds and gold shimmer tips; faint...</p>
-<div class="scores"><span>DZ 3</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p077">
-<div class="head"><span class="num">077</span><span class="name">Mycelium Veil</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/077_mycelium_veil/preview.png" alt="077 Mycelium Veil preview" loading="lazy">
-<p class="desc">A radial web of amber and rose hyphae wanders outward from a warm-glowing heart, filaments meandering like living threads with bright growing tips and pulsing spore...</p>
-<div class="scores"><span>DZ 4</span><span>CO 5</span><span>MO 7</span><span class="tot">TOTAL 16</span></div>
-</div>
-<div class="card" id="p078">
-<div class="head"><span class="num">078</span><span class="name">Turing Garden</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/078_turing_garden/preview.png" alt="078 Turing Garden preview" loading="lazy">
-<p class="desc">Bold reaction-diffusion colonies — solid vermilion continents on cobalt seas, edged everywhere with crawling gold rims — slowly deform, split and merge like living coral...</p>
-<div class="scores"><span>DZ 7</span><span>CO 9</span><span>MO 7</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p079">
-<div class="head"><span class="num">079</span><span class="name">Golden Bloom</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/079_golden_bloom/preview.png" alt="079 Golden Bloom preview" loading="lazy">
-<p class="desc">A sunflower head assembles itself floret by floret on the golden angle, rainbow seeds spiraling out from the center until they fill the frame in interlocking phyllotaxis...</p>
-<div class="scores"><span>DZ 6</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card" id="p080">
-<div class="head"><span class="num">080</span><span class="name">Tendril Rose</span><span class="fam">Organic &amp; Growth</span></div>
-<img src="patterns/080_tendril_rose/preview.png" alt="080 Tendril Rose preview" loading="lazy">
-<p class="desc">Two counter-rotating rose-curve tendrils draw themselves onto a deep violet ground with four-fold mirrored symmetry — an outer wide-petaled rosette and a tighter inner...</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p081">
-<div class="head"><span class="num">081</span><span class="name">Poly Morph</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/081_poly_morph/preview.png" alt="081 Poly Morph preview" loading="lazy">
-<p class="desc">Five glowing medallions — one large center, four mirrored satellites — float over a dim violet ring-field; each medallion is a filled regular polygon that slowly melts...</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p082">
-<div class="head"><span class="num">082</span><span class="name">Greek Key</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/082_greek_key/preview.png" alt="082 Greek Key preview" loading="lazy">
-<p class="desc">A central rectangular panel packed with interlocking greek-key / meander hooks (alternating chirality per cell, exactly the a02–a04 maze-panel reference) framed in gold,...</p>
-<div class="scores"><span>DZ 8</span><span>CO 7</span><span>MO 7</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p083">
-<div class="head"><span class="num">083</span><span class="name">Patch Quilt</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/083_patch_quilt/preview.png" alt="083 Patch Quilt preview" loading="lazy">
-<p class="desc">A stitched quilt of 48-px patches, each patch owning ONE distinct motif — nested diamonds, target rings, cross bands, or a woven checker — in its own hue, separated by...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p084">
-<div class="head"><span class="num">084</span><span class="name">Gear Rosettes</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/084_gear_rosettes/preview.png" alt="084 Gear Rosettes preview" loading="lazy">
-<p class="desc">Four large sunflower-gear rosettes in a 2x2 array — toothed golden discs with dotted seed cores — sitting on a slow blue diagonal-stripe ground, with a chain of small...</p>
-<div class="scores"><span>DZ 6</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p085">
-<div class="head"><span class="num">085</span><span class="name">Vector Machine</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/085_vector_machine/preview.png" alt="085 Vector Machine preview" loading="lazy">
-<p class="desc">A bold CGA-poster machine on black (the c01–c05 &quot;H-frame&quot; reference): giant red concentric arc stacks open left and right like parentheses, a blue-to-magenta gradient...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p086">
-<div class="head"><span class="num">086</span><span class="name">Gem Orbit</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/086_gem_orbit/preview.png" alt="086 Gem Orbit preview" loading="lazy">
-<p class="desc">Nine faceted hexagonal gems — a big one at center, eight smaller ones on an elliptical orbit — glide over a deep-blue pond of faint breathing rings.</p>
-<div class="scores"><span>DZ 7</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p087">
-<div class="head"><span class="num">087</span><span class="name">Chevron Court</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/087_chevron_court/preview.png" alt="087 Chevron Court preview" loading="lazy">
-<p class="desc">A four-fold mirrored court of emerald-and-gold chevrons marching diagonally from every corner toward a cream-framed violet striped core at center (the d19–d21...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p088">
-<div class="head"><span class="num">088</span><span class="name">Star Cross</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/088_star_cross/preview.png" alt="088 Star Cross preview" loading="lazy">
-<p class="desc">The classic Islamic star-and-cross tiling as living objects: gold-rimmed 8-point stars filled with concentric rainbow layers alternate with cool plus-shaped crosses on a...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p089">
-<div class="head"><span class="num">089</span><span class="name">Oval Drums</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/089_oval_drums/preview.png" alt="089 Oval Drums preview" loading="lazy">
-<p class="desc">Full-screen concentric racetrack (stadium) rings in rolling rainbow bands radiate from a pair of white-framed striped drums that sit side by side at center, their stripe...</p>
-<div class="scores"><span>DZ 9</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card" id="p090">
-<div class="head"><span class="num">090</span><span class="name">Diamond Burst</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/090_diamond_burst/preview.png" alt="090 Diamond Burst preview" loading="lazy">
-<p class="desc">One huge diamond dominates the screen (the a01 rhombus-kaleidoscope): a magenta-rimmed confetti-mosaic heart wrapped in expanding concentric diamond bands that cycle...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p091">
-<div class="head"><span class="num">091</span><span class="name">Diamond Confetti</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/091_diamond_confetti/preview.png" alt="091 Diamond Confetti preview" loading="lazy">
-<p class="desc">A single huge rhombus fills the screen: thick cyan and magenta rims, an interior packed with a 4-fold-mirrored quilt of tiny rainbow confetti cells, and faint concentric...</p>
-<div class="scores"><span>DZ 7</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 21</span></div>
-</div>
-<div class="card" id="p092">
-<div class="head"><span class="num">092</span><span class="name">Greek Key Panel</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/092_greek_key_panel/preview.png" alt="092 Greek Key Panel preview" loading="lazy">
-<p class="desc">A big central panel covered edge-to-edge in interlocking greek-key maze motifs, framed by a border of blue kaleidoscope wedges with small six-lobed rosettes, while thin...</p>
-<div class="scores"><span>DZ 8</span><span>CO 7</span><span>MO 7</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p093">
-<div class="head"><span class="num">093</span><span class="name">Cathedral Fan</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/093_cathedral_fan/preview.png" alt="093 Cathedral Fan preview" loading="lazy">
-<p class="desc">A red/pink sunburst pinched flat at a glowing horizontal centerline, its rays sweeping like a slowly opening fan; blocky stair-stepped blue spires with green step-seams...</p>
-<div class="scores"><span>DZ 7</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p094">
-<div class="head"><span class="num">094</span><span class="name">Thread Web</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/094_thread_web/preview.png" alt="094 Thread Web preview" loading="lazy">
-<p class="desc">A flat violet flood on which fine, gently-curved rainbow threads accumulate one by one, always sweeping corner-to-center through a 4-fold mirror so the whole screen...</p>
-<div class="scores"><span>DZ 5</span><span>CO 4</span><span>MO 7</span><span class="tot">TOTAL 16</span></div>
-</div>
-<div class="card" id="p095">
-<div class="head"><span class="num">095</span><span class="name">Ring Machine</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/095_ring_machine/preview.png" alt="095 Ring Machine preview" loading="lazy">
-<p class="desc">A bold CGA-poster machine: two stacks of red concentric arcs bow outward left and right like giant parentheses, framing an &quot;H&quot; of blue→magenta gradient rectangles with a...</p>
-<div class="scores"><span>DZ 7</span><span>CO 7</span><span>MO 8</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card" id="p096">
-<div class="head"><span class="num">096</span><span class="name">Scanline Butterfly</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/096_scanline_butterfly/preview.png" alt="096 Scanline Butterfly preview" loading="lazy">
-<p class="desc">The whole field is closely spaced horizontal scanlines whose spacing bulges around two wing lobes, producing a big green-to-yellow moiré butterfly with a cyan diamond...</p>
-<div class="scores"><span>DZ 7</span><span>CO 7</span><span>MO 9</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card" id="p097">
-<div class="head"><span class="num">097</span><span class="name">Magenta Fireworks</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/097_magenta_fireworks/preview.png" alt="097 Magenta Fireworks preview" loading="lazy">
-<p class="desc">Radial particle bursts pop every few frames across a hot magenta flood, each in one or two hues, their thin trails drooping under gravity and staying on screen forever —...</p>
-<div class="scores"><span>DZ 4</span><span>CO 3</span><span>MO 6</span><span class="tot">TOTAL 13</span></div>
-</div>
-<div class="card" id="p098">
-<div class="head"><span class="num">098</span><span class="name">Gear Flower Quad</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/098_gear_flower_quad/preview.png" alt="098 Gear Flower Quad preview" loading="lazy">
-<p class="desc">Four big toothed gear/sunflower rosettes in a 2×2 array — yellow-green discs with dark rims and dotted navy seed cores — sit on a ground of drifting diagonal blue/cyan...</p>
-<div class="scores"><span>DZ 5</span><span>CO 6</span><span>MO 8</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card" id="p099">
-<div class="head"><span class="num">099</span><span class="name">Racetrack Drums</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/099_racetrack_drums/preview.png" alt="099 Racetrack Drums preview" loading="lazy">
-<p class="desc">The entire screen is concentric stadium/racetrack ovals — thick multicolor bands with dark seams — slowly shimmering outward from the center while their hues roll...</p>
-<div class="scores"><span>DZ 8</span><span>CO 8</span><span>MO 8</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card" id="p100">
-<div class="head"><span class="num">100</span><span class="name">Pinwheel Swirl</span><span class="fam">Original Footage Remakes</span></div>
-<img src="patterns/100_pinwheel_swirl/preview.png" alt="100 Pinwheel Swirl preview" loading="lazy">
-<p class="desc">Six smooth-shaded comma arms spiral out of the center over black, turning slowly clockwise while the spiral&#x27;s tightness breathes in and out; the shading ramp rolls from...</p>
-<div class="scores"><span>DZ 8</span><span>CO 9</span><span>MO 9</span><span class="tot">TOTAL 26</span></div>
-</div>
-</div>
-<h2>PALETTES P01–P30</h2>
-<div class="grid">
-<div class="card pal" id="P01">
-<div class="head"><span class="num">P01</span><span class="name">Chasm</span></div>
-<img src="palettes/P01_chasm/swatch.png" alt="P01 Chasm swatch" loading="lazy">
-<div class="chips"><i style="background:#85daeb"></i><i style="background:#5fc9e7"></i><i style="background:#5fa1e7"></i><i style="background:#5f6ee7"></i><i style="background:#4c60aa"></i><i style="background:#444774"></i><i style="background:#32313b"></i><i style="background:#463c5e"></i><i style="background:#5d4776"></i><i style="background:#855395"></i><i style="background:#ab58a8"></i><i style="background:#ca60ae"></i><i style="background:#f3a787"></i><i style="background:#f5daa7"></i><i style="background:#8dd894"></i><i style="background:#5dc190"></i><i style="background:#4ab9a3"></i><i style="background:#4593a5"></i><i style="background:#5efdf7"></i><i style="background:#ff5dcc"></i><i style="background:#fdfe89"></i><i style="background:#ffffff"></i></div>
-<p class="desc">Neon aurora over a deep indigo chasm: cyan and cobalt sink into near-black violet, then climb back out through orchid, magenta, peach and mint to electric accents...</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P02">
-<div class="head"><span class="num">P02</span><span class="name">Funkyfuture 8</span></div>
-<img src="palettes/P02_funkyfuture-8/swatch.png" alt="P02 Funkyfuture 8 swatch" loading="lazy">
-<div class="chips"><i style="background:#2b0f54"></i><i style="background:#ab1f65"></i><i style="background:#ff4f69"></i><i style="background:#fff7f8"></i><i style="background:#ff8142"></i><i style="background:#ffda45"></i><i style="background:#3368dc"></i><i style="background:#49e7ec"></i></div>
-<p class="desc">Eight bold retrowave tones: deep violet ground, hot magenta and pink, cream highlight, orange and banana yellow, cobalt and sky cyan.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 7</span><span>MOOD 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card pal" id="P03">
-<div class="head"><span class="num">P03</span><span class="name">Technogarten</span></div>
-<img src="palettes/P03_technogarten/swatch.png" alt="P03 Technogarten swatch" loading="lazy">
-<div class="chips"><i style="background:#0e0a2e"></i><i style="background:#30286d"></i><i style="background:#924fdc"></i><i style="background:#9a60ff"></i><i style="background:#9d7cff"></i><i style="background:#fd75ca"></i><i style="background:#fba7db"></i><i style="background:#ffc6fe"></i><i style="background:#b295ff"></i><i style="background:#1e34c1"></i><i style="background:#534ed9"></i><i style="background:#2bffd2"></i><i style="background:#60fffa"></i><i style="background:#5fc5ff"></i><i style="background:#60ff64"></i><i style="background:#22c278"></i><i style="background:#000000"></i><i style="background:#fffcc8"></i><i style="background:#ff9e8b"></i><i style="background:#ffec83"></i><i style="background:#d53c6a"></i><i style="background:#f81ca6"></i><i style="background:#fffdeb"></i></div>
-<p class="desc">An electric garden: violet and periwinkle beds, blue-to-teal-to-green vines, with rose and blush blooms and a black void row.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P04">
-<div class="head"><span class="num">P04</span><span class="name">Cyberpunk Neons</span></div>
-<img src="palettes/P04_cyberpunk-neons/swatch.png" alt="P04 Cyberpunk Neons swatch" loading="lazy">
-<div class="chips"><i style="background:#53ebe4"></i><i style="background:#0f9595"></i><i style="background:#084f64"></i><i style="background:#03274c"></i><i style="background:#08173d"></i><i style="background:#0b001b"></i><i style="background:#4d004f"></i><i style="background:#c1115a"></i><i style="background:#e13a6a"></i><i style="background:#e46a87"></i><i style="background:#eca6c0"></i></div>
-<p class="desc">Teal-to-cyan ramp on near-black navy, opposed by a crimson-to-rose ramp: two enemy gradients sharing one dark city sky.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 6</span><span>MOOD 9</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card pal" id="P05">
-<div class="head"><span class="num">P05</span><span class="name">Sunraze</span></div>
-<img src="palettes/P05_sunraze/swatch.png" alt="P05 Sunraze swatch" loading="lazy">
-<div class="chips"><i style="background:#27032a"></i><i style="background:#4b083d"></i><i style="background:#731144"></i><i style="background:#890c38"></i><i style="background:#ab0a2a"></i><i style="background:#be2028"></i><i style="background:#cf492c"></i><i style="background:#e36433"></i><i style="background:#e3884e"></i><i style="background:#ecb55f"></i><i style="background:#eed67b"></i><i style="background:#f4efae"></i><i style="background:#fffdd9"></i><i style="background:#fbfbf2"></i></div>
-<p class="desc">A pure dusk ramp: near-black plum through wine, crimson, vermilion, orange, gold, peach, to pale cream.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 6</span><span>MOOD 8</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card pal" id="P06">
-<div class="head"><span class="num">P06</span><span class="name">Fireball 32</span></div>
-<img src="palettes/P06_fireball-32/swatch.png" alt="P06 Fireball 32 swatch" loading="lazy">
-<div class="chips"><i style="background:#29131a"></i><i style="background:#daaea6"></i><i style="background:#ffffff"></i><i style="background:#ffeb6f"></i><i style="background:#ffc355"></i><i style="background:#ff8846"></i><i style="background:#f4103c"></i><i style="background:#c41e2d"></i><i style="background:#572b39"></i><i style="background:#68393d"></i><i style="background:#a24a37"></i><i style="background:#df7b4d"></i><i style="background:#4f30d9"></i><i style="background:#0672f8"></i><i style="background:#3ab3ff"></i><i style="background:#85eaff"></i><i style="background:#77ff92"></i><i style="background:#60d173"></i><i style="background:#2e674d"></i><i style="background:#054030"></i><i style="background:#4e2a61"></i><i style="background:#62168b"></i><i style="background:#ad51c9"></i><i style="background:#f296ff"></i><i style="background:#7c4af9"></i><i style="background:#ab6aff"></i><i style="background:#ff5d9b"></i><i style="background:#ff356b"></i><i style="background:#d8dde5"></i><i style="background:#878ea1"></i><i style="background:#4b5168"></i><i style="background:#3f3b5f"></i></div>
-<p class="desc">Fire and its afterimage: white-hot core through yellow, orange, crimson and ember browns, answered by a cool half of cobalt, sky blue, mint green and violet-purple.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 10</span><span>MOOD 6</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card pal" id="P07">
-<div class="head"><span class="num">P07</span><span class="name">Bubblegum 16</span></div>
-<img src="palettes/P07_bubblegum-16/swatch.png" alt="P07 Bubblegum 16 swatch" loading="lazy">
-<div class="chips"><i style="background:#16171a"></i><i style="background:#7f0622"></i><i style="background:#d62411"></i><i style="background:#ff8426"></i><i style="background:#ffd100"></i><i style="background:#fafdff"></i><i style="background:#ff80a4"></i><i style="background:#ff2674"></i><i style="background:#94216a"></i><i style="background:#430067"></i><i style="background:#234975"></i><i style="background:#68aed4"></i><i style="background:#bfff3c"></i><i style="background:#10d275"></i><i style="background:#007899"></i><i style="background:#002859"></i></div>
-<p class="desc">Arcade candy: black licorice ground, cherry red, orange, lemon, white, then bubblegum pinks, grape purples, blueberry blues and a lime accent.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P08">
-<div class="head"><span class="num">P08</span><span class="name">Pop Rox</span></div>
-<img src="palettes/P08_pop-rox/swatch.png" alt="P08 Pop Rox swatch" loading="lazy">
-<div class="chips"><i style="background:#ffc888"></i><i style="background:#ff8667"></i><i style="background:#c11c3a"></i><i style="background:#64172d"></i><i style="background:#bb4310"></i><i style="background:#f27e0d"></i><i style="background:#ffc405"></i><i style="background:#faffce"></i><i style="background:#bef318"></i><i style="background:#79c12d"></i><i style="background:#2d7a29"></i><i style="background:#123e3d"></i><i style="background:#0d041a"></i><i style="background:#6b3d66"></i><i style="background:#c8667c"></i><i style="background:#ffb4b8"></i><i style="background:#ff6ca8"></i><i style="background:#d036a9"></i><i style="background:#6d1b81"></i><i style="background:#240e55"></i><i style="background:#253a91"></i><i style="background:#1366bc"></i><i style="background:#12a0b0"></i><i style="background:#31f8aa"></i></div>
-<p class="desc">Candy jewels: coral-red through salmon and cream on the warm side, midnight navy through violet, magenta and rose on the cool side.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P09">
-<div class="head"><span class="num">P09</span><span class="name">Vaporsthetic</span></div>
-<img src="palettes/P09_vaporsthetic/swatch.png" alt="P09 Vaporsthetic swatch" loading="lazy">
-<div class="chips"><i style="background:#ffe0f7"></i><i style="background:#f5c9eb"></i><i style="background:#f5c1e5"></i><i style="background:#fc92fa"></i><i style="background:#fb6cff"></i><i style="background:#ff7dcb"></i><i style="background:#ff4aa7"></i><i style="background:#feffbe"></i><i style="background:#ffd08a"></i><i style="background:#ff8370"></i><i style="background:#cbffe6"></i><i style="background:#83ded2"></i><i style="background:#66b9c1"></i><i style="background:#afe9ff"></i><i style="background:#94c4ff"></i><i style="background:#8f8cf3"></i><i style="background:#a453f5"></i><i style="background:#764ead"></i><i style="background:#6a1483"></i><i style="background:#482254"></i></div>
-<p class="desc">Miami dusk: rose, salmon and cream sands against seafoam, teal and mint waters, grounded by plum-mauve shadows.</p>
-<div class="scores"><span>RICH 7</span><span>RANGE 7</span><span>MOOD 9</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card pal" id="P10">
-<div class="head"><span class="num">P10</span><span class="name">Berry Nebula</span></div>
-<img src="palettes/P10_berry-nebula/swatch.png" alt="P10 Berry Nebula swatch" loading="lazy">
-<div class="chips"><i style="background:#6ceded"></i><i style="background:#6cb9c9"></i><i style="background:#6d85a5"></i><i style="background:#6e5181"></i><i style="background:#6f1d5c"></i><i style="background:#4f1446"></i><i style="background:#2e0a30"></i><i style="background:#0d001a"></i></div>
-<p class="desc">Eight-step space ramp: bright cyan sinking through teal into blackberry darkness, then rising through royal purple and orchid to hot pink.</p>
-<div class="scores"><span>RICH 6</span><span>RANGE 5</span><span>MOOD 9</span><span class="tot">TOTAL 20</span></div>
-</div>
-<div class="card pal" id="P11">
-<div class="head"><span class="num">P11</span><span class="name">Azure Abyss</span></div>
-<img src="palettes/P11_azure-abyss/swatch.png" alt="P11 Azure Abyss swatch" loading="lazy">
-<div class="chips"><i style="background:#10022a"></i><i style="background:#0e033e"></i><i style="background:#04055d"></i><i style="background:#002c7b"></i><i style="background:#004a9b"></i><i style="background:#0076af"></i><i style="background:#00a3ca"></i><i style="background:#00c6bf"></i><i style="background:#69f0c7"></i></div>
-<p class="desc">A nine-step descent: pale seafoam and aqua down through azure and cobalt into abyssal navy-black.</p>
-<div class="scores"><span>RICH 6</span><span>RANGE 4</span><span>MOOD 9</span><span class="tot">TOTAL 19</span></div>
-</div>
-<div class="card pal" id="P12">
-<div class="head"><span class="num">P12</span><span class="name">Unstable</span></div>
-<img src="palettes/P12_unstable/swatch.png" alt="P12 Unstable swatch" loading="lazy">
-<div class="chips"><i style="background:#0b0c31"></i><i style="background:#541191"></i><i style="background:#4915be"></i><i style="background:#2357d5"></i><i style="background:#5b98f4"></i><i style="background:#489c73"></i><i style="background:#6fc25a"></i><i style="background:#8ed73d"></i><i style="background:#c2ed51"></i><i style="background:#3a0737"></i><i style="background:#a70e62"></i><i style="background:#e10e3c"></i><i style="background:#f4402a"></i><i style="background:#f47140"></i><i style="background:#f0b932"></i><i style="background:#ffd95a"></i><i style="background:#8d25a7"></i><i style="background:#d141c7"></i><i style="background:#e170c0"></i><i style="background:#c52a91"></i><i style="background:#dd7f6c"></i><i style="background:#e8b994"></i><i style="background:#b72d61"></i><i style="background:#7e1950"></i><i style="background:#630f4f"></i><i style="background:#6ecad5"></i><i style="background:#5892be"></i><i style="background:#455894"></i><i style="background:#2e337e"></i><i style="background:#9ec6bf"></i><i style="background:#d4eceb"></i><i style="background:#faffff"></i></div>
-<p class="desc">A 32-color jewel riot in ordered ramps: violet-&gt;grape, cobalt-&gt;sky, jade-&gt;lime, wine-&gt;scarlet-&gt;amber-&gt;gold, magenta-&gt;blush, rose-&gt;salmon, teal-&gt;ice, slate-&gt;white.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 10</span><span>MOOD 7</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P13">
-<div class="head"><span class="num">P13</span><span class="name">Wlk44 V2</span></div>
-<img src="palettes/P13_wlk44-v2/swatch.png" alt="P13 Wlk44 V2 swatch" loading="lazy">
-<div class="chips"><i style="background:#020918"></i><i style="background:#424e66"></i><i style="background:#93a5be"></i><i style="background:#f2f2f2"></i><i style="background:#ffff99"></i><i style="background:#ffc61a"></i><i style="background:#a2b20a"></i><i style="background:#459201"></i><i style="background:#4d0a00"></i><i style="background:#9d2c07"></i><i style="background:#ea7d10"></i><i style="background:#f8be49"></i><i style="background:#c3f787"></i><i style="background:#47d163"></i><i style="background:#107a68"></i><i style="background:#01253c"></i><i style="background:#082525"></i><i style="background:#03683e"></i><i style="background:#21b039"></i><i style="background:#8df34f"></i><i style="background:#99e7f4"></i><i style="background:#12c2f8"></i><i style="background:#0341b5"></i><i style="background:#020a55"></i><i style="background:#030d30"></i><i style="background:#0b6f9d"></i><i style="background:#22e2d5"></i><i style="background:#d878ed"></i><i style="background:#9232ec"></i><i style="background:#30008f"></i><i style="background:#160132"></i><i style="background:#46024b"></i><i style="background:#830165"></i><i style="background:#b9138d"></i><i style="background:#e057c9"></i><i style="background:#faa3ab"></i><i style="background:#ef5d7f"></i><i style="background:#ee113d"></i><i style="background:#980b1c"></i><i style="background:#3f0409"></i><i style="background:#190400"></i><i style="background:#ba5017"></i><i style="background:#f4964e"></i><i style="background:#fecc81"></i></div>
-<p class="desc">The master spectrum: 44 colors covering full-value ramps of red, orange, gold, green, teal, blue, violet and magenta plus clean neutrals.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 10</span><span>MOOD 6</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card pal" id="P14">
-<div class="head"><span class="num">P14</span><span class="name">Ink Crimson</span></div>
-<img src="palettes/P14_ink-crimson/swatch.png" alt="P14 Ink Crimson swatch" loading="lazy">
-<div class="chips"><i style="background:#ff0546"></i><i style="background:#9c173b"></i><i style="background:#660f31"></i><i style="background:#450327"></i><i style="background:#270022"></i><i style="background:#17001d"></i><i style="background:#09010d"></i><i style="background:#0ce6f2"></i><i style="background:#0098db"></i><i style="background:#1e579c"></i></div>
-<p class="desc">Crimson noir: scarlet through blood red and wine into violet-black ink, with a three-step ice counterstrike (0ce6f2 cyan, 0098db azure, 1e579c steel blue) at the deep...</p>
-<div class="scores"><span>RICH 7</span><span>RANGE 5</span><span>MOOD 10</span><span class="tot">TOTAL 22</span></div>
-</div>
-<div class="card pal" id="P15">
-<div class="head"><span class="num">P15</span><span class="name">Holographic Mode</span></div>
-<img src="palettes/P15_holographic-mode/swatch.png" alt="P15 Holographic Mode swatch" loading="lazy">
-<div class="chips"><i style="background:#e7e0e4"></i><i style="background:#efcaa7"></i><i style="background:#a1d5b4"></i><i style="background:#84b5e5"></i><i style="background:#e19bd9"></i><i style="background:#9779d1"></i><i style="background:#5f65b5"></i><i style="background:#1c1529"></i></div>
-<p class="desc">Eight iridescent pastels: pearl white through mint, sky, periwinkle and lilac — a soap-bubble sheen ramp.</p>
-<div class="scores"><span>RICH 7</span><span>RANGE 7</span><span>MOOD 9</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card pal" id="P16">
-<div class="head"><span class="num">P16</span><span class="name">Cathedral Glass</span></div>
-<img src="palettes/P16_cathedral_glass/swatch.png" alt="P16 Cathedral Glass swatch" loading="lazy">
-<div class="chips"><i style="background:#0d0b10"></i><i style="background:#1b1722"></i><i style="background:#4a0d20"></i><i style="background:#7c1230"></i><i style="background:#b01c3c"></i><i style="background:#e63a55"></i><i style="background:#ff7a8a"></i><i style="background:#5c3a08"></i><i style="background:#9c6510"></i><i style="background:#d9960f"></i><i style="background:#ffc93c"></i><i style="background:#ffe9a0"></i><i style="background:#101c4a"></i><i style="background:#1c3a8c"></i><i style="background:#2f62d9"></i><i style="background:#5f9dff"></i><i style="background:#aacdff"></i><i style="background:#0e4d2e"></i><i style="background:#1f9e5a"></i><i style="background:#5ee08a"></i><i style="background:#f5f0ff"></i></div>
-<p class="desc">Rich saturated jewel ramps separated by near-black leading; every hue reads against the dark ground.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 9</span><span class="tot">TOTAL 27</span></div>
-</div>
-<div class="card pal" id="P17">
-<div class="head"><span class="num">P17</span><span class="name">Peacock Court</span></div>
-<img src="palettes/P17_peacock_court/swatch.png" alt="P17 Peacock Court swatch" loading="lazy">
-<div class="chips"><i style="background:#04121a"></i><i style="background:#07293a"></i><i style="background:#0a4a5c"></i><i style="background:#0f7280"></i><i style="background:#12a0a0"></i><i style="background:#3cd3c0"></i><i style="background:#8ff2df"></i><i style="background:#123a7a"></i><i style="background:#1c5fc0"></i><i style="background:#4a8fe6"></i><i style="background:#8fc2ff"></i><i style="background:#0d4a2a"></i><i style="background:#1f8a48"></i><i style="background:#55c46a"></i><i style="background:#a8e88a"></i><i style="background:#6b3014"></i><i style="background:#a8542a"></i><i style="background:#e08a3c"></i><i style="background:#ffc27a"></i><i style="background:#f2fff4"></i></div>
-<p class="desc">Cool analogous wash that flows hue-to-hue seamlessly; copper is ~15% of usage and lands like eyespots.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 7</span><span>MOOD 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card pal" id="P18">
-<div class="head"><span class="num">P18</span><span class="name">Aurora Veil</span></div>
-<img src="palettes/P18_aurora_veil/swatch.png" alt="P18 Aurora Veil swatch" loading="lazy">
-<div class="chips"><i style="background:#050810"></i><i style="background:#0a1226"></i><i style="background:#101c3a"></i><i style="background:#0c5a3c"></i><i style="background:#12996b"></i><i style="background:#27d98a"></i><i style="background:#7dffb0"></i><i style="background:#ccffd9"></i><i style="background:#2a1454"></i><i style="background:#4a2496"></i><i style="background:#7a44d9"></i><i style="background:#ab7aff"></i><i style="background:#8a1a6a"></i><i style="background:#cc2fa0"></i><i style="background:#ff6ad5"></i><i style="background:#1c4a8a"></i><i style="background:#3f83c9"></i><i style="background:#eef4ff"></i></div>
-<p class="desc">Green dominates, magenta/violet fringe it — the classic split-complement tension of real aurora photos.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 8</span><span>MOOD 9</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card pal" id="P19">
-<div class="head"><span class="num">P19</span><span class="name">Macaw Riot</span></div>
-<img src="palettes/P19_macaw_riot/swatch.png" alt="P19 Macaw Riot swatch" loading="lazy">
-<div class="chips"><i style="background:#140806"></i><i style="background:#26100a"></i><i style="background:#0a1a10"></i><i style="background:#8a1010"></i><i style="background:#cc2418"></i><i style="background:#ff4a2a"></i><i style="background:#ff8a5a"></i><i style="background:#b87f00"></i><i style="background:#f2b705"></i><i style="background:#ffe14a"></i><i style="background:#2a6a10"></i><i style="background:#4fa524"></i><i style="background:#8ad93c"></i><i style="background:#ccf07a"></i><i style="background:#0f2a7a"></i><i style="background:#1c50c4"></i><i style="background:#3f8ce6"></i><i style="background:#85c8ff"></i><i style="background:#12b0a0"></i><i style="background:#fff8e8"></i></div>
-<p class="desc">Maximum-chroma triad kept cohesive by shared dark jungle grounds and matched ramp lengths.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P20">
-<div class="head"><span class="num">P20</span><span class="name">Koi Pond Dusk</span></div>
-<img src="palettes/P20_koi_pond_dusk/swatch.png" alt="P20 Koi Pond Dusk swatch" loading="lazy">
-<div class="chips"><i style="background:#06131c"></i><i style="background:#0a2433"></i><i style="background:#10394a"></i><i style="background:#1a5a66"></i><i style="background:#2f8a86"></i><i style="background:#5ec4ac"></i><i style="background:#a8e8cf"></i><i style="background:#2a1440"></i><i style="background:#1e5a34"></i><i style="background:#3f8a4f"></i><i style="background:#7ec46a"></i><i style="background:#7a2410"></i><i style="background:#c44514"></i><i style="background:#f2712a"></i><i style="background:#ffa04f"></i><i style="background:#ffd08f"></i><i style="background:#f5f2e8"></i></div>
-<p class="desc">Seven-step water ramp carries the field; koi orange is the exact complement of the teal center.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 8</span><span>MOOD 9</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card pal" id="P21">
-<div class="head"><span class="num">P21</span><span class="name">Blacklight Lounge</span></div>
-<img src="palettes/P21_blacklight_lounge/swatch.png" alt="P21 Blacklight Lounge swatch" loading="lazy">
-<div class="chips"><i style="background:#0a0514"></i><i style="background:#160a2e"></i><i style="background:#241452"></i><i style="background:#3a1f8a"></i><i style="background:#5a35cc"></i><i style="background:#8a5fff"></i><i style="background:#bfa0ff"></i><i style="background:#7a1060"></i><i style="background:#c41f9e"></i><i style="background:#ff3fd4"></i><i style="background:#ff8ae8"></i><i style="background:#1f7a2a"></i><i style="background:#3fd44f"></i><i style="background:#8aff7a"></i><i style="background:#c4b800"></i><i style="background:#f2ee3f"></i><i style="background:#ffff9e"></i><i style="background:#e8e0ff"></i></div>
-<p class="desc">Everything floats on violet-black; the two complement pairs give four glow inks that all pop equally.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 8</span><span>MOOD 9</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P22">
-<div class="head"><span class="num">P22</span><span class="name">Byzantine Mosaic</span></div>
-<img src="palettes/P22_byzantine_mosaic/swatch.png" alt="P22 Byzantine Mosaic swatch" loading="lazy">
-<div class="chips"><i style="background:#12080a"></i><i style="background:#241408"></i><i style="background:#5c3c10"></i><i style="background:#8f6314"></i><i style="background:#c49224"></i><i style="background:#ecc45a"></i><i style="background:#ffe9a8"></i><i style="background:#0f1c4a"></i><i style="background:#1c3a8c"></i><i style="background:#3563c4"></i><i style="background:#6a95e0"></i><i style="background:#4a1428"></i><i style="background:#7c2148"></i><i style="background:#b03a6a"></i><i style="background:#143c2e"></i><i style="background:#2a7a58"></i><i style="background:#5ab88a"></i><i style="background:#f2e8d4"></i></div>
-<p class="desc">Warm gold field vs cool lapis, tempered by wine-purple and oxidized green — imperial and heavy.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 8</span><span>MOOD 9</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P23">
-<div class="head"><span class="num">P23</span><span class="name">Holi Burst</span></div>
-<img src="palettes/P23_holi_burst/swatch.png" alt="P23 Holi Burst swatch" loading="lazy">
-<div class="chips"><i style="background:#1a0a1e"></i><i style="background:#2e1035"></i><i style="background:#8a1058"></i><i style="background:#cc1f7e"></i><i style="background:#ff4aa8"></i><i style="background:#ff9ad0"></i><i style="background:#b8480a"></i><i style="background:#f2751f"></i><i style="background:#ffa84a"></i><i style="background:#e8c414"></i><i style="background:#fff06a"></i><i style="background:#0c7a8a"></i><i style="background:#18bcc4"></i><i style="background:#6ae8e0"></i><i style="background:#4a1f9e"></i><i style="background:#7a4ae0"></i><i style="background:#ab8aff"></i><i style="background:#3fb83f"></i><i style="background:#fff4f8"></i></div>
-<p class="desc">Six powder hues at matched brightness over one shared dark — chaotic joy that still coheres.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 9</span><span class="tot">TOTAL 27</span></div>
-</div>
-<div class="card pal" id="P24">
-<div class="head"><span class="num">P24</span><span class="name">Obsidian Magma</span></div>
-<img src="palettes/P24_obsidian_magma/swatch.png" alt="P24 Obsidian Magma swatch" loading="lazy">
-<div class="chips"><i style="background:#070608"></i><i style="background:#141018"></i><i style="background:#231a24"></i><i style="background:#3a2a33"></i><i style="background:#40101c"></i><i style="background:#5c0f0a"></i><i style="background:#9e1c0c"></i><i style="background:#e03a10"></i><i style="background:#ff6b1f"></i><i style="background:#ff8a54"></i><i style="background:#ffa03a"></i><i style="background:#ffd970"></i><i style="background:#1c2a3f"></i><i style="background:#3a5a7a"></i><i style="background:#7a9cb8"></i><i style="background:#e8ddd0"></i></div>
-<p class="desc">One long incandescent ramp from black to near-white; steel blue is the cold complement whisper.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 7</span><span>MOOD 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card pal" id="P25">
-<div class="head"><span class="num">P25</span><span class="name">Orchid Greenhouse</span></div>
-<img src="palettes/P25_orchid_greenhouse/swatch.png" alt="P25 Orchid Greenhouse swatch" loading="lazy">
-<div class="chips"><i style="background:#100a14"></i><i style="background:#1f1226"></i><i style="background:#3a1f5c"></i><i style="background:#5c2f8a"></i><i style="background:#8a4ac0"></i><i style="background:#b87ae0"></i><i style="background:#7a1454"></i><i style="background:#b02585"></i><i style="background:#e84aae"></i><i style="background:#ff8ad0"></i><i style="background:#ffc2e8"></i><i style="background:#143a1f"></i><i style="background:#2a7a3a"></i><i style="background:#5cb85c"></i><i style="background:#a8e08a"></i><i style="background:#ff8a70"></i><i style="background:#fff0c4"></i></div>
-<p class="desc">Warm purple-to-pink flow (the mood the pool&#x27;s pastels miss: saturated + dark-grounded florals).</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 8</span><span>MOOD 9</span><span class="tot">TOTAL 25</span></div>
-</div>
-<div class="card pal" id="P26">
-<div class="head"><span class="num">P26</span><span class="name">Thunderhead</span></div>
-<img src="palettes/P26_thunderhead/swatch.png" alt="P26 Thunderhead swatch" loading="lazy">
-<div class="chips"><i style="background:#0a0c12"></i><i style="background:#151a26"></i><i style="background:#232c3f"></i><i style="background:#36445c"></i><i style="background:#55688a"></i><i style="background:#8399b8"></i><i style="background:#bccbe0"></i><i style="background:#2a2260"></i><i style="background:#4a3fa0"></i><i style="background:#7a6fd9"></i><i style="background:#1f5c66"></i><i style="background:#3f9ea0"></i><i style="background:#e0a01f"></i><i style="background:#ffdf5c"></i><i style="background:#fff2a8"></i><i style="background:#ffffff"></i></div>
-<p class="desc">A seven-step neutral-blue cloud ramp does the heavy lifting; amber appears rarely and reads electric.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 7</span><span>MOOD 8</span><span class="tot">TOTAL 23</span></div>
-</div>
-<div class="card pal" id="P27">
-<div class="head"><span class="num">P27</span><span class="name">Carnival Glass</span></div>
-<img src="palettes/P27_carnival_glass/swatch.png" alt="P27 Carnival Glass swatch" loading="lazy">
-<div class="chips"><i style="background:#140c0a"></i><i style="background:#261410"></i><i style="background:#8a4a14"></i><i style="background:#cc7a1f"></i><i style="background:#f2a83f"></i><i style="background:#ffd98a"></i><i style="background:#8a2440"></i><i style="background:#cc4a70"></i><i style="background:#ff8aa0"></i><i style="background:#0f4a5c"></i><i style="background:#1f8a9e"></i><i style="background:#5cc4d4"></i><i style="background:#3f7a2a"></i><i style="background:#7ab84a"></i><i style="background:#c4e07a"></i><i style="background:#5c2a7a"></i><i style="background:#9e5cc4"></i><i style="background:#fce8f0"></i></div>
-<p class="desc">Five hue families all with a bright &#x27;sheen&#x27; step — cycle through them in order for oil-slick motion.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P28">
-<div class="head"><span class="num">P28</span><span class="name">Absinthe Hour</span></div>
-<img src="palettes/P28_absinthe_hour/swatch.png" alt="P28 Absinthe Hour swatch" loading="lazy">
-<div class="chips"><i style="background:#0a0f08"></i><i style="background:#141f10"></i><i style="background:#20301a"></i><i style="background:#2f5c1f"></i><i style="background:#4a8a24"></i><i style="background:#74b82a"></i><i style="background:#a8dd3f"></i><i style="background:#def27a"></i><i style="background:#8a6a14"></i><i style="background:#c49c24"></i><i style="background:#edcc5c"></i><i style="background:#0f4a3a"></i><i style="background:#1f8a66"></i><i style="background:#8a1424"></i><i style="background:#cc2a3a"></i><i style="background:#ff5c5c"></i><i style="background:#f8f2d8"></i></div>
-<p class="desc">A poison-green world warmed by brass; red is the direct complement, used at candle-flame scale.</p>
-<div class="scores"><span>RICH 8</span><span>RANGE 7</span><span>MOOD 9</span><span class="tot">TOTAL 24</span></div>
-</div>
-<div class="card pal" id="P29">
-<div class="head"><span class="num">P29</span><span class="name">Nebula Reef</span></div>
-<img src="palettes/P29_nebula_reef/swatch.png" alt="P29 Nebula Reef swatch" loading="lazy">
-<div class="chips"><i style="background:#03060e"></i><i style="background:#071226"></i><i style="background:#0c1f3f"></i><i style="background:#0f5c7a"></i><i style="background:#14a0b8"></i><i style="background:#2fe0e0"></i><i style="background:#9afff2"></i><i style="background:#8a2f1a"></i><i style="background:#e05c24"></i><i style="background:#ff9a4a"></i><i style="background:#3a1a6a"></i><i style="background:#6a35b0"></i><i style="background:#a86ae8"></i><i style="background:#d9aaff"></i><i style="background:#c41f8a"></i><i style="background:#ff6ad0"></i><i style="background:#e8faff"></i></div>
-<p class="desc">Cold cyan/violet field with warm coral counterweight — the triad keeps deep-sea from going monochrome.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 8</span><span>MOOD 9</span><span class="tot">TOTAL 26</span></div>
-</div>
-<div class="card pal" id="P30">
-<div class="head"><span class="num">P30</span><span class="name">Spice Bazaar</span></div>
-<img src="palettes/P30_spice_bazaar/swatch.png" alt="P30 Spice Bazaar swatch" loading="lazy">
-<div class="chips"><i style="background:#1a0e0a"></i><i style="background:#2e180f"></i><i style="background:#6a1f14"></i><i style="background:#9e3520"></i><i style="background:#cc5c2a"></i><i style="background:#e8834a"></i><i style="background:#b87a10"></i><i style="background:#e8a81f"></i><i style="background:#ffd45c"></i><i style="background:#1f2a8a"></i><i style="background:#3547cc"></i><i style="background:#5c78e8"></i><i style="background:#93a8ff"></i><i style="background:#0f6a66"></i><i style="background:#1fa89a"></i><i style="background:#62d9c4"></i><i style="background:#1f5c3a"></i><i style="background:#a8e8c4"></i><i style="background:#4a1f3f"></i><i style="background:#f8ecd4"></i></div>
-<p class="desc">Warm spice ramps against the famous majorelle blue — two complement pairs, market-stall energy.</p>
-<div class="scores"><span>RICH 9</span><span>RANGE 9</span><span>MOOD 8</span><span class="tot">TOTAL 26</span></div>
-</div>
-</div>
+<footer><div class="wrap">
+  JellyDazzle · MIT · built by J and M5 at
+  <a href="https://jelia.nyc">jelia.nyc</a> ·
+  <a href="https://github.com/LIBCSYS/JellyDazzle">github.com/LIBCSYS/JellyDazzle</a><br>
+  In memory of every hour spent staring at DAZZLE.EXE.
+</div></footer>
+
 </body></html>

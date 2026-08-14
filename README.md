@@ -59,22 +59,34 @@ prototypes and 30 palettes, built as the expansion roadmap.
 ## Download & run (no tools needed)
 
 Grab **JellyDazzle.app.zip** from the
-[latest release](https://github.com/LIBCSYS/JellyDazzle/releases), unzip,
-and double-click. Apple Silicon Macs only. ESC quits.
+[latest release](https://github.com/LIBCSYS/JellyDazzle/releases), unzip, and
+double-click. **Apple Silicon Macs only.** ESC quits.
 
-> **"Apple could not verify JellyDazzle is free of malware."**
-> That is macOS Gatekeeper, not a problem with the app — this is a free
-> open-source project without a $99/yr Apple Developer notarization
-> certificate. The source is right here; read it, or build it yourself.
->
-> To run it, either:
-> - **Right-click** the app → **Open** → **Open** (once), or
-> - **System Settings → Privacy & Security** → *Open Anyway*, or
-> - in Terminal: `xattr -dr com.apple.quarantine /path/to/JellyDazzle.app`
->
-> Building from source (below) produces an app with no warning at all.
->
-> Sharing it with someone? Send them **[HOW_TO_OPEN.md](HOW_TO_OPEN.md)** — the same steps, plain and friendly.
+### First launch: macOS will block it — here's the 30-second fix
+
+macOS says *"Apple could not verify JellyDazzle is free of malware."* That is
+Gatekeeper flagging any app without a **paid Apple notarization certificate** —
+nothing is wrong with the app, and all of its source is right here. You do this
+once:
+
+1. **Double-click** the app once and let it get refused
+2. Open **System Settings → Privacy & Security**
+3. Scroll to the bottom — there's a line saying *"JellyDazzle was blocked to
+   protect your Mac"*
+4. Click **Open Anyway** → confirm with Touch ID or your password
+5. It launches, and every launch after that is a normal double-click
+
+**Or the one-liner, which works regardless** — paste in Terminal after
+downloading:
+
+```
+xattr -dr com.apple.quarantine ~/Downloads/JellyDazzle.app
+```
+
+> On macOS 15+ the old "right-click → Open" trick no longer works for unsigned
+> apps. Use **Open Anyway** or the command above. A signed, notarized build is
+> coming — then none of this is needed.
+> Full walkthrough: **[HOW_TO_OPEN.md](HOW_TO_OPEN.md)**
 
 ## The engine vs. the lab
 
