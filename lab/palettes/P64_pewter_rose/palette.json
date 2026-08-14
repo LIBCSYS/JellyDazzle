@@ -1,0 +1,32 @@
+{
+ "id": "P64",
+ "slug": "pewter_rose",
+ "name": "Pewter Rose",
+ "class": "metallic",
+ "scheme": "warm pewter 348-22 on a full value ramp; neutral return leg",
+ "mood": "Old pewter with the faintest blush in it \u2014 black in the shadow, white on the rim, and a warmth you only see next to a true grey.",
+ "count": 21,
+ "colors": [
+  "030001",
+  "0b0403",
+  "2a201c",
+  "4c413e",
+  "726662",
+  "9a8d89",
+  "c3b6b2",
+  "e8d1d2",
+  "efe1dc",
+  "fff8f8",
+  "f9eaeb",
+  "f1dede",
+  "eccfd2",
+  "d9adb3",
+  "c38c97",
+  "ab6d7d",
+  "915164",
+  "74384d",
+  "562138",
+  "380d23",
+  "1b010e"
+ ]
+}

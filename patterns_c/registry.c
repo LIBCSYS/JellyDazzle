@@ -100,6 +100,107 @@ extern void pattern_097(uint32_t*, int, int, int, int, uint32_t, const uint32_t*
 extern void pattern_098(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_099(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_100(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_101(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_102(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_103(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_104(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_105(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_106(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_107(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_108(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_109(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_110(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_111(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_112(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_113(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_114(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_115(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_116(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_117(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_118(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_119(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_120(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_121(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_122(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_123(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_124(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_125(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_126(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_127(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_128(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_129(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_130(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_131(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_132(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_133(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_134(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_135(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_136(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_137(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_138(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_139(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_140(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_141(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_142(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_143(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_144(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_145(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_146(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_147(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_148(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_149(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_150(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_151(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_152(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_153(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_154(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_155(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_156(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_157(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_158(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_159(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_160(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_161(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_162(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_163(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_164(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_165(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_166(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_167(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_168(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_169(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_170(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_171(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_172(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_173(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_174(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_175(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_176(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_177(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_178(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_179(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_180(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_181(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_182(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_183(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_184(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_185(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_186(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_187(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_188(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_189(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_190(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_191(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_192(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_193(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_194(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_195(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_196(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_197(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_198(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_199(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_200(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_201(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 const jd_pattern_fn jd_patterns[] = {
     pattern_001,
     pattern_002,
@@ -201,5 +302,106 @@ const jd_pattern_fn jd_patterns[] = {
     pattern_098,
     pattern_099,
     pattern_100,
+    pattern_101,
+    pattern_102,
+    pattern_103,
+    pattern_104,
+    pattern_105,
+    pattern_106,
+    pattern_107,
+    pattern_108,
+    pattern_109,
+    pattern_110,
+    pattern_111,
+    pattern_112,
+    pattern_113,
+    pattern_114,
+    pattern_115,
+    pattern_116,
+    pattern_117,
+    pattern_118,
+    pattern_119,
+    pattern_120,
+    pattern_121,
+    pattern_122,
+    pattern_123,
+    pattern_124,
+    pattern_125,
+    pattern_126,
+    pattern_127,
+    pattern_128,
+    pattern_129,
+    pattern_130,
+    pattern_131,
+    pattern_132,
+    pattern_133,
+    pattern_134,
+    pattern_135,
+    pattern_136,
+    pattern_137,
+    pattern_138,
+    pattern_139,
+    pattern_140,
+    pattern_141,
+    pattern_142,
+    pattern_143,
+    pattern_144,
+    pattern_145,
+    pattern_146,
+    pattern_147,
+    pattern_148,
+    pattern_149,
+    pattern_150,
+    pattern_151,
+    pattern_152,
+    pattern_153,
+    pattern_154,
+    pattern_155,
+    pattern_156,
+    pattern_157,
+    pattern_158,
+    pattern_159,
+    pattern_160,
+    pattern_161,
+    pattern_162,
+    pattern_163,
+    pattern_164,
+    pattern_165,
+    pattern_166,
+    pattern_167,
+    pattern_168,
+    pattern_169,
+    pattern_170,
+    pattern_171,
+    pattern_172,
+    pattern_173,
+    pattern_174,
+    pattern_175,
+    pattern_176,
+    pattern_177,
+    pattern_178,
+    pattern_179,
+    pattern_180,
+    pattern_181,
+    pattern_182,
+    pattern_183,
+    pattern_184,
+    pattern_185,
+    pattern_186,
+    pattern_187,
+    pattern_188,
+    pattern_189,
+    pattern_190,
+    pattern_191,
+    pattern_192,
+    pattern_193,
+    pattern_194,
+    pattern_195,
+    pattern_196,
+    pattern_197,
+    pattern_198,
+    pattern_199,
+    pattern_200,
+    pattern_201,
 };
-const int jd_pattern_count = 100;
+const int jd_pattern_count = 201;

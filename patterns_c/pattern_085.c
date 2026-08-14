@@ -7,6 +7,7 @@
  * Repaint pattern, full resolution, per-frame ring + ramp LUTs. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 #define P85_TAU 6.28318530718f
 
@@ -14,6 +15,60 @@ static float p85_ptab[1024][3];
 static float p85_sin[2048];
 static float p85_arcL[1024], p85_arcR[1024];
 static int p85_inited;
+
+/* The two arc stacks are a fixed annulus in screen space: both the sqrtf and
+ * the 55<r<170 test depend only on (x,y). Bake the LUT index per pixel once
+ * (-1 == outside the annulus); the arc *values* still vary per frame. */
+static int16_t *p85_kL, *p85_kR;
+static int p85_tw, p85_th;
+static int16_t p85_rowL[4096], p85_rowR[4096];  /* fallback if alloc fails */
+
+static void p85_arcrow(int16_t *kl, int16_t *kr, float qy, float isx, int w)
+{
+    int x;
+    if (w > 4096) w = 4096;
+    for (x = 0; x < w; x++) {
+        float px = ((float)x + 0.5f) * isx - 160.0f;
+        float dx = px + 175.0f;
+        int k = -1;
+        if (dx > 0.0f) {
+            float r = sqrtf(qy + dx * dx);
+            if (r > 55.0f && r < 170.0f) {
+                k = (int)(r * 4.0f); if (k > 1023) k = 1023;
+            }
+        }
+        kl[x] = (int16_t)k;
+        dx = px - 175.0f; k = -1;
+        if (dx < 0.0f) {
+            float r = sqrtf(qy + dx * dx);
+            if (r > 55.0f && r < 170.0f) {
+                k = (int)(r * 4.0f); if (k > 1023) k = 1023;
+            }
+        }
+        kr[x] = (int16_t)k;
+    }
+}
+
+static void p85_map(int w, int h)
+{
+    float isx, isy;
+    int y;
+    if (p85_tw == w && p85_th == h && p85_kL) return;
+    free(p85_kL); free(p85_kR);
+    p85_kL = (int16_t *)malloc(sizeof(int16_t) * (size_t)w * (size_t)h);
+    p85_kR = (int16_t *)malloc(sizeof(int16_t) * (size_t)w * (size_t)h);
+    if (!p85_kL || !p85_kR) {
+        free(p85_kL); free(p85_kR); p85_kL = 0; p85_kR = 0;
+        p85_tw = 0; p85_th = 0; return;
+    }
+    isx = 320.0f / (float)w; isy = 240.0f / (float)h;
+    for (y = 0; y < h; y++) {
+        float py = ((float)y + 0.5f) * isy - 120.0f;
+        p85_arcrow(p85_kL + (long)y * w, p85_kR + (long)y * w,
+                   py * py, isx, w);
+    }
+    p85_tw = w; p85_th = h;
+}
 
 static void p85_init(void)
 {
@@ -66,12 +121,18 @@ void pattern_085(uint32_t *fb, int w, int h, int frame, int sl,
     }
     ds = 14.0f + 3.0f * p85_lsin(t * 0.02f);
 
+    p85_map(w, h);
+
     for (y = 0; y < h; y++) {
         float py = ((float)y + 0.5f) * isy - 120.0f;
         float ay = fabsf(py), qy = py * py;
         float g = (py + 70.0f) * (1.0f / 140.0f) + grow;
         uint32_t *row = fb + (long)y * w;
+        const int16_t *kl, *kr;
         int inbar = (ay < 72.0f), incross = (ay < 13.0f);
+        if (p85_kL) { kl = p85_kL + (long)y * w; kr = p85_kR + (long)y * w; }
+        else { p85_arcrow(p85_rowL, p85_rowR, qy, isx, w);
+               kl = p85_rowL; kr = p85_rowR; }
         g -= floorf(g);
         ramp[0] = cB[0] + (cC[0] - cB[0]) * g;
         ramp[1] = cB[1] + (cC[1] - cB[1]) * g;
@@ -84,39 +145,31 @@ void pattern_085(uint32_t *fb, int w, int h, int frame, int sl,
             int ir, ig, ib, k;
 
             /* red X lattice */
-            d = fabsf(py - 0.613105f * px) * 0.852525f;
-            m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
-                cr += m * 0.45f * cA[0]; cg += m * 0.45f * cA[1]; cb += m * 0.45f * cA[2]; }
-            d = fabsf(py + 0.613105f * px) * 0.852525f;
-            m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
-                cr += m * 0.45f * cA[0]; cg += m * 0.45f * cA[1]; cb += m * 0.45f * cA[2]; }
-            d = fabsf(py - 1.743315f * px) * 0.497571f;
-            m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
-                cr += m * 0.45f * cA[0]; cg += m * 0.45f * cA[1]; cb += m * 0.45f * cA[2]; }
-            d = fabsf(py + 1.743315f * px) * 0.497571f;
-            m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
-                cr += m * 0.45f * cA[0]; cg += m * 0.45f * cA[1]; cb += m * 0.45f * cA[2]; }
+            {
+                d = fabsf(py - 0.613105f * px) * 0.852525f;
+                m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
+                    cr += m*0.45f*cA[0]; cg += m*0.45f*cA[1]; cb += m*0.45f*cA[2]; }
+                d = fabsf(py + 0.613105f * px) * 0.852525f;
+                m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
+                    cr += m*0.45f*cA[0]; cg += m*0.45f*cA[1]; cb += m*0.45f*cA[2]; }
+                d = fabsf(py - 1.743315f * px) * 0.497571f;
+                m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
+                    cr += m*0.45f*cA[0]; cg += m*0.45f*cA[1]; cb += m*0.45f*cA[2]; }
+                d = fabsf(py + 1.743315f * px) * 0.497571f;
+                m = 1.0f - d * 0.5f; if (m > 0.0f) { if (m > 1.0f) m = 1.0f;
+                    cr += m*0.45f*cA[0]; cg += m*0.45f*cA[1]; cb += m*0.45f*cA[2]; }
+            }
 
             /* concentric arc stacks; keep only the inward-facing half */
-            {
-                float dx = px + 175.0f;
-                if (dx > 0.0f) {
-                    float r = sqrtf(qy + dx * dx);
-                    if (r > 55.0f && r < 170.0f) {
-                        k = (int)(r * 4.0f); if (k > 1023) k = 1023;
-                        m = p85_arcL[k] * 0.85f;
-                        cr += m * cA[0]; cg += m * cA[1]; cb += m * cA[2];
-                    }
-                }
-                dx = px - 175.0f;
-                if (dx < 0.0f) {
-                    float r = sqrtf(qy + dx * dx);
-                    if (r > 55.0f && r < 170.0f) {
-                        k = (int)(r * 4.0f); if (k > 1023) k = 1023;
-                        m = p85_arcR[k] * 0.85f;
-                        cr += m * cA[0]; cg += m * cA[1]; cb += m * cA[2];
-                    }
-                }
+            k = kl[x];
+            if (k >= 0) {
+                m = p85_arcL[k] * 0.85f;
+                cr += m * cA[0]; cg += m * cA[1]; cb += m * cA[2];
+            }
+            k = kr[x];
+            if (k >= 0) {
+                m = p85_arcR[k] * 0.85f;
+                cr += m * cA[0]; cg += m * cA[1]; cb += m * cA[2];
             }
 
             /* the H: two gradient uprights, then the crossbar */

@@ -115,16 +115,31 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
 {
     float t = (float)frame;
-    float march, droll, tn[3];
+    float march, droll, tn[3], hroll;
     uint32_t bcol[8], scol[8], court, dedge;
-    int hueroll, i, x, y;
+    int i, x, y;
     (void)sl; (void)seed;
 
     if (!p99_ready) p99_init();
     p99_tint(pal, tn);
     march = t * 0.18f; march -= 88.0f * floorf(march / 88.0f);
     droll = t * 0.55f; droll -= 48.0f * floorf(droll / 48.0f);
-    hueroll = (int)(t * 0.02f);
+    /* The hue roll advances one band every 50 frames.  It used to be taken
+     * as an integer added to the band INDEX, which re-coloured all eight
+     * bands at once — a whole-screen colour cut every 50 frames (measured
+     * frame-delta ~80, far past the motion budget).
+     *
+     * Fold it into the band COORDINATE instead.  Each pixel now crosses
+     * into the next band when its own v+hroll passes an integer, so the
+     * recolour arrives as a boundary sweeping across the rings rather than
+     * a global snap, and every band always shows a pure palette colour.
+     * (Cross-fading the eight band colours pairwise was tried first and
+     * rejected: lerping between opposite hues in RGB passes through grey,
+     * so the whole image throbbed in and out of saturation.)
+     *
+     * Wrapped to the 8-band cycle so it stays exact over long runs. */
+    hroll = t * 0.02f;
+    hroll -= 8.0f * floorf(hroll * 0.125f);
 
     for (i = 0; i < 8; i++) {
         bcol[i] = p99_pack(p99_band[i][0], p99_band[i][1], p99_band[i][2], tn);
@@ -141,10 +156,10 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
         uint32_t *out = p99_low + (long)y * P99_LW;
         for (x = 0; x < P99_LW; x++) {
             float d = (float)dr[x] * 0.125f;
-            float v = (d - march + 352.0f) * (1.0f / 11.0f);
+            float v = (d - march + 352.0f) * (1.0f / 11.0f) + hroll;
             int bi = (int)v;
             float fr = v - (float)bi;
-            out[x] = (fr < 0.163636f) ? scol[(bi + hueroll) & 7] : bcol[(bi + hueroll) & 7];
+            out[x] = (fr < 0.163636f) ? scol[bi & 7] : bcol[bi & 7];
             if (d < 34.0f) out[x] = court;
         }
         /* two striped drums inside the inner oval */

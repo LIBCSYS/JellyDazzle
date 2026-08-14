@@ -6,6 +6,7 @@
  * the engine palette so it tracks the scheme crossfade. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 #define P93_LW 640
 #define P93_LH 480
@@ -51,34 +52,93 @@ static inline float p93_ang(float ay, float ax)
     return r;
 }
 
+/* Horizontal half of the bilinear blit for one source row, split out so each
+ * source row is resampled once instead of once per output row it feeds (at
+ * 480 -> 960 that is a 4x cut in horizontal work). Arithmetic is unchanged. */
+static uint32_t *p93_hrb0, *p93_hg0, *p93_hrb1, *p93_hg1;
+static int p93_hw;
+
+static void p93_hrow(uint32_t *orb, uint32_t *og, const uint32_t *r,
+                     int w, int fx0, int stepx, int maxx)
+{
+    int x, fx = fx0;
+    for (x = 0; x < w; x++) {
+        int cx = fx < 0 ? 0 : (fx > maxx ? maxx : fx);
+        int x0 = cx >> 16, x1 = x0 + 1 < P93_LW ? x0 + 1 : x0;
+        unsigned wx = (unsigned)((cx >> 8) & 255), sx = 256u - wx;
+        uint32_t a = r[x0], b = r[x1];
+        orb[x] = (((a & 0xFF00FFu) * sx + (b & 0xFF00FFu) * wx) >> 8) & 0xFF00FFu;
+        og[x]  = (((a & 0x00FF00u) * sx + (b & 0x00FF00u) * wx) >> 8) & 0x00FF00u;
+        fx += stepx;
+    }
+}
+
 static void p93_blit(uint32_t *fb, int w, int h)
 {
-    int x, y;
+    int x, y, cy = -2;
     int stepx = (int)(((long)P93_LW << 16) / w);
     int fx0 = (int)(((long)P93_LW << 15) / w) - (1 << 15);
     int maxx = (P93_LW - 1) << 16, maxy = (P93_LH - 1) << 16;
+
+    if (p93_hw != w) {
+        free(p93_hrb0); free(p93_hg0); free(p93_hrb1); free(p93_hg1);
+        p93_hrb0 = (uint32_t *)malloc(sizeof(uint32_t) * (size_t)w);
+        p93_hg0  = (uint32_t *)malloc(sizeof(uint32_t) * (size_t)w);
+        p93_hrb1 = (uint32_t *)malloc(sizeof(uint32_t) * (size_t)w);
+        p93_hg1  = (uint32_t *)malloc(sizeof(uint32_t) * (size_t)w);
+        if (!p93_hrb0 || !p93_hg0 || !p93_hrb1 || !p93_hg1) {
+            free(p93_hrb0); free(p93_hg0); free(p93_hrb1); free(p93_hg1);
+            p93_hrb0 = p93_hg0 = p93_hrb1 = p93_hg1 = 0; p93_hw = 0;
+        } else p93_hw = w;
+    }
+
     for (y = 0; y < h; y++) {
         int fy = (int)(((long)(2 * y + 1) * P93_LH << 15) / h) - (1 << 15);
         int y0, y1, wy, fx = fx0;
         const uint32_t *r0, *r1;
         uint32_t *dst = fb + (long)y * w;
+        unsigned sy2;
         if (fy < 0) fy = 0; if (fy > maxy) fy = maxy;
         y0 = fy >> 16; y1 = y0 + 1 < P93_LH ? y0 + 1 : y0; wy = (fy >> 8) & 255;
         r0 = p93_low + (long)y0 * P93_LW;
         r1 = p93_low + (long)y1 * P93_LW;
+        sy2 = 256u - (unsigned)wy;
+
+        if (!p93_hrb0) {                       /* alloc failed: direct path */
+            for (x = 0; x < w; x++) {
+                int cx = fx < 0 ? 0 : (fx > maxx ? maxx : fx);
+                int x0 = cx >> 16, x1 = x0 + 1 < P93_LW ? x0 + 1 : x0;
+                unsigned wx = (unsigned)((cx >> 8) & 255), sx = 256u - wx;
+                uint32_t a = r0[x0], b = r0[x1], c = r1[x0], d = r1[x1];
+                uint32_t trb = (((a & 0xFF00FFu)*sx + (b & 0xFF00FFu)*wx) >> 8) & 0xFF00FFu;
+                uint32_t tg  = (((a & 0x00FF00u)*sx + (b & 0x00FF00u)*wx) >> 8) & 0x00FF00u;
+                uint32_t brb = (((c & 0xFF00FFu)*sx + (d & 0xFF00FFu)*wx) >> 8) & 0xFF00FFu;
+                uint32_t bg  = (((c & 0x00FF00u)*sx + (d & 0x00FF00u)*wx) >> 8) & 0x00FF00u;
+                uint32_t orb = ((trb * sy2 + brb * (unsigned)wy) >> 8) & 0xFF00FFu;
+                uint32_t og  = ((tg  * sy2 + bg  * (unsigned)wy) >> 8) & 0x00FF00u;
+                dst[x] = 0xFF000000u | orb | og;
+                fx += stepx;
+            }
+            continue;
+        }
+
+        if (y0 != cy) {
+            if (y0 == cy + 1) {                /* the common step down a row */
+                uint32_t *t;
+                t = p93_hrb0; p93_hrb0 = p93_hrb1; p93_hrb1 = t;
+                t = p93_hg0;  p93_hg0  = p93_hg1;  p93_hg1  = t;
+            } else {
+                p93_hrow(p93_hrb0, p93_hg0, r0, w, fx0, stepx, maxx);
+            }
+            p93_hrow(p93_hrb1, p93_hg1, r1, w, fx0, stepx, maxx);
+            cy = y0;
+        }
         for (x = 0; x < w; x++) {
-            int cx = fx < 0 ? 0 : (fx > maxx ? maxx : fx);
-            int x0 = cx >> 16, x1 = x0 + 1 < P93_LW ? x0 + 1 : x0;
-            unsigned wx = (unsigned)((cx >> 8) & 255), sx = 256u - wx, sy2 = 256u - (unsigned)wy;
-            uint32_t a = r0[x0], b = r0[x1], c = r1[x0], d = r1[x1];
-            uint32_t trb = (((a & 0xFF00FFu) * sx + (b & 0xFF00FFu) * wx) >> 8) & 0xFF00FFu;
-            uint32_t tg  = (((a & 0x00FF00u) * sx + (b & 0x00FF00u) * wx) >> 8) & 0x00FF00u;
-            uint32_t brb = (((c & 0xFF00FFu) * sx + (d & 0xFF00FFu) * wx) >> 8) & 0xFF00FFu;
-            uint32_t bg  = (((c & 0x00FF00u) * sx + (d & 0x00FF00u) * wx) >> 8) & 0x00FF00u;
-            uint32_t orb = ((trb * sy2 + brb * (unsigned)wy) >> 8) & 0xFF00FFu;
-            uint32_t og  = ((tg  * sy2 + bg  * (unsigned)wy) >> 8) & 0x00FF00u;
+            uint32_t orb = ((p93_hrb0[x] * sy2
+                             + p93_hrb1[x] * (unsigned)wy) >> 8) & 0xFF00FFu;
+            uint32_t og  = ((p93_hg0[x] * sy2
+                             + p93_hg1[x] * (unsigned)wy) >> 8) & 0x00FF00u;
             dst[x] = 0xFF000000u | orb | og;
-            fx += stepx;
         }
     }
 }

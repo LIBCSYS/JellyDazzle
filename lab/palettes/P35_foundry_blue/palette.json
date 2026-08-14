@@ -1,0 +1,29 @@
+{
+ "id": "P35",
+ "slug": "foundry_blue",
+ "name": "Foundry Blue",
+ "class": "duotone",
+ "scheme": "steel blue 248-256 vs amber 58-66",
+ "mood": "Cold steel stock and the orange heat coming off it \u2014 a forge at night, two temperatures and no third opinion.",
+ "count": 18,
+ "colors": [
+  "000004",
+  "00091a",
+  "011f41",
+  "05376d",
+  "0a509f",
+  "206ccd",
+  "518ce3",
+  "7facf1",
+  "afccfb",
+  "daa888",
+  "d38a56",
+  "c76c17",
+  "a75b11",
+  "884a0c",
+  "6b3a07",
+  "4f2a04",
+  "361b02",
+  "1e0d00"
+ ]
+}

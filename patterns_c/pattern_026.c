@@ -4,9 +4,20 @@
  * Port of lab/patterns/026_spoke_moire/proto.py. Repaint pattern. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 static int16_t s_sin026[4096];          /* Q14 sine, full turn = 4096 */
 static int s_ready026;
+
+/* Frame-invariant polar map: the radius and the folded atan2 index are pure
+ * functions of (x,y), so the per-pixel sqrtf and the atan2 divide are hoisted
+ * out of the frame loop. Expressions below are copied verbatim from the inner
+ * loop they replace, so the image is unchanged. */
+static float   *s_rtab026;
+static uint16_t *s_atab026;
+static int s_tw026, s_th026;
+static float    s_frow026[4096];        /* fallback if the alloc ever fails */
+static uint16_t s_arow026[4096];
 
 static void s_init026(void) {
     if (s_ready026) return;
@@ -31,10 +42,38 @@ static inline uint32_t s_shade026(uint32_t c, int v8) {
     return 0xFF000000u | (r << 16) | (g << 8) | b;
 }
 
+static void s_polrow026(float *rr, uint16_t *aa, float dy, float cx, int w) {
+    float qy = dy * dy;
+    if (w > 4096) w = 4096;
+    for (int x = 0; x < w; x++) {
+        float dx = (float)x - cx;
+        rr[x] = sqrtf(qy + dx * dx);
+        aa[x] = (uint16_t)(((int)(s_atan2_026(dy, dx) * 651.8986f + 8192.5f))
+                           & 4095);
+    }
+}
+
+static void s_map026(int w, int h) {
+    if (s_tw026 == w && s_th026 == h && s_rtab026) return;
+    free(s_rtab026); free(s_atab026);
+    s_rtab026 = (float *)malloc(sizeof(float) * (size_t)w * (size_t)h);
+    s_atab026 = (uint16_t *)malloc(sizeof(uint16_t) * (size_t)w * (size_t)h);
+    if (!s_rtab026 || !s_atab026) {
+        free(s_rtab026); free(s_atab026);
+        s_rtab026 = 0; s_atab026 = 0; s_tw026 = 0; s_th026 = 0; return;
+    }
+    float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
+    for (int y = 0; y < h; y++)
+        s_polrow026(s_rtab026 + (long)y * w, s_atab026 + (long)y * w,
+                    (float)y - cy, cx, w);
+    s_tw026 = w; s_th026 = h;
+}
+
 void pattern_026(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     (void)sl;
     s_init026();
+    s_map026(w, h);
     const float sc = (float)w / 320.0f;
     const float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
     const float tt = (float)frame;
@@ -49,12 +88,15 @@ void pattern_026(uint32_t *fb, int w, int h, int frame, int sl,
 
     for (int y = 0; y < h; y++) {
         float dy = (float)y - cy;
-        float qy = dy * dy;
         uint32_t *row = fb + (long)y * w;
+        const float *rr; const uint16_t *aa;
+        if (s_rtab026) { rr = s_rtab026 + (long)y * w;
+                         aa = s_atab026 + (long)y * w; }
+        else { s_polrow026(s_frow026, s_arow026, dy, cx, w);
+               rr = s_frow026; aa = s_arow026; }
         for (int x = 0; x < w; x++) {
-            float dx = (float)x - cx;
-            float r = sqrtf(qy + dx * dx);
-            int ai = ((int)(s_atan2_026(dy, dx) * 651.8986f + 8192.5f)) & 4095;
+            float r = rr[x];
+            int ai = aa[x];
             int ri1 = (int)(r * KT1);
             int ri2 = (int)(r * KT2);
             int g1 = s_sin026[( 9 * ai + ri1 + p1) & 4095];

@@ -4,9 +4,20 @@
  * Port of lab/patterns/027_wedge_ripples/proto.py. Repaint pattern. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 static int16_t s_sin027[4096];          /* Q14 sine, full turn = 4096 */
 static int s_ready027;
+
+/* Frame-invariant polar map: radius and the fixed-point atan2 index depend only
+ * on (x,y), so hoist the per-pixel sqrtf + fdiv out of the frame loop. Built
+ * once per resolution; the expressions are byte-identical to the inline ones
+ * they replace, so the image does not change. */
+static float   *s_rtab027;
+static uint16_t *s_atab027;
+static int s_tw027, s_th027;
+static float    s_frow027[4096];        /* fallback if the alloc ever fails */
+static uint16_t s_arow027[4096];
 
 static void s_init027(void) {
     if (s_ready027) return;
@@ -30,10 +41,35 @@ static inline uint32_t s_shade027(uint32_t c, int v8) {
     return 0xFF000000u | (r << 16) | (g << 8) | b;
 }
 
+static void s_map027(int w, int h) {
+    if (s_tw027 == w && s_th027 == h && s_rtab027 && s_atab027) return;
+    free(s_rtab027); free(s_atab027);
+    s_rtab027 = (float *)malloc(sizeof(float) * (size_t)w * (size_t)h);
+    s_atab027 = (uint16_t *)malloc(sizeof(uint16_t) * (size_t)w * (size_t)h);
+    if (!s_rtab027 || !s_atab027) {
+        free(s_rtab027); free(s_atab027);
+        s_rtab027 = 0; s_atab027 = 0; s_tw027 = 0; s_th027 = 0; return;
+    }
+    const float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
+    for (int y = 0; y < h; y++) {
+        float dy = (float)y - cy;
+        float qy = dy * dy;
+        float *rr = s_rtab027 + (long)y * w;
+        uint16_t *aa = s_atab027 + (long)y * w;
+        for (int x = 0; x < w; x++) {
+            float dx = (float)x - cx;
+            rr[x] = sqrtf(qy + dx * dx);
+            aa[x] = (uint16_t)(int)(s_atan2_027(dy, dx) * 651.8986f + 8192.5f);
+        }
+    }
+    s_tw027 = w; s_th027 = h;
+}
+
 void pattern_027(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     (void)sl;
     s_init027();
+    s_map027(w, h);
     const float sc = (float)w / 320.0f;
     const float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
     const float tt = (float)frame;
@@ -58,10 +94,22 @@ void pattern_027(uint32_t *fb, int w, int h, int frame, int sl,
         float dy = (float)y - cy;
         float qy = dy * dy;
         uint32_t *row = fb + (long)y * w;
+        const float *rr; const uint16_t *aa;
+        if (s_rtab027) {
+            rr = s_rtab027 + (long)y * w; aa = s_atab027 + (long)y * w;
+        } else {                                  /* alloc failed: row scratch */
+            int n = w > 4096 ? 4096 : w;
+            for (int x = 0; x < n; x++) {
+                float dx = (float)x - cx;
+                s_frow027[x] = sqrtf(qy + dx * dx);
+                s_arow027[x] = (uint16_t)(int)(s_atan2_027(dy, dx)
+                                               * 651.8986f + 8192.5f);
+            }
+            rr = s_frow027; aa = s_arow027;
+        }
         for (int x = 0; x < w; x++) {
-            float dx = (float)x - cx;
-            float r = sqrtf(qy + dx * dx);
-            int ai = (int)(s_atan2_027(dy, dx) * 651.8986f + 8192.5f);
+            float r = rr[x];
+            int ai = aa[x];
             int fa = ((ai + spin) & 511) - 256;      /* 8-fold fold, +-256 */
             if (fa < 0) fa = -fa;                    /* 0..256 == 0..pi/8 */
             float u = r * (float)s_sin027[(fa + 1024) & 4095] * (1.0f / 16384.0f);

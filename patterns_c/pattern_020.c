@@ -28,10 +28,24 @@ static uint32_t lerp2(uint32_t a, uint32_t b, unsigned f) {
     return (rb & 0xFF00FFu) | ((gg & 0xFFu) << 8) | 0xFF000000u;
 }
 
+/* Horizontal half of the bilinear blit for one source row. Each 320x240 source
+ * row feeds several output rows (four, at 960), so resampling it once and
+ * caching costs one lerp2 per output pixel instead of three. Same arithmetic. */
+static void hlerp_row(uint32_t *dst, const uint32_t *r, const int *xi,
+                      const unsigned char *xf, int n) {
+    for (int x = 0; x < n; x++) {
+        int x0 = xi[x];
+        dst[x] = lerp2(r[x0], r[x0 + 1], xf[x]);
+    }
+}
+
 static void blit(uint32_t *fb, int w, int h) {
     static int cw = -1;
     static int xi[4096];
     static unsigned char xf[4096];
+    static uint32_t hbuf[2][4096];
+    uint32_t *p0 = hbuf[0], *p1 = hbuf[1];
+    int cy = -2;
     int wl = w > 4096 ? 4096 : w;
     if (w != cw) {
         for (int x = 0; x < wl; x++) {
@@ -50,11 +64,13 @@ static void blit(uint32_t *fb, int w, int h) {
         if (y0 >= LH - 1) { y0 = LH - 2; fy = 255; }
         const uint32_t *r0 = lbuf + y0 * LW, *r1 = r0 + LW;
         uint32_t *d = fb + (long)y * w;
-        for (int x = 0; x < wl; x++) {
-            int x0 = xi[x]; unsigned fx = xf[x];
-            d[x] = lerp2(lerp2(r0[x0], r0[x0 + 1], fx),
-                         lerp2(r1[x0], r1[x0 + 1], fx), fy);
+        if (y0 != cy) {
+            if (y0 == cy + 1) { uint32_t *t = p0; p0 = p1; p1 = t; }
+            else hlerp_row(p0, r0, xi, xf, wl);
+            hlerp_row(p1, r1, xi, xf, wl);
+            cy = y0;
         }
+        for (int x = 0; x < wl; x++) d[x] = lerp2(p0[x], p1[x], fy);
         for (int x = wl; x < w; x++) d[x] = d[wl - 1];
     }
 }

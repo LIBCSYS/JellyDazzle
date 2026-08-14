@@ -1,0 +1,27 @@
+{
+ "id": "P66",
+ "slug": "gold_rule",
+ "name": "Gold Rule",
+ "class": "stark",
+ "scheme": "black / white / one gold rule",
+ "mood": "Black ink, white stock, and a single gold rule ruled across it.",
+ "count": 16,
+ "colors": [
+  "000000",
+  "010201",
+  "030403",
+  "070806",
+  "0c0e0b",
+  "151714",
+  "d0d1cf",
+  "e4e5e3",
+  "e8eae7",
+  "edeeec",
+  "f2f3f1",
+  "f6f7f5",
+  "fbfcfa",
+  "b58c00",
+  "8d7100",
+  "664f00"
+ ]
+}

@@ -29,6 +29,7 @@ static int last_sl = -1;
 static int up_w = -1, up_h = -1;
 static int *up_xi;
 static uint8_t *up_fx;
+static uint8_t *up_h0, *up_h1;
 
 static uint32_t rs;
 static uint32_t rnd(void) { rs = rs * 1664525u + 1013904223u; return rs; }
@@ -72,9 +73,9 @@ static void splat(float x, float y, const float c[3], float w) {
 
 static void soften1(void) {
     for (int y = 0; y < GH; y++) {
-        int ym = (y + GH - 1) % GH, yp = (y + 1) % GH;
+        int ym = y ? y - 1 : GH - 1, yp = (y + 1 < GH) ? y + 1 : 0;
         for (int x = 0; x < GW; x++) {
-            int xm = (x + GW - 1) % GW, xp = (x + 1) % GW;
+            int xm = x ? x - 1 : GW - 1, xp = (x + 1 < GW) ? x + 1 : 0;
             for (int k = 0; k < 3; k++)
                 acc2[y][x][k] = acc[y][x][k] * 0.5f
                     + 0.125f * (acc[ym][x][k] + acc[yp][x][k]
@@ -97,11 +98,31 @@ static void compose(void) {
     }
 }
 
+/* Bilinear upscale 320x240 -> (w,h).
+ * Two changes vs the naive form, both invisible in the output:
+ *  - each source row is resampled horizontally ONCE and cached; at 960 output
+ *    rows over 239 source rows the old code redid that work ~8x over.
+ *  - the cached rows are stored as B,G,R,255 so the vertical lerp is a flat
+ *    byte loop straight into the framebuffer, which clang vectorises.
+ * The integer maths per channel is identical to the two-lerp original. */
+static void up_hrow(uint8_t *dst, const uint8_t *s, int w) {
+    for (int x = 0; x < w; x++) {
+        int X = up_xi[x], fx = up_fx[x];
+        int r = s[X + 0] + (((s[X + 3] - s[X + 0]) * fx) >> 8);
+        int g = s[X + 1] + (((s[X + 4] - s[X + 1]) * fx) >> 8);
+        int b = s[X + 2] + (((s[X + 5] - s[X + 2]) * fx) >> 8);
+        dst[4 * x + 0] = (uint8_t)b; dst[4 * x + 1] = (uint8_t)g;
+        dst[4 * x + 2] = (uint8_t)r; dst[4 * x + 3] = 255;
+    }
+}
+
 static void upscale(uint32_t *fb, int w, int h) {
     if (w != up_w) {
-        free(up_xi); free(up_fx);
+        free(up_xi); free(up_fx); free(up_h0); free(up_h1);
         up_xi = (int *)malloc(sizeof(int) * w);
         up_fx = (uint8_t *)malloc(w);
+        up_h0 = (uint8_t *)malloc((size_t)w * 4);
+        up_h1 = (uint8_t *)malloc((size_t)w * 4);
         for (int x = 0; x < w; x++) {
             int q = (int)(((int64_t)x * (GW - 1) * 256) / (w > 1 ? w - 1 : 1));
             int xi = q >> 8; if (xi > GW - 2) { xi = GW - 2; q = (GW - 1) * 256; }
@@ -110,22 +131,24 @@ static void upscale(uint32_t *fb, int w, int h) {
         up_w = w;
     }
     up_h = h;
+    int cy = -2;                       /* source row currently held in up_h0 */
     for (int y = 0; y < h; y++) {
         int qy = (int)(((int64_t)y * (GH - 1) * 256) / (h > 1 ? h - 1 : 1));
         int yi = qy >> 8; if (yi > GH - 2) { yi = GH - 2; qy = (GH - 1) * 256; }
         int fy = qy & 255;
-        const uint8_t *r0 = &img[yi][0][0], *r1 = &img[yi + 1][0][0];
-        uint32_t *out = fb + (size_t)y * w;
-        for (int x = 0; x < w; x++) {
-            int X = up_xi[x], fx = up_fx[x];
-            int c[3];
-            for (int k = 0; k < 3; k++) {
-                int t0 = r0[X + k] + (((r0[X + 3 + k] - r0[X + k]) * fx) >> 8);
-                int t1 = r1[X + k] + (((r1[X + 3 + k] - r1[X + k]) * fx) >> 8);
-                c[k] = t0 + (((t1 - t0) * fy) >> 8);
+        uint8_t *o = (uint8_t *)(fb + (size_t)y * w);
+        int n = w * 4, i;
+        if (yi != cy) {
+            if (yi == cy + 1) {        /* the common step: reuse the lower row */
+                uint8_t *t = up_h0; up_h0 = up_h1; up_h1 = t;
+            } else {
+                up_hrow(up_h0, &img[yi][0][0], w);
             }
-            out[x] = 0xFF000000u | ((uint32_t)c[0] << 16) | ((uint32_t)c[1] << 8) | (uint32_t)c[2];
+            up_hrow(up_h1, &img[yi + 1][0][0], w);
+            cy = yi;
         }
+        for (i = 0; i < n; i++)
+            o[i] = (uint8_t)(up_h0[i] + (((up_h1[i] - up_h0[i]) * fy) >> 8));
     }
 }
 

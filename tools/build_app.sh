@@ -23,7 +23,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>JellyDazzle</string>
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
-  <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
+  <key>CFBundleIdentifier</key><string>nyc.jelia.jd${VER}</string>
   <key>CFBundleVersion</key><string>${VER}</string>
   <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundlePackageType</key><string>APPL</string>

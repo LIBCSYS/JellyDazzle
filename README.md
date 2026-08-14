@@ -16,10 +16,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-ffb02e?style=flat-square" alt="version 2.0.0">
-  <img src="https://img.shields.io/badge/routines-124-52e0ff?style=flat-square" alt="124 routines">
-  <img src="https://img.shields.io/badge/patterns-100-ff5ec8?style=flat-square" alt="100 patterns">
-  <img src="https://img.shields.io/badge/palettes-30-a0e060?style=flat-square" alt="30 palettes">
+  <img src="https://img.shields.io/badge/version-2.1.0-ffb02e?style=flat-square" alt="version 2.0.0">
+  <img src="https://img.shields.io/badge/routines-225-52e0ff?style=flat-square" alt="124 routines">
+  <img src="https://img.shields.io/badge/patterns-201-ff5ec8?style=flat-square" alt="100 patterns">
+  <img src="https://img.shields.io/badge/palettes-100-a0e060?style=flat-square" alt="30 palettes">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-lightgrey?style=flat-square" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
 </p>
@@ -75,6 +75,25 @@ for the full frame:
 prototypes and 30 palettes, built as the expansion roadmap.
 
 ## What it does
+
+- **225 routines** — 24 hand-tuned ARM64 assembly modes plus 201 C plug-ins,
+  from kaleidoscope symmetries and demoscene classics (plasma, rotozoom,
+  tunnels, metaballs, copper bars) through interference, self-drawing
+  spirographs, cellular spirals, particle swarms, organic growth, and a
+  multicoloured lava lamp
+- **Layered composition** — routines don't take turns, they *stack*: a base
+  enters, seconds later a second fades in over it, then a third, each on its
+  own clock with its own blend and its own lifetime
+- **Nothing repeats** — shuffled bags rather than dice, seeded per run, so a
+  routine plays once before any repeat and no two launches deal the same deck
+- **100 colour schemes** — community palettes plus designed harmonies,
+  expanded into 32,768-entry ramps in OKLab along a cyclic Catmull-Rom spline
+  (no grey midpoints, no plateaus, no banding)
+- **A startup probe** measures every routine's coverage, brightness, motion
+  and cost, then casts it into a role — ground, field, figure or spark — so
+  the compositor knows what can carry a picture and what belongs on top
+
+### Under the hood (v2.0 and earlier)
 
 - **24 drawing routines** on a shuffled wheel — interference kaleidoscopes,
   the radius-sheared *twist*, tunnels, moiré eyes, spirographs that draw

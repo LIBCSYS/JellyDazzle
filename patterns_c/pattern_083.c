@@ -3,6 +3,7 @@
  * Repaint pattern, full resolution, per-cell scalars + shared sine LUT. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 #define P83_L 48.0f
 #define P83_GX 8
@@ -15,6 +16,30 @@ static float p83_ph[P83_GY][P83_GX];
 static float p83_hue[P83_GY][P83_GX];
 static int   p83_mid[P83_GY][P83_GX];
 static int p83_inited;
+
+/* Column geometry: the patch column, the offset within it and the two edge
+ * distances are pure functions of x, so they are computed once per resolution
+ * instead of once per pixel. Expressions are verbatim from the inner loop. */
+#define P83_BLK 512
+typedef struct { float u, au, ub; uint16_t cgx; } p83_col;
+static p83_col *p83_cols;
+static int p83_colw;
+static p83_col p83_colblk[P83_BLK];       /* used only if the alloc fails */
+
+static void p83_fillcols(p83_col *c, int x0, int n, float isx)
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        float px = ((float)(x0 + i) + 0.5f) * isx + 8.0f;
+        int cgx = (int)(px * (1.0f / P83_L));
+        float u, au;
+        if (cgx < 0) cgx = 0; if (cgx >= P83_GX) cgx = P83_GX - 1;
+        u = px - (float)cgx * P83_L - P83_L * 0.5f;
+        au = fabsf(u);
+        c[i].u = u; c[i].au = au; c[i].ub = 24.0f - au;
+        c[i].cgx = (uint16_t)cgx;
+    }
+}
 
 static void p83_init(void)
 {
@@ -60,12 +85,20 @@ void pattern_083(uint32_t *fb, int w, int h, int frame, int sl,
     float hrot = t * 0.0012f;
     float sashr, sashg, sashb, sm;
     float bh;
-    int x, y, ir, ig, ib;
+    int x, y, ir, ig, ib, x0, i, blk;
     (void)sl; (void)seed;
 
     if (!p83_inited) p83_init();
     p83_buildpal(pal);
 
+    if (p83_colw != w) {
+        free(p83_cols);
+        p83_cols = (p83_col *)malloc(sizeof(p83_col) * (size_t)w);
+        if (p83_cols) p83_fillcols(p83_cols, 0, w, isx);
+        p83_colw = p83_cols ? w : 0;
+    }
+
+    blk = p83_cols ? w : P83_BLK;
     sm = 0.05f * p83_lsin(t * 0.01f);
     sashr = 0.10f + sm; sashg = 0.07f + sm; sashb = 0.18f + sm;
     bh = 0.12f + hrot;
@@ -79,15 +112,17 @@ void pattern_083(uint32_t *fb, int w, int h, int frame, int sl,
         v = py - (float)cgy * P83_L - P83_L * 0.5f;
         av = fabsf(v);
         vb = 24.0f - av;                       /* distance to nearest v edge */
-        for (x = 0; x < w; x++) {
-            float px = ((float)x + 0.5f) * isx + 8.0f;
-            int cgx = (int)(px * (1.0f / P83_L));
-            float u, au, ub, fld, hue, bri, cr, cg, cb, ph;
+        for (x0 = 0; x0 < w; x0 += blk) {
+        const p83_col *cc;
+        int n = w - x0; if (n > blk) n = blk;
+        if (p83_cols) cc = p83_cols + x0;
+        else { p83_fillcols(p83_colblk, x0, n, isx); cc = p83_colblk; }
+        for (i = 0; i < n; i++) {
+            float u = cc[i].u, au = cc[i].au, ub = cc[i].ub;
+            int cgx = cc[i].cgx;
+            float fld, hue, bri, cr, cg, cb, ph;
             const float *c;
-            if (cgx < 0) cgx = 0; if (cgx >= P83_GX) cgx = P83_GX - 1;
-            u = px - (float)cgx * P83_L - P83_L * 0.5f;
-            au = fabsf(u);
-            ub = 24.0f - au;
+            x = x0 + i;
             ph = p83_ph[cgy][cgx];
 
             /* corner buttons sit on top of everything */
@@ -128,6 +163,7 @@ void pattern_083(uint32_t *fb, int w, int h, int frame, int sl,
             ib = (int)(cb * 255.0f); if (ib > 255) ib = 255; if (ib < 0) ib = 0;
             row[x] = 0xFF000000u | ((uint32_t)ir << 16)
                    | ((uint32_t)ig << 8) | (uint32_t)ib;
+        }
         }
     }
 }

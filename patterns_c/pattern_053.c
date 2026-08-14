@@ -1,8 +1,10 @@
 /* 053 Gravity Rose — precessing Kepler petals, 4-fold mirrored comet trails.
  * Port of lab/patterns/053_gravity_rose/proto.py. */
 #include "../jellydazzle.h"
+#include "jd_up.h"
 #include <math.h>
 #include <stdlib.h>
+static jd_up p053_up;
 
 #define P53_LW 320
 #define P53_LH 240
@@ -64,7 +66,7 @@ static void p53_color(const uint32_t *pal, float hue, float sat, float val,
 
 static void p53_blit(uint32_t *fb, int w, int h)
 {
-    int i, x, y;
+    int i, x;
     int n = P53_LW * P53_LH * 3;
     for (i = 0; i < n; i++) {
         float v = p53_acc[i] * 255.0f;
@@ -77,27 +79,7 @@ static void p53_blit(uint32_t *fb, int w, int h)
             p53_xmap[x] = (int)(((long long)x * (P53_LW - 1) << 8) / (w > 1 ? w - 1 : 1));
         p53_xmap_w = w;
     }
-    for (y = 0; y < h; y++) {
-        int sy = (int)(((long long)y * (P53_LH - 1) << 8) / (h > 1 ? h - 1 : 1));
-        int y0 = sy >> 8, fy = sy & 255;
-        int y1 = y0 + 1 < P53_LH ? y0 + 1 : P53_LH - 1;
-        const unsigned char *r0 = p53_img + y0 * P53_LW * 3;
-        const unsigned char *r1 = p53_img + y1 * P53_LW * 3;
-        uint32_t *dst = fb + (size_t)y * (size_t)w;
-        for (x = 0; x < w; x++) {
-            int sx = p53_xmap[x];
-            int x0 = sx >> 8, fx = sx & 255;
-            int x1 = x0 + 1 < P53_LW ? x0 + 1 : P53_LW - 1;
-            int o0 = x0 * 3, o1 = x1 * 3, c, out[3];
-            for (c = 0; c < 3; c++) {
-                int top = r0[o0 + c] + (((r0[o1 + c] - r0[o0 + c]) * fx) >> 8);
-                int bot = r1[o0 + c] + (((r1[o1 + c] - r1[o0 + c]) * fx) >> 8);
-                out[c] = top + (((bot - top) * fy) >> 8);
-            }
-            dst[x] = 0xFF000000u | ((uint32_t)out[0] << 16) |
-                     ((uint32_t)out[1] << 8) | (uint32_t)out[2];
-        }
-    }
+    jd_up_blit(&p053_up, fb, w, h, p53_img, P53_LW, P53_LH);
 }
 
 /* ------------- pattern ------------- */

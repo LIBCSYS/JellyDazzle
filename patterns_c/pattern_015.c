@@ -4,6 +4,7 @@
  * Port of lab/patterns/015_twister_star/proto.py. Repaint pattern. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 #define SN 4096
 #define SMASK 4095
@@ -35,6 +36,40 @@ static uint32_t shade(uint32_t c, unsigned v) {
     return (rb & 0xFF00FFu) | ((g & 0xFFu) << 8) | 0xFF000000u;
 }
 
+/* Frame-invariant polar map. r and the fast_atan2 angle depend only on (x,y);
+ * caching them lifts one sqrtf and one divide per pixel out of the frame loop.
+ * The stored expressions are verbatim copies, so the image is unchanged. */
+static float *p15_r, *p15_a;
+static int p15_tw, p15_th;
+static float p15_rrow[4096], p15_arow[4096];   /* fallback if alloc fails */
+
+static void p15_polrow(float *rr, float *aa, float dy, float cx, float sc,
+                       int w) {
+    if (w > 4096) w = 4096;
+    for (int x = 0; x < w; x++) {
+        float dx = ((float)x - cx) * sc;
+        rr[x] = sqrtf(dx * dx + dy * dy);
+        aa[x] = fast_atan2(dy, dx);
+    }
+}
+
+static void p15_map(int w, int h) {
+    if (p15_tw == w && p15_th == h && p15_r) return;
+    free(p15_r); free(p15_a);
+    p15_r = (float *)malloc(sizeof(float) * (size_t)w * (size_t)h);
+    p15_a = (float *)malloc(sizeof(float) * (size_t)w * (size_t)h);
+    if (!p15_r || !p15_a) {
+        free(p15_r); free(p15_a); p15_r = 0; p15_a = 0;
+        p15_tw = 0; p15_th = 0; return;
+    }
+    float sc = 320.0f / (float)w;
+    float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
+    for (int y = 0; y < h; y++)
+        p15_polrow(p15_r + (long)y * w, p15_a + (long)y * w,
+                   ((float)y - cy) * sc, cx, sc, w);
+    p15_tw = w; p15_th = h;
+}
+
 static void setup(void) {
     for (int i = 0; i < SN; i++) sn_tab[i] = sinf((float)i * (6.2831853f / SN));
     for (int i = 0; i < LT; i++) {
@@ -47,6 +82,7 @@ void pattern_015(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     (void)sl;
     if (!ready) { setup(); ready = 1; }
+    p15_map(w, h);
     const float t = (float)frame;
     const float sc = 320.0f / (float)w;          /* screen px -> proto units */
     const float cx = 0.5f * (float)w, cy = 0.5f * (float)h;
@@ -60,10 +96,13 @@ void pattern_015(uint32_t *fb, int w, int h, int frame, int sl,
     for (int y = 0; y < h; y++) {
         float dy = ((float)y - cy) * sc;
         uint32_t *row = fb + (long)y * w;
+        const float *rr, *aa;
+        if (p15_r) { rr = p15_r + (long)y * w; aa = p15_a + (long)y * w; }
+        else { p15_polrow(p15_rrow, p15_arow, dy, cx, sc, w);
+               rr = p15_rrow; aa = p15_arow; }
         for (int x = 0; x < w; x++) {
-            float dx = ((float)x - cx) * sc;
-            float r = sqrtf(dx * dx + dy * dy);
-            float a = fast_atan2(dy, dx);
+            float r = rr[x];
+            float a = aa[x];
             float phi = 1.6f * s_sin(r * 0.028f + twist) + spin;
             /* face coordinate in quarter-turn units */
             float q = (a * 5.0f + phi) * 0.63661977f + 1024.0f;

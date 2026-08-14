@@ -5,6 +5,7 @@
  * confetti is a per-frame 8x8-cell colour table, streaks are two 1-D LUTs. */
 #include "../jellydazzle.h"
 #include <math.h>
+#include <stdlib.h>
 
 #define P90_TAU 6.28318530718f
 #define P90_D 118.0f
@@ -20,6 +21,30 @@ static float p90_conf[P90_CY][P90_CX][3];
 static float p90_bx[1024];
 static float p90_ay[512];
 static int p90_inited;
+
+/* Column geometry. px, |px|, the confetti column and the streak-LUT index are
+ * pure functions of x, so they are built once per resolution rather than once
+ * per pixel. Expressions are copied verbatim from the inner loop. */
+#define P90_BLK 512
+typedef struct { float px, ax; uint16_t jxc, kbx; } p90_col;
+static p90_col *p90_cols;
+static int p90_colw;
+static p90_col p90_colblk[P90_BLK];      /* used only if the alloc fails */
+
+static void p90_fillcols(p90_col *c, int x0, int n, float isx)
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        float px = ((float)(x0 + i) + 0.5f) * isx - 160.0f;
+        float ax = fabsf(px);
+        int jxc = (int)(ax * 0.125f);
+        int k = (int)((px + 160.0f) * 2.0f);
+        if (jxc >= P90_CX) jxc = P90_CX - 1;
+        if (k < 0) k = 0; if (k > 1023) k = 1023;
+        c[i].px = px; c[i].ax = ax;
+        c[i].jxc = (uint16_t)jxc; c[i].kbx = (uint16_t)k;
+    }
+}
 
 static void p90_init(void)
 {
@@ -55,11 +80,19 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
     float isx = 320.0f / (float)w, isy = 240.0f / (float)h;
     float rsh = t * 0.010f, hdrift = t * 0.0012f, cdrift = t * 0.0015f;
     float spark = t * 0.02f;
-    int i, jx, jy, x, y;
+    int i, jx, jy, x, y, x0, blk;
     (void)sl; (void)seed;
 
+    blk = 0;
     if (!p90_inited) p90_init();
     p90_buildpal(pal);
+
+    if (p90_colw != w) {
+        free(p90_cols);
+        p90_cols = (p90_col *)malloc(sizeof(p90_col) * (size_t)w);
+        if (p90_cols) p90_fillcols(p90_cols, 0, w, isx);
+        p90_colw = p90_cols ? w : 0;
+    }
 
     /* rim band LUT over the diamond norm m, 0.5 unit steps */
     for (i = 0; i < 1024; i++) {
@@ -88,6 +121,8 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
             p90_conf[jy][jx][1] = c[1] * bri;
             p90_conf[jy][jx][2] = c[2] * bri;
         }
+    blk = p90_cols ? w : P90_BLK;
+
     /* horizontal streak ripple over x in [-160,160) */
     for (i = 0; i < 1024; i++)
         p90_bx[i] = 0.4f + 0.3f * p90_lsin(((float)i * 0.5f - 160.0f) * 0.11f
@@ -102,15 +137,20 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
         uint32_t *row = fb + (long)y * w;
         int jyc = (int)(ay * 0.125f); if (jyc >= P90_CY) jyc = P90_CY - 1;
         fall = (ky < 512) ? p90_ay[ky] : 0.0f;
-        for (x = 0; x < w; x++) {
-            float px = ((float)x + 0.5f) * isx - 160.0f;
-            float ax = fabsf(px);
+        for (x0 = 0; x0 < w; x0 += blk) {
+        const p90_col *cc;
+        int n = w - x0; if (n > blk) n = blk;
+        if (p90_cols) cc = p90_cols + x0;
+        else { p90_fillcols(p90_colblk, x0, n, isx); cc = p90_colblk; }
+        for (i = 0; i < n; i++) {
+            float ax = cc[i].ax;
             float m = ax + m0;
             float cr, cg, cb, e;
             int k, ir, ig, ib;
+            x = x0 + i;
 
             if (m <= P90_DI) {
-                int jxc = (int)(ax * 0.125f); if (jxc >= P90_CX) jxc = P90_CX - 1;
+                int jxc = cc[i].jxc;
                 cr = p90_conf[jyc][jxc][0];
                 cg = p90_conf[jyc][jxc][1];
                 cb = p90_conf[jyc][jxc][2];
@@ -119,11 +159,8 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
                 cr = p90_rim[k][0]; cg = p90_rim[k][1]; cb = p90_rim[k][2];
             } else {
                 float st = fall;
-                if (st > 0.0f) {
-                    k = (int)((px + 160.0f) * 2.0f);
-                    if (k < 0) k = 0; if (k > 1023) k = 1023;
-                    st *= p90_bx[k];
-                } else st = 0.0f;
+                if (st > 0.0f) st *= p90_bx[cc[i].kbx];
+                else st = 0.0f;
                 cr = 0.03f + st * 0.25f;
                 cg = 0.03f + st * 0.45f;
                 cb = 0.03f + st * 0.55f;
@@ -140,6 +177,7 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
             ib = (int)(cb * 255.0f); if (ib > 255) ib = 255; if (ib < 0) ib = 0;
             row[x] = 0xFF000000u | ((uint32_t)ir << 16)
                    | ((uint32_t)ig << 8) | (uint32_t)ib;
+        }
         }
     }
 }

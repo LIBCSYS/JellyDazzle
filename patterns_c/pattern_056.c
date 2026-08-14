@@ -2,8 +2,10 @@
  * Port of lab/patterns/056_ribbon_swarm/proto.py.
  * Low-res float accumulator repainted every frame, bilinear upscale to fb. */
 #include "../jellydazzle.h"
+#include "jd_up.h"
 #include <math.h>
 #include <stdlib.h>
+static jd_up p056_up;
 
 #define P56_LW 320
 #define P56_LH 240
@@ -64,7 +66,7 @@ static void p56_color(const uint32_t *pal, float hue, float sat, float val,
 
 static void p56_blit(uint32_t *fb, int w, int h)
 {
-    int i, x, y;
+    int i, x;
     int n = P56_LW * P56_LH * 3;
     for (i = 0; i < n; i++) {
         float v = p56_acc[i] * 255.0f;
@@ -77,31 +79,11 @@ static void p56_blit(uint32_t *fb, int w, int h)
             p56_xmap[x] = (int)(((long long)x * (P56_LW - 1) << 8) / (w > 1 ? w - 1 : 1));
         p56_xmap_w = w;
     }
-    for (y = 0; y < h; y++) {
-        int sy = (int)(((long long)y * (P56_LH - 1) << 8) / (h > 1 ? h - 1 : 1));
-        int y0 = sy >> 8, fy = sy & 255;
-        int y1 = y0 + 1 < P56_LH ? y0 + 1 : P56_LH - 1;
-        const unsigned char *r0 = p56_img + y0 * P56_LW * 3;
-        const unsigned char *r1 = p56_img + y1 * P56_LW * 3;
-        uint32_t *dst = fb + (size_t)y * (size_t)w;
-        for (x = 0; x < w; x++) {
-            int sx = p56_xmap[x];
-            int x0 = sx >> 8, fx = sx & 255;
-            int x1 = x0 + 1 < P56_LW ? x0 + 1 : P56_LW - 1;
-            int o0 = x0 * 3, o1 = x1 * 3, c, out[3];
-            for (c = 0; c < 3; c++) {
-                int top = r0[o0 + c] + (((r0[o1 + c] - r0[o0 + c]) * fx) >> 8);
-                int bot = r1[o0 + c] + (((r1[o1 + c] - r1[o0 + c]) * fx) >> 8);
-                out[c] = top + (((bot - top) * fy) >> 8);
-            }
-            dst[x] = 0xFF000000u | ((uint32_t)out[0] << 16) |
-                     ((uint32_t)out[1] << 8) | (uint32_t)out[2];
-        }
-    }
+    jd_up_blit(&p056_up, fb, w, h, p56_img, P56_LW, P56_LH);
 }
 
 /* ------------- pattern state ------------- */
-#define P56_N 300
+#define P56_N 900
 #define P56_NTR 9
 
 static int p56_init_done;
@@ -135,18 +117,18 @@ void pattern_056(uint32_t *fb, int w, int h, int frame, int sl,
         p56_acc[i * 3 + 2] = 0.07f;
     }
 
-    spread = 1.7f + 1.1f * sinf(tt * 0.0019f);
+    spread = 1.7f + 1.1f * sinf(tt * 0.0008f);
 
     for (j = 0; j < P56_NTR; j++) {
-        float ttj = tt - (float)j * 2.2f;
-        float th = ttj * 0.0095f;
-        float drift = ttj * 0.0031f;
+        float ttj = tt - (float)j * 5.2f;
+        float th = ttj * 0.0040f;
+        float drift = ttj * 0.0013f;
         float a2 = 2.0f * th, a3 = 3.0f * th + drift;
         float fade = p56_fade[j];
         float sat = j ? 0.92f : 0.5f;
         float val = 1.0f - 0.30f * ((float)j / (float)P56_NTR);
         float wf = fade * 0.85f, wb = fade * 0.28f;
-        float hue0 = tt * 0.0006f;
+        float hue0 = tt * 0.00025f;
         for (i = 0; i < P56_N; i++) {
             float u = p56_hu[i];
             float ph = u * P56_TAU * spread;

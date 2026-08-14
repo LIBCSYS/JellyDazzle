@@ -4,8 +4,11 @@
 #include "../jellydazzle.h"
 #include <math.h>
 
+#define P23_BLK 512              /* distance-scratch tile; stays in L1 */
+
 static int16_t s_sin023[4096];          /* Q14 sine, full turn = 4096 */
 static int s_ready023;
+static int s_ia023[P23_BLK], s_ib023[P23_BLK];
 
 static void s_init023(void) {
     if (s_ready023) return;
@@ -49,10 +52,20 @@ void pattern_023(uint32_t *fb, int w, int h, int frame, int sl,
         float dya = (float)y - ay, dyb = (float)y - by;
         float qa = dya * dya, qb = dyb * dyb;
         uint32_t *row = fb + (long)y * w;
-        for (int x = 0; x < w; x++) {
-            float dxa = (float)x - ax, dxb = (float)x - bx;
-            int ia = (int)(sqrtf(qa + dxa * dxa) * K1);
-            int ib = (int)(sqrtf(qb + dxb * dxb) * K2);
+        for (int x0 = 0; x0 < w; x0 += P23_BLK) {
+        int n = w - x0; if (n > P23_BLK) n = P23_BLK;
+        /* the two ring distances are the only float work; hoisting them into
+         * their own tiled pass (the sine/palette lookups below block it) lets
+         * clang emit 4-wide FSQRT. Same expressions, same image. */
+        for (int i = 0; i < n; i++) {
+            float dxa = (float)(x0 + i) - ax, dxb = (float)(x0 + i) - bx;
+            s_ia023[i] = (int)(sqrtf(qa + dxa * dxa) * K1);
+            s_ib023[i] = (int)(sqrtf(qb + dxb * dxb) * K2);
+        }
+        for (int i = 0; i < n; i++) {
+            int x = x0 + i;
+            int ia = s_ia023[i];
+            int ib = s_ib023[i];
             int g1 = s_sin023[(ia + ph1) & 4095];
             int g2 = s_sin023[(ib + ph2) & 4095];
             int car = (g1 * g2) >> 14;                    /* fine weave, Q14 */
@@ -64,6 +77,7 @@ void pattern_023(uint32_t *fb, int w, int h, int frame, int sl,
             if (v > 16383) v = 16383;
             int idx = drift + ((env * 2600) >> 14) + ((car * 900) >> 14);
             row[x] = s_shade023(pal[idx & JD_PAL_MASK], v >> 6);
+        }
         }
     }
 }

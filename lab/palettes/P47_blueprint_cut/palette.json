@@ -1,0 +1,28 @@
+{
+ "id": "P47",
+ "slug": "blueprint_cut",
+ "name": "Blueprint Cut",
+ "class": "stark",
+ "scheme": "near-black / chalk white / cold cyan",
+ "mood": "Drafting-table contrast: near-black paper, chalk-white line, and one cold cyan cut through both.",
+ "count": 17,
+ "colors": [
+  "000000",
+  "000001",
+  "020407",
+  "05080d",
+  "090e13",
+  "12171c",
+  "cdd1d6",
+  "e1e5e9",
+  "e6eaed",
+  "ebeef2",
+  "eff3f7",
+  "f4f8fb",
+  "f9fcff",
+  "00a3c0",
+  "00829e",
+  "005d6f",
+  "000203"
+ ]
+}

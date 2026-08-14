@@ -1,0 +1,30 @@
+{
+ "id": "P68",
+ "slug": "sea_fog",
+ "name": "Sea Fog",
+ "class": "earth",
+ "scheme": "sea teal 180-235 at very low chroma, mid value only",
+ "mood": "Fog that has not lifted off cold water: teal, grey-green, and the wet light between them.",
+ "count": 19,
+ "colors": [
+  "174f5e",
+  "18525b",
+  "1b5a5e",
+  "206664",
+  "2b746c",
+  "408277",
+  "549084",
+  "659c91",
+  "72a49d",
+  "7ba8a5",
+  "7fa6a9",
+  "7ea0a6",
+  "7796a0",
+  "6c8995",
+  "5f7a89",
+  "4f6c7d",
+  "3f5f72",
+  "305669",
+  "205163"
+ ]
+}

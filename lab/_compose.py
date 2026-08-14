@@ -106,16 +106,20 @@ lines.append("## Patterns 001-100")
 lines.append("")
 lines.append("| # | Name | Family | DZ | CO | MO | Total | One-liner |")
 lines.append("|---|------|--------|----|----|----|-------|-----------|")
+# v2.1 work adds patterns and palettes faster than the curator passes score
+# them, so an unscored entry must render as "—" rather than crash the build.
+NO_PAT = dict(dz='—', co='—', mo='—', total='—', notes='')
+NO_PAL = dict(rich='—', rng='—', mood='—', total='—', notes='')
 for p in patterns:
-    s = p["sc"]
+    s = p["sc"] or NO_PAT
     lines.append(f"| {p['n']:03d} | {p['name']} | {p['family']} | {s['dz']} | {s['co']} | {s['mo']} | **{s['total']}** | {p['look']} |")
 lines.append("")
-lines.append("## Palettes P01-P30")
+lines.append("## Palettes")
 lines.append("")
 lines.append("| ID | Name | Richness | Range | Mood | Total | One-liner |")
 lines.append("|----|------|----------|-------|------|-------|-----------|")
 for p in palettes:
-    s = p["sc"]
+    s = p["sc"] or NO_PAL
     lines.append(f"| {p['pid']} | {p['name']} | {s['rich']} | {s['rng']} | {s['mood']} | **{s['total']}** | {p['look']} |")
 lines.append("")
 lines.append("## TOP 20 (ranked from curator scores)")
@@ -155,7 +159,7 @@ def esc(s): return html.escape(s, quote=True)
 
 cards = []
 for p in patterns:
-    s = p["sc"]
+    s = p["sc"] or NO_PAT
     cards.append(f"""<div class="card" id="p{p['n']:03d}">
 <div class="head"><span class="num">{p['n']:03d}</span><span class="name">{esc(p['name'])}</span><span class="fam">{esc(p['family'])}</span></div>
 <img src="{p['preview']}" alt="{p['n']:03d} {esc(p['name'])} preview" loading="lazy">
@@ -165,7 +169,7 @@ for p in patterns:
 
 pal_cards = []
 for p in palettes:
-    s = p["sc"]
+    s = p["sc"] or NO_PAL
     chips = "".join(f'<i style="background:#{c}"></i>' for c in p["colors"])
     pal_cards.append(f"""<div class="card pal" id="{p['pid']}">
 <div class="head"><span class="num">{p['pid']}</span><span class="name">{esc(p['name'])}</span></div>

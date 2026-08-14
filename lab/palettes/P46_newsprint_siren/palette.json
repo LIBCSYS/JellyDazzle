@@ -1,0 +1,27 @@
+{
+ "id": "P46",
+ "slug": "newsprint_siren",
+ "name": "Newsprint Siren",
+ "class": "stark",
+ "scheme": "black / white / siren red",
+ "mood": "Black ink, white paper, and one siren-red slash across it. No midtones and no apology.",
+ "count": 16,
+ "colors": [
+  "000000",
+  "010101",
+  "040404",
+  "080808",
+  "0d0d0d",
+  "161616",
+  "d1d1d1",
+  "e4e4e4",
+  "e9e9e9",
+  "eeeeee",
+  "f2f2f2",
+  "f7f7f7",
+  "fcfcfc",
+  "ff3e4e",
+  "da001e",
+  "9e001a"
+ ]
+}

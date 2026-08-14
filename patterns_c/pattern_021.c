@@ -3,8 +3,11 @@
 #include "../jellydazzle.h"
 #include <math.h>
 
+#define P21_BLK 512              /* distance-scratch tile; stays in L1 */
+
 static int16_t s_sin021[4096];   /* Q14 sine, full turn = 4096 */
 static int s_ready021;
+static int s_d1_021[P21_BLK], s_d2_021[P21_BLK];
 
 static void s_init021(void) {
     if (s_ready021) return;
@@ -36,14 +39,25 @@ void pattern_021(uint32_t *fb, int w, int h, int frame, int sl,
     const int ph2 = (int)(-0.038f * tt * 651.898f) & 4095;
     const int drift = (int)(tt * 0.75f) + (int)(seed & 1023u) + 7000;
 
+    /* The two source distances are the only floating-point work left, and the
+     * sine/palette lookups in the body block auto-vectorisation. Splitting the
+     * distances into their own tiled pass lets clang emit a 4-wide FSQRT for
+     * them; the expressions are unchanged, so the image is unchanged. */
     for (int y = 0; y < h; y++) {
         float dy1 = (float)y - y1, dy2 = (float)y - y2;
         float q1 = dy1 * dy1, q2 = dy2 * dy2;
         uint32_t *row = fb + (long)y * w;
-        for (int x = 0; x < w; x++) {
-            float dx1 = (float)x - x1, dx2 = (float)x - x2;
-            int di1 = (int)sqrtf(q1 + dx1 * dx1);
-            int di2 = (int)sqrtf(q2 + dx2 * dx2);
+        for (int x0 = 0; x0 < w; x0 += P21_BLK) {
+        int n = w - x0; if (n > P21_BLK) n = P21_BLK;
+        for (int i = 0; i < n; i++) {
+            float dx1 = (float)(x0 + i) - x1, dx2 = (float)(x0 + i) - x2;
+            s_d1_021[i] = (int)sqrtf(q1 + dx1 * dx1);
+            s_d2_021[i] = (int)sqrtf(q2 + dx2 * dx2);
+        }
+        for (int i = 0; i < n; i++) {
+            int x = x0 + i;
+            int di1 = s_d1_021[i];
+            int di2 = s_d2_021[i];
             int wv1 = s_sin021[(((di1 * ki) >> 4) + ph1) & 4095];
             int wv2 = s_sin021[(((di2 * ki) >> 4) + ph2) & 4095];
             int f = wv1 + wv2;                       /* -32768..32768 ~ -2..2 */
@@ -60,6 +74,7 @@ void pattern_021(uint32_t *fb, int w, int h, int frame, int sl,
             uint32_t g = (((c >> 8) & 255) * s8) >> 8;
             uint32_t b = ((c & 255) * s8) >> 8;
             row[x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
         }
     }
 }

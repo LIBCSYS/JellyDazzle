@@ -7,6 +7,7 @@
 #define P9_IW 320
 #define P9_IH 240
 #define P9_NS 4200                 /* curve samples in the trailing window */
+#define P9_XF 120                  /* frames of lacing-to-lacing cross-fade */
 
 static float p9_acc[P9_IW * P9_IH];
 static float p9_blur[P9_IW * P9_IH];
@@ -76,7 +77,22 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
             }
     }
     float t = (float)frame;
-    int N = seq[(frame / 320) % 6];
+    /* The stamp count used to snap to the next entry of seq[] the instant
+     * frame/320 ticked, re-lacing the whole web in one frame (measured
+     * delta ~29 every 320 frames — a slow strobe).  Cross-fade the two
+     * lacings instead: over the last P9_XF frames of each leg both arm
+     * counts are stamped with complementary smootherstep weights, so the
+     * web dissolves from one lacing into the next.  Outside the window
+     * the second arm's weight is zero and it is skipped, so the common
+     * case costs exactly what it did before. */
+    int leg = frame / 320, pos = frame % 320;
+    int arm_n[2]; float arm_w[2]; float mb = 0.0f;
+    if (pos >= 320 - P9_XF) {
+        float u = (float)(pos - (320 - P9_XF)) * (1.0f / (float)P9_XF);
+        mb = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f);
+    }
+    arm_n[0] = seq[leg % 6];       arm_w[0] = 1.0f - mb;
+    arm_n[1] = seq[(leg + 1) % 6]; arm_w[1] = mb;
     /* temporal rates halved vs the lab prototype to satisfy the motion law */
     float sb = t * 0.006f, phx = t * 0.00075f, stamp = t * 0.0009f;
     for (int i = 0; i < P9_NS; i++) {
@@ -86,23 +102,28 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
     }
     for (int i = 0; i < P9_IW * P9_IH; i++) p9_acc[i] = 0.0f;
     float cx = P9_IW * 0.5f, cy = P9_IH * 0.5f;
-    for (int k = 0; k < N; k++) {
-        float ang = (float)k * (6.2831853f / (float)N) + stamp;
-        float ca = cosf(ang), sa = sinf(ang);
-        for (int i = 0; i < P9_NS; i++) {
-            float px = p9_px[i], py = p9_py[i];
-            float gx = px * ca - py * sa + cx;
-            float gy = px * sa + py * ca + cy;
-            int ix = (int)floorf(gx), iy = (int)floorf(gy);
-            if (ix < 0 || ix >= P9_IW - 1 || iy < 0 || iy >= P9_IH - 1) continue;
-            float fx = gx - (float)ix, fy = gy - (float)iy;
-            float wq = p9_wt[i];
-            float w0 = wq * (1.0f - fx), w1 = wq * fx;
-            float *p = p9_acc + iy * P9_IW + ix;
-            p[0] += w0 * (1.0f - fy);
-            p[1] += w1 * (1.0f - fy);
-            p[P9_IW] += w0 * fy;
-            p[P9_IW + 1] += w1 * fy;
+    for (int a = 0; a < 2; a++) {
+        int N = arm_n[a];
+        float armw = arm_w[a];
+        if (armw < 0.004f) continue;          /* the usual single-arm path */
+        for (int k = 0; k < N; k++) {
+            float ang = (float)k * (6.2831853f / (float)N) + stamp;
+            float ca = cosf(ang), sa = sinf(ang);
+            for (int i = 0; i < P9_NS; i++) {
+                float px = p9_px[i], py = p9_py[i];
+                float gx = px * ca - py * sa + cx;
+                float gy = px * sa + py * ca + cy;
+                int ix = (int)floorf(gx), iy = (int)floorf(gy);
+                if (ix < 0 || ix >= P9_IW - 1 || iy < 0 || iy >= P9_IH - 1) continue;
+                float fx = gx - (float)ix, fy = gy - (float)iy;
+                float wq = p9_wt[i] * armw;
+                float w0 = wq * (1.0f - fx), w1 = wq * fx;
+                float *p = p9_acc + iy * P9_IW + ix;
+                p[0] += w0 * (1.0f - fy);
+                p[1] += w1 * (1.0f - fy);
+                p[P9_IW] += w0 * fy;
+                p[P9_IW + 1] += w1 * fy;
+            }
         }
     }
     /* one 5-tap box soften (edges just reuse the centre tap) */
