@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleName</key><string>Dazzle</string>
-  <key>CFBundleDisplayName</key><string>Dazzle</string>
-  <key>CFBundleExecutable</key><string>Dazzle</string>
-  <key>CFBundleIdentifier</key><string>us.je9.dazzle</string>
+  <key>CFBundleName</key><string>JellyDazzle</string>
+  <key>CFBundleDisplayName</key><string>JellyDazzle</string>
+  <key>CFBundleExecutable</key><string>JellyDazzle</string>
+  <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
   <key>CFBundleVersion</key><string>1.8</string>
   <key>CFBundleShortVersionString</key><string>1.8</string>
   <key>CFBundlePackageType</key><string>APPL</string>

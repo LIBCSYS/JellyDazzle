@@ -1,6 +1,6 @@
-# dazzle64
+# JellyDazzle
 
-**An homage to DAZZLE.EXE — the magical DOS kaleidoscope — hand-written in
+**JellyDazzle — an homage to DAZZLE.EXE — the magical DOS kaleidoscope — hand-written in
 ARMv9.2-A assembly for Apple Silicon.**
 
 > "I spent hours and hours staring at that magical kaleidoscope. Never the
@@ -28,6 +28,22 @@ prototypes and 30 palettes, built as the expansion roadmap.
 - **All integer math**: 16-bit interpolated sine tables, fixed point,
   octagonal norms — the way 1994 would have wanted it. ~175 fps at
   1280×960 on an M-series core, single thread
+
+## Download & run (no tools needed)
+
+Grab **JellyDazzle.app.zip** from the
+[latest release](https://github.com/LIBCSYS/JellyDazzle/releases), unzip,
+and double-click. Apple Silicon Macs only. First launch: right-click the app
+and choose *Open* (it is self-signed, not notarized — Gatekeeper will ask
+once). ESC quits.
+
+## The engine vs. the lab
+
+The running app is a 24-routine wheel. The
+[gallery](https://dazzle.jelia.nyc) is the **expansion roadmap** — 100
+numbered prototypes waiting to be promoted into the assembly engine, one
+verified port at a time. Watch the releases: each new version names the lab
+numbers it absorbed.
 
 ## Build & run
 

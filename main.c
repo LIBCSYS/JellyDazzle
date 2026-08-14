@@ -27,7 +27,7 @@ int main(void)
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_Window *win = SDL_CreateWindow(
-        "dazzle64",
+        "JellyDazzle",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         W, H, SDL_WINDOW_RESIZABLE);
 
