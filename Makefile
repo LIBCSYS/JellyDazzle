@@ -6,10 +6,10 @@
 CC      = clang
 SDLFLAGS = $(shell sdl2-config --cflags --libs)
 
-dazzle64: main.c draw.s palette.bin sintab.bin
+dazzle64: main.c draw.s palette.bin sintab.bin shapes.bin
 	$(CC) main.c draw.s -o $@ $(SDLFLAGS)
 
-palette.bin sintab.bin: gen_tables.py
+palette.bin sintab.bin shapes.bin: gen_tables.py
 	python3 gen_tables.py
 
 .PHONY: gen run clean
