@@ -77,6 +77,31 @@ with open('palette.bin', 'wb') as f:
             f.write(struct.pack('<I', 0xFF000000 | (int(r*255) << 16)
                                      | (int(g*255) << 8) | int(b*255)))
 
+# ---------------- downloaded artist palettes (Lospec) ----------------
+# J: "there must be a million color schemes we can download and use."
+# reference/palettes.json = 24 curated community palettes (pico-8, NES,
+# apollo, resurrect-64, ...). Each expands into a smooth cyclic 32768
+# ramp — the artists' colors, untouched, just interpolated.
+import json as _json
+_dl = _json.load(open('reference/palettes.json'))
+with open('palette.bin', 'ab') as f:
+    for pal in _dl:
+        cols = [(int(c[0:2],16), int(c[2:4],16), int(c[4:6],16))
+                for c in pal['colors']]
+        M = len(cols)
+        for i in range(N):
+            pos = i * M / N
+            k = int(pos) % M
+            t = pos - int(pos)
+            t = t * t * (3 - 2 * t)
+            a, b = cols[k], cols[(k + 1) % M]
+            r = int(a[0] + (b[0] - a[0]) * t)
+            g = int(a[1] + (b[1] - a[1]) * t)
+            bch = int(a[2] + (b[2] - a[2]) * t)
+            f.write(struct.pack('<I', 0xFF000000 | (r << 16) | (g << 8) | bch))
+NSCHEMES = 6 + len(_dl)
+print(f'schemes: {NSCHEMES} (6 house + {len(_dl)} downloaded)')
+
 # ---------------- Q14 sine table ----------------
 with open('sintab.bin', 'wb') as f:
     for i in range(256):
@@ -151,7 +176,7 @@ with open('shapes.bin', 'wb') as f:
         print(f'  shape {name:8s} sdf ok  (min {field.min()}, max {field.max()})')
 
 import os
-assert os.path.getsize('palette.bin') == 6 * 131072, 'palette size'
+assert os.path.getsize('palette.bin') == NSCHEMES * 131072, 'palette size'
 assert os.path.getsize('sintab.bin') == 1024
 assert os.path.getsize('shapes.bin') == 5 * G * G * 2
 print('palette.bin', os.path.getsize('palette.bin'), 'bytes  OK (6 schemes)')
