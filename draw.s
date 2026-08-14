@@ -44,10 +44,10 @@ _draw_frame:
     // ---- mode select: (frame>>11) mod 7 — ~34s each, hard cut ----
     fmov    s28, w3                     // stash TRUE frame (accumulator modes)
     lsr     w9, w3, #11
-    mov     w13, #23
+    mov     w13, #24
     udiv    w10, w9, w13
     msub    w9, w10, w13, w9
-    fmov    s19, w9                     // mode 0..22
+    fmov    s19, w9                     // mode 0..23
 
     // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
     lsl     w9, w3, #4
@@ -244,6 +244,8 @@ Lacc_dispatch:
     b.eq    L10start                    // 21: string-art fans
     cmp     w9, #7
     b.eq    L11start                    // 22: vector panels
+    cmp     w9, #8
+    b.eq    L12start                    // 23: fireworks
     and     w12, w9, #1
     fmov    s31, w12                    // variant
     lsr     w10, w9, #1
@@ -968,6 +970,70 @@ L11cd:
     sub     w22, w2, w24
     sub     w22, w22, w17
     bl      Lfillrect
+    b       Ldone
+
+
+// ============================================================
+// MODE 23 — FIREWORKS (video 4: bursts on hot magenta)
+// a new burst every 16 frames: 24 rays stamp their tips at a
+// growing radius with gravity droop — the persistent canvas
+// turns the tips into falling spark trails.
+// ============================================================
+L12start:
+    fmov    w9, s28
+    and     w22, w9, #2047
+    cbnz    w22, L12draw
+    mul     w9, w1, w2
+    mov     w10, #0
+    movz    w11, #0x0E86                // deep magenta night
+    movk    w11, #0xFF6E, lsl #16
+L12clear:
+    str     w11, [x0, w10, uxtw #2]
+    add     w10, w10, #1
+    cmp     w10, w9
+    b.lt    L12clear
+L12draw:
+    and     w24, w22, #15               // burst age 0..15
+    fmov    w9, s28
+    lsr     w9, w9, #4                  // burst serial
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w20, w9, w10                // burst hash
+    ubfx    w9, w20, #6, #10
+    mul     w21, w9, w1
+    lsr     w21, w21, #10               // burst x
+    ubfx    w9, w20, #16, #10
+    mul     w22, w9, w2
+    lsr     w22, w22, #10               // burst y
+    mov     w9, #7
+    mul     w25, w24, w9
+    add     w25, w25, #6                // radius grows with age
+    lsl     w10, w20, #1
+    and     w10, w10, #0x7FFF
+    bl      Lpalmix                     // burst color (per burst)
+    mov     w23, #0
+L12ray:
+    lsl     w9, w23, #8
+    mov     w10, #24
+    udiv    w9, w9, w10
+    and     w9, w9, #255
+    ldr     w16, [x19, w9, uxtw #2]
+    add     w9, w9, #64
+    and     w9, w9, #255
+    ldr     w17, [x19, w9, uxtw #2]
+    mul     w9, w16, w25
+    asr     w9, w9, #14
+    add     w9, w9, w21                 // tip x
+    mul     w10, w17, w25
+    asr     w10, w10, #14
+    add     w10, w10, w22
+    mul     w12, w24, w24
+    lsr     w12, w12, #2
+    add     w10, w10, w12               // tip y + gravity droop
+    bl      Lplot22
+    add     w23, w23, #1
+    cmp     w23, #24
+    b.lt    L12ray
     b       Ldone
 
 Ldone:
