@@ -66,7 +66,9 @@ static void p34_emit(double n, float w) {
     double dl = n * 0.0013;                    /* phase sweep = 3-D tumble */
     float  x  = (float)(118.0 * sin(3.0 * sp + dl));
     float  y  = (float)(88.0 * sin(4.0015 * sp));
-    float  hw = (float)(sp * 0.0021) * w;
+    /* hue crawls with arc length, damped so the whole visible window
+       reads as one scheme (the global drift is added at compose time) */
+    float  hw = (float)(sp * 0.0021 * 0.30) * w;
     const float ox = P34_AW * 0.5f, oy = P34_AH * 0.5f;
     int ya = (int)lrintf(oy + y);
     p34_splat((int)lrintf(ox + x), ya, w, hw);

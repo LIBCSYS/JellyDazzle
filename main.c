@@ -14,6 +14,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifndef JD_VERSION
+#define JD_VERSION "dev"   /* set by the Makefile from ./VERSION */
+#endif
+
 #define W 1280
 #define H 960
 
@@ -27,7 +31,7 @@ int main(void)
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_Window *win = SDL_CreateWindow(
-        "JellyDazzle",
+        "JellyDazzle v" JD_VERSION,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         W, H, SDL_WINDOW_RESIZABLE);
 
