@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://dazzle.jelia.nyc">
-    <img src="lab/jellydazzle.gif" width="560" alt="JellyDazzle: three routines layered over each other, crossfading">
+    <img src="lab/hero.jpg" width="900" alt="Four moments from JellyDazzle: a glowing geodesic dome, a starburst rosette, a gold kaleidoscope, a white flower on magenta">
   </a>
 </p>
 
@@ -45,6 +45,11 @@ watch is the *combination*, and the combinations essentially never recur.
     <img src="lab/patterns_montage.png" width="900" alt="Contact sheet of the pattern library">
   </a><br>
   <i>The pattern library, one frame each — every tile is a routine that can appear in any layer.</i>
+</p>
+
+<p align="center">
+  <img src="lab/jellydazzle.gif" width="520" alt="Layers fading in over each other">
+  <br><i>Layers arriving over one another — the still images above are single frames of this.</i>
 </p>
 
 ## What it is
