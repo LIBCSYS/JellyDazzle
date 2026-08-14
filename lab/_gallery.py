@@ -178,9 +178,12 @@ HTML = f"""<!doctype html>
   <p class="tag">LIBCSystems · jelia.nyc</p>
   <h1>JellyDazzle <span class="dim">Pattern Lab</span></h1>
   <p class="lede">Thirty years after the DOS kaleidoscope <b>DAZZLE.EXE</b>, every routine
-    rebuilt in hand-written ARMv9.2-A assembly and C — <b>{len(patterns)} pattern modes</b>
+    rebuilt in ARMv9.2-A assembly and C — <b>{len(patterns)} pattern modes</b>
     and <b>{len(palettes)} palettes</b>, shuffled so it never repeats itself.
     Each mode below runs on its own by number.</p>
+  <p class="lede" style="color:var(--dim);font-size:.9rem;margin-top:10px">
+    Vibe-coded: human direction and taste, AI execution — every routine judged
+    by eye against footage of the original.</p>
   <p class="statline">
     <span><b>{len(patterns)}</b> modes</span>
     <span><b>{len(palettes)}</b> palettes</span>
@@ -242,7 +245,7 @@ HTML = f"""<!doctype html>
 </div>
 
 <footer><div class="wrap">
-  JellyDazzle · MIT · built by J and M5 at
+  JellyDazzle · MIT · vibe-coded: directed by J, written by Claude ·
   <a href="https://jelia.nyc">jelia.nyc</a> ·
   <a href="https://github.com/LIBCSYS/JellyDazzle">github.com/LIBCSYS/JellyDazzle</a><br>
   In memory of every hour spent staring at DAZZLE.EXE.

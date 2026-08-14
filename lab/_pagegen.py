@@ -130,9 +130,9 @@ def build():
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JellyDazzle — DAZZLE.EXE reborn in Apple Silicon assembly</title>
-<meta name="description" content="An homage to DAZZLE.EXE, the magical DOS kaleidoscope — hand-written in ARMv9.2-A assembly for Apple Silicon. 100 lab patterns, 30 palettes, zero floats.">
+<meta name="description" content="An homage to DAZZLE.EXE, the magical DOS kaleidoscope — written in ARMv9.2-A assembly for Apple Silicon — vibe-coded, human-directed. 100 lab patterns, 30 palettes, zero floats.">
 <meta property="og:title" content="JellyDazzle">
-<meta property="og:description" content="Never the same pattern, never the same colors. DAZZLE.EXE reborn in hand-written ARM assembly.">
+<meta property="og:description" content="Never the same pattern, never the same colors. DAZZLE.EXE reborn in ARM assembly — vibe-coded, human-directed.">
 <meta property="og:image" content="https://libcsys.github.io/JellyDazzle/lab/patterns/011_plasma_mandala/preview.png">
 <link rel="icon" href="lab/patterns/011_plasma_mandala/preview.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -266,10 +266,10 @@ footer.site .mono {{ font-size:.76rem; letter-spacing:.14em; text-transform:uppe
 
 <header class="hero">
 {chr(10).join(hero_layers)}
-<p class="eyebrow">DAZZLE.EXE homage · hand-written ARMv9.2-A assembly · Apple Silicon</p>
+<p class="eyebrow">DAZZLE.EXE homage · ARMv9.2-A assembly · vibe-coded, human-directed</p>
 <h1 class="wordmark">JELLY<br>DAZZLE</h1>
 <p class="tagline"><em>Never the same pattern, never the same colors.</em><br>
-The magical DOS kaleidoscope, rebuilt from scratch — every pixel drawn by hand-written ARM64 assembly.</p>
+The magical DOS kaleidoscope, rebuilt from scratch — every pixel drawn by ARM64 assembly.</p>
 <div class="ctas">
 <a class="btn primary" href="https://github.com/LIBCSYS/JellyDazzle/releases">Download JellyDazzle.app</a>
 <a class="btn ghost" href="https://github.com/LIBCSYS/JellyDazzle/blob/master/draw.s">Read the assembly</a>

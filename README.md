@@ -8,7 +8,11 @@
 
 <p align="center">
   <b>An homage to DAZZLE.EXE — the magical DOS kaleidoscope —<br>
-  hand-written in ARMv9.2-A assembly for Apple Silicon.</b>
+  written in ARMv9.2-A assembly for Apple Silicon.</b>
+</p>
+
+<p align="center">
+  <i>Vibe-coded: human direction and taste, AI execution.</i>
 </p>
 
 <p align="center">
@@ -33,8 +37,16 @@
 > looked cool." — the reason this exists
 
 Thirty years after the original DOS screensaver, this is a from-scratch
-rebuild: every pixel drawn by hand-written ARM64 assembly (`draw.s`), with a
-tiny SDL2 shim (`main.c`) standing in for INT 10h and a flat framebuffer.
+rebuild: every pixel drawn by ARM64 assembly (`draw.s`), with a tiny SDL2
+shim (`main.c`) standing in for INT 10h and a flat framebuffer.
+
+**How it was made:** vibe-coded, with professional direction and execution.
+The assembly and C were written by [Claude](https://claude.com/claude-code)
+(Anthropic) working from a human's direction, reference footage, and repeated
+"no, that's wrong" — every routine was judged by eye against video of the real
+DAZZLE.EXE and rejected until it earned its place. Nobody typed 8,000 lines of
+`fmov` by hand in 2026, and pretending otherwise would be the one dishonest
+thing in a project built out of nostalgia.
 
 ## A taste of the lab
 
@@ -147,6 +159,12 @@ through the current wheel. `git tag j-favorite` marks the canonical one.
 - The unknown author of the original **DAZZLE.EXE** — the high-water mark
 - [Lospec](https://lospec.com) and its palette artists (palette slugs are
   preserved in `reference/palettes.json` and `lab/palettes/`)
-- Built with hand-written assembly, a Makefile, and stubbornness
+- **Direction, taste, and quality control:** John Elia (LIBCSystems) — who
+  remembered the original, filmed it off a DOS box for reference, and threw
+  out every version that didn't feel right
+- **Assembly, C, and the 100-pattern lab:** Claude (Anthropic), under that
+  direction — including the agent fleet that researched, prototyped, judged,
+  and ported every pattern
+- Built with a Makefile, an lldb session, and stubbornness
 
 MIT — see LICENSE.
