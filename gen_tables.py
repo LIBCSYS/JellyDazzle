@@ -22,13 +22,15 @@ SCHEMES = {}  # generated analytically below: SIX FULL-SPECTRUM RAINBOWS
 # the entire hue wheel; they differ in character, not in gamut.
 #   name      hue cycles, hue phase, sat base, sat wave, val base, val wave
 RAINBOWS = {
-    'vivid':   (2, 0.00, 0.95, 0.05, 0.72, 0.25),
-    'neon':    (3, 0.15, 1.00, 0.00, 0.80, 0.20),
-    'pastel':  (2, 0.40, 0.45, 0.15, 0.90, 0.10),
-    'deep':    (1, 0.60, 0.90, 0.10, 0.45, 0.30),
-    'sunset':  (2, 0.85, 0.85, 0.15, 0.65, 0.30),
-    'ocean':   (3, 0.50, 0.75, 0.20, 0.60, 0.30),
+    'vivid':   (6, 0.00, 0.95, 0.05, 0.72, 0.25),
+    'neon':    (8, 0.15, 1.00, 0.00, 0.80, 0.20),
+    'pastel':  (5, 0.40, 0.50, 0.15, 0.90, 0.10),
+    'deep':    (5, 0.60, 0.90, 0.10, 0.48, 0.30),
+    'sunset':  (7, 0.85, 0.85, 0.15, 0.65, 0.30),
+    'ocean':   (6, 0.50, 0.78, 0.18, 0.60, 0.30),
 }
+# 5-8 hue cycles across 32768: even a NARROW calm-moment index window
+# (~2000 idx) spans half a rainbow — no more monochrome walls, ever.
 ORDER = ['vivid', 'neon', 'pastel', 'deep', 'sunset', 'ocean']
 
 def hlerp(a, b, t):

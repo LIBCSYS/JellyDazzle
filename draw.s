@@ -103,11 +103,9 @@ _draw_frame:
     cmp     w12, #0
     csel    w12, wzr, w12, lt
     mul     w12, w12, w12
-    lsr     w12, w12, #20
-    add     w12, w12, #72               // duoQ 72..328: second color
-    cmp     w12, #256                   //   family ALWAYS present
-    mov     w10, #256
-    csel    w12, w10, w12, gt
+    // duo retired: the rainbow palettes made the second color
+    // family redundant, and its boundary seams sliced the picture
+    mov     w12, #0
     orr     w16, w16, w12, lsl #16
     fmov    s28, w16
 
@@ -485,11 +483,22 @@ Lrot_go:
     add     w12, w12, w9, asr #8
 Ltm_done:
 
-    // ---- yin-yang side bit, packed into the r32 stash ----
+    // ---- yin-yang: side bit + SOFT edge factor (no hard seams) ----
     eor     w13, w11, w12
     lsr     w13, w13, #31
+    cmp     w11, #0
+    cneg    w9, w11, lt
+    cmp     w12, #0
+    cneg    w10, w12, lt
+    cmp     w9, w10
+    csel    w9, w10, w9, ge             // min(|rx|,|ry|)
+    cmp     w9, #64
+    mov     w10, #64
+    csel    w9, w10, w9, gt
+    lsl     w9, w9, #2                  // edge factor 0..256
+    orr     w13, w9, w13, lsl #9        // pack side<<9 | edge
     fmov    w10, s16
-    orr     w10, w10, w13, lsl #30
+    orr     w10, w10, w13, lsl #20
     fmov    s16, w10
 
     // ---- moire term (skipped when weightless) ----
@@ -545,7 +554,7 @@ Lmo_done:
 
     // ================= THE TERM SUM =================
     fmov    w12, s16
-    and     w12, w12, #0x3FFFFFFF       // r32
+    and     w12, w12, #0x000FFFFF       // r32 (bits 20+ = yin-yang pack)
     sub     w13, w12, w15               // ring |r-R32|
     cmp     w13, #0
     cneg    w13, w13, lt
@@ -666,7 +675,12 @@ Lray_skip:
     lsr     w13, w13, #16               // duoQ
     cbz     w13, Lduo_done
     fmov    w12, s16
-    tbz     w12, #30, Lduo_done         // yang side only
+    tbz     w12, #29, Lduo_done         // yang side only (bit 20+9)
+    lsr     w12, w12, #20
+    and     w12, w12, #255              // soft edge factor 0..256
+    mul     w13, w13, w12
+    lsr     w13, w13, #8                // duoQ fades at the seam
+    cbz     w13, Lduo_done
     ldr     w9,  [x22, w10, uxtw #2]
     ldr     w12, [x23, w10, uxtw #2]
     and     w16, w9,  #0x00FF00FF
