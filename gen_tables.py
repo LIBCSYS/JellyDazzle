@@ -17,41 +17,19 @@ N = 32768
 
 # ---------------- six color schemes ----------------
 # (position, hue, sat, val, shimmer) — same sampler as v1
-SCHEMES = {
-    'jewels': [   # the original materials ramp
-        (0.00, 0.615, 0.97, 0.28, 0.05), (0.10, 0.760, 0.95, 0.42, 0.08),
-        (0.20, 0.380, 0.97, 0.36, 0.06), (0.30, 0.130, 0.80, 0.97, 0.30),
-        (0.40, 0.070, 0.85, 0.58, 0.26), (0.50, 0.520, 0.65, 0.85, 0.32),
-        (0.60, 0.580, 0.08, 0.94, 0.36), (0.70, 0.950, 0.34, 0.98, 0.06),
-        (0.80, 0.450, 0.32, 0.97, 0.05), (0.90, 0.720, 0.36, 0.97, 0.06),
-        (1.00, 0.615, 0.97, 0.28, 0.05)],
-    'ember': [    # DARK RED heart with teal + gold counterpoints
-        (0.00, 0.990, 0.90, 0.12, 0.03), (0.15, 0.985, 0.97, 0.38, 0.06),
-        (0.30, 0.030, 0.90, 0.72, 0.16), (0.45, 0.510, 0.70, 0.80, 0.20),
-        (0.60, 0.985, 0.95, 0.50, 0.10), (0.75, 0.120, 0.75, 0.97, 0.28),
-        (0.88, 0.760, 0.60, 0.55, 0.10), (1.00, 0.990, 0.90, 0.12, 0.03)],
-    'royal': [    # PURPLE court with gold, emerald and rose guests
-        (0.00, 0.740, 0.98, 0.22, 0.04), (0.16, 0.760, 0.95, 0.50, 0.10),
-        (0.32, 0.130, 0.78, 0.95, 0.30), (0.48, 0.820, 0.80, 0.75, 0.14),
-        (0.62, 0.380, 0.80, 0.60, 0.12), (0.76, 0.900, 0.55, 0.90, 0.10),
-        (0.88, 0.720, 0.90, 0.45, 0.10), (1.00, 0.740, 0.98, 0.22, 0.04)],
-    'gilded': [   # GOLD hall hung with sapphire and ruby
-        (0.00, 0.090, 0.90, 0.28, 0.08), (0.18, 0.120, 0.85, 0.75, 0.24),
-        (0.36, 0.610, 0.85, 0.55, 0.14), (0.52, 0.130, 0.75, 0.96, 0.34),
-        (0.68, 0.960, 0.80, 0.60, 0.12), (0.84, 0.140, 0.50, 1.00, 0.28),
-        (1.00, 0.090, 0.90, 0.28, 0.08)],
-    'ice': [      # LIGHT BLUE with coral dawn and violet dusk
-        (0.00, 0.620, 0.95, 0.25, 0.04), (0.16, 0.580, 0.70, 0.70, 0.14),
-        (0.34, 0.050, 0.60, 0.90, 0.18), (0.50, 0.540, 0.40, 0.98, 0.28),
-        (0.66, 0.760, 0.55, 0.65, 0.12), (0.82, 0.560, 0.65, 0.85, 0.16),
-        (1.00, 0.620, 0.95, 0.25, 0.04)],
-    'spring': [   # LIGHT GREEN meadow with lilac and honey
-        (0.00, 0.360, 0.95, 0.22, 0.04), (0.16, 0.330, 0.80, 0.60, 0.12),
-        (0.34, 0.780, 0.45, 0.85, 0.14), (0.50, 0.290, 0.40, 0.98, 0.24),
-        (0.66, 0.120, 0.60, 0.95, 0.20), (0.82, 0.400, 0.60, 0.65, 0.12),
-        (1.00, 0.360, 0.95, 0.22, 0.04)],
+SCHEMES = {}  # generated analytically below: SIX FULL-SPECTRUM RAINBOWS
+# (J: "we have 32k colors, lets fucking use them") — every scheme contains
+# the entire hue wheel; they differ in character, not in gamut.
+#   name      hue cycles, hue phase, sat base, sat wave, val base, val wave
+RAINBOWS = {
+    'vivid':   (2, 0.00, 0.95, 0.05, 0.72, 0.25),
+    'neon':    (3, 0.15, 1.00, 0.00, 0.80, 0.20),
+    'pastel':  (2, 0.40, 0.45, 0.15, 0.90, 0.10),
+    'deep':    (1, 0.60, 0.90, 0.10, 0.45, 0.30),
+    'sunset':  (2, 0.85, 0.85, 0.15, 0.65, 0.30),
+    'ocean':   (3, 0.50, 0.75, 0.20, 0.60, 0.30),
 }
-ORDER = ['jewels', 'ember', 'royal', 'gilded', 'ice', 'spring']
+ORDER = ['vivid', 'neon', 'pastel', 'deep', 'sunset', 'ocean']
 
 def hlerp(a, b, t):
     d = (b - a + 0.5) % 1.0 - 0.5
@@ -68,16 +46,16 @@ def sample(keys, p):
 
 with open('palette.bin', 'wb') as f:
     for name in ORDER:
-        keys = SCHEMES[name]
+        cyc, ph, sb, sw, vb, vw = RAINBOWS[name]
         for i in range(N):
-            h, s, v, sh = sample(keys, i / N)
-            fr = i * 2 * math.pi / N
-            # broad, soft texture: high-frequency shimmer made motion
-            # read as marching noise — VGA-style wide ramps relax
-            v += sh * 0.35 * (0.6 * math.sin(fr * 10) + 0.4 * math.sin(fr * 27))
-            v += 0.10 * max(0.0, math.sin(fr * 6)) ** 5         # gentle crests
-            v -= 0.07 * max(0.0, math.sin(fr * 6 + 2.1)) ** 5   # gentle troughs
-            v = max(0.02, min(1.0, v))
+            p = i / N
+            fr = p * 2 * math.pi
+            h = (p * cyc + ph) % 1.0                      # FULL hue wheel
+            s = sb + sw * math.sin(fr * 5)
+            v = vb + vw * math.sin(fr * 7 + 1.3)          # broad soft waves
+            v += 0.08 * math.sin(fr * 17)                 # mild sheen only
+            s = max(0.15, min(1.0, s))
+            v = max(0.06, min(1.0, v))
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
             f.write(struct.pack('<I', 0xFF000000 | (int(r*255) << 16)
                                      | (int(g*255) << 8) | int(b*255)))

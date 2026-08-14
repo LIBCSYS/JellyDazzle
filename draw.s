@@ -379,8 +379,25 @@ _draw_frame:
     bl      Lpalmix
     fmov    s20, w11
 
-    lsr     w5, w1, #1                  // cx
-    lsr     w6, w2, #1                  // cy
+    // ---- WANDERING CENTER: the focal point roams the screen ----
+    lsr     w5, w1, #1
+    lsr     w6, w2, #1
+    mov     w10, #2
+    mul     w9, w3, w10
+    movz    w10, #17000
+    add     w9, w9, w10
+    bl      Lsin16
+    mul     w12, w12, w1
+    asr     w12, w12, #16               // +-w/4 horizontal roam
+    add     w5, w5, w12
+    mov     w10, #3
+    mul     w9, w3, w10
+    movz    w10, #43000
+    add     w9, w9, w10
+    bl      Lsin16
+    mul     w12, w12, w2
+    asr     w12, w12, #16               // +-h/4 vertical roam
+    add     w6, w6, w12
     mov     w3, #0                      // y (frame consumed)
 
 // ============================================================
