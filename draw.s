@@ -41,112 +41,205 @@ _draw_frame:
     adrp    x19, sintab@PAGE
     add     x19, x19, sintab@PAGEOFF
 
-    // ---- mode select: (frame>>11) mod 7 — ~34s each, hard cut ----
-    fmov    s28, w3                     // stash TRUE frame (accumulator modes)
-    lsr     w9, w3, #11
-    mov     w13, #24
-    udiv    w10, w9, w13
-    msub    w9, w10, w13, w9
-    fmov    s19, w9                     // mode 0..23
+    // ======== ENTROPY: everything below rolls per-segment dice ========
+    // h (w21) / h2 (w23) = segment hashes; sl (w22) = segment-local
+    // frame. Clocks are sl-based with hash-random speed, direction
+    // and phase; sizes and scheme pairs are hash-picked per visit.
+    fmov    s28, w3                     // stash TRUE frame
+    and     w22, w3, #2047              // sl
+    lsr     w21, w3, #11                // seg
+    movz    w12, #0x79B1
+    movk    w12, #0x9E37, lsl #16
+    mul     w21, w21, w12               // h
+    movz    w12, #0xCA6B
+    movk    w12, #0x85EB, lsl #16
+    mul     w23, w21, w12               // h2
 
-    // ---- spin: phase = frame*16 (~68s/rev), interpolated ----
-    lsl     w9, w3, #4
+    // ---- hashed mode order (no back-to-back repeats) ----
+    mov     w13, #24
+    lsr     w12, w21, #13
+    udiv    w10, w12, w13
+    msub    w12, w10, w13, w12          // mode(seg)
+    lsr     w9, w3, #11
+    sub     w9, w9, #1
+    movz    w10, #0x79B1
+    movk    w10, #0x9E37, lsl #16
+    mul     w9, w9, w10
+    lsr     w9, w9, #13
+    udiv    w10, w9, w13
+    msub    w9, w10, w13, w9            // mode(seg-1)
+    cmp     w12, w9
+    b.ne    Lmode_ok
+    add     w12, w12, #7
+    cmp     w12, #24
+    sub     w9, w12, #24
+    csel    w12, w9, w12, ge
+Lmode_ok:
+    lsr     w9, w21, #30
+    and     w9, w9, #1
+    orr     w12, w12, w9, lsl #6        // bit6: yin-yang duo this segment
+    fmov    s19, w12
+
+    // ---- spin: random speed 8..39, random direction & phase ----
+    ubfx    w10, w21, #0, #5
+    add     w10, w10, #8
+    mul     w9, w22, w10
+    tbz     w21, #5, Lsp_d
+    neg     w9, w9
+Lsp_d:
+    add     w9, w9, w21, lsr #16
     bl      Lsin16
     fmov    s5, w12                     // sin
-    lsl     w9, w3, #4
+    ubfx    w10, w21, #0, #5
+    add     w10, w10, #8
+    mul     w9, w22, w10
+    tbz     w21, #5, Lsp_e
+    neg     w9, w9
+Lsp_e:
+    add     w9, w9, w21, lsr #16
     add     w9, w9, #16384
     bl      Lsin16
     fmov    s4, w12                     // cos
 
-    // ---- pulse: same period, offset phase, deep amplitude ----
-    lsl     w9, w3, #4
-    movz    w10, #21845
-    add     w9, w9, w10
+    // ---- pulse: random speed/dir/phase, random DEPTH ----
+    ubfx    w10, w21, #6, #4
+    add     w10, w10, #8
+    mul     w9, w22, w10
+    tbz     w21, #10, Lpu_d
+    neg     w9, w9
+Lpu_d:
+    add     w9, w9, w23, lsr #17
     bl      Lsin16
-    mov     w16, w12                    // pulse sin
+    mov     w16, w12
     cmp     w1, w2
     csel    w10, w1, w2, lt
     add     w10, w10, w10, lsl #1
     lsr     w10, w10, #3                // base = min*3/8
-    add     w11, w10, w10, lsl #1
-    lsr     w11, w11, #2                // amp = base*3/4
+    ubfx    w11, w23, #0, #2
+    add     w11, w11, #2
+    mul     w11, w10, w11
+    lsr     w11, w11, #2                // amp = base*(2..5)/4: rolled depth
     mul     w16, w16, w11
-    asr     w16, w16, #14               // osc
-    add     w9, w10, w16                // R = base + osc
+    asr     w16, w16, #14
+    add     w9, w10, w16
     lsl     w15, w9, #5                 // R32
-    sub     w14, w10, w16               // S = base - osc
-    lsl     w12, w10, #2
-    fmov    s3, w12                     // satellite ring radius
+    sub     w14, w10, w16               // S
+    ubfx    w12, w21, #10, #2
+    add     w12, w12, #3
+    mul     w12, w10, w12
+    lsr     w12, w12, #2
+    lsl     w12, w12, #2
+    lsr     w12, w12, #2                // ring radius: base*(3..6)/4
+    fmov    s3, w12
 
-    // ---- quarter-phase pulse -> D32 (mode 2 diamond field) ----
-    mov     w17, w10                    // save base across the call
-    lsl     w9, w3, #4
-    movz    w10, #21845
-    add     w9, w9, w10
+    // ---- D32: quarter-phase of the same rolled pulse ----
+    mov     w17, w10                    // save base
+    ubfx    w10, w21, #6, #4
+    add     w10, w10, #8
+    mul     w9, w22, w10
+    tbz     w21, #10, Lqp_d
+    neg     w9, w9
+Lqp_d:
+    add     w9, w9, w23, lsr #17
     add     w9, w9, #16384
     bl      Lsin16
-    mul     w12, w12, w11               // oscQ = cos * amp
+    mul     w12, w12, w11
     asr     w12, w12, #14
-    add     w12, w17, w12               // D = base + oscQ
+    add     w12, w17, w12
     lsl     w24, w12, #5                // D32
 
-    // ---- twist controls (mode 2) ----
-    lsl     w26, w3, #6                 // twist spin, Q8 idx (~17s/rev)
-    lsl     w9, w3, #1                  // twistiness clock (~9min)
-    bl      Lsin16
-    asr     w12, w12, #11               // -8..8
-    add     w12, w12, #10               // twistiness 2..18
+    // ---- twist: rolled strength, speed, direction ----
+    ubfx    w10, w21, #12, #5
+    add     w10, w10, #12
+    mul     w26, w22, w10
+    tbz     w21, #17, Ltw_d
+    neg     w26, w26
+Ltw_d:
+    add     w26, w26, w23, lsl #3       // twist spin Q8 + random phase
+    ubfx    w12, w21, #18, #4
+    add     w12, w12, #3                // twistiness 3..18, per visit
     fmov    s17, w12
-    lsr     w9, w3, #1                  // ripple phase: crawls at half rate
-    fmov    s18, w9
+    lsr     w9, w22, #1
+    add     w9, w9, w23, lsr #20
+    fmov    s18, w9                     // ripple phase (random offset)
 
-    // ---- satellite 1: orbit=base, ~34s, smooth ----
-    lsl     w9, w3, #5
+    // ---- satellite 1: rolled speed/dir, rolled orbit ----
+    ubfx    w10, w21, #20, #5
+    add     w10, w10, #12
+    mul     w9, w22, w10
+    tbz     w21, #25, Ls1_d
+    neg     w9, w9
+Ls1_d:
+    add     w9, w9, w21, lsr #14
     bl      Lsin16
     mov     w16, w12
-    lsl     w9, w3, #5
+    ubfx    w10, w21, #20, #5
+    add     w10, w10, #12
+    mul     w9, w22, w10
+    tbz     w21, #25, Ls1_e
+    neg     w9, w9
+Ls1_e:
+    add     w9, w9, w21, lsr #14
     add     w9, w9, #16384
     bl      Lsin16
     mov     w17, w12
     cmp     w1, w2
     csel    w10, w1, w2, lt
     add     w10, w10, w10, lsl #1
-    lsr     w10, w10, #3                // base again
+    lsr     w10, w10, #3
+    ubfx    w12, w23, #2, #2
+    add     w12, w12, #2
+    mul     w10, w10, w12
+    lsr     w10, w10, #2                // orbit = base*(2..5)/4
     mul     w16, w16, w10
     asr     w16, w16, #14
     mul     w17, w17, w10
     asr     w17, w17, #14
-    fmov    s24, w16                    // unfolded c1 (moire mode)
+    fmov    s24, w16                    // unfolded c1
     fmov    s25, w17
     cmp     w16, #0
     cneg    w16, w16, lt
     cmp     w17, #0
     cneg    w17, w17, lt
     cmp     w17, w16
-    csel    w13, w17, w16, ge           // fold into octant space
+    csel    w13, w17, w16, ge
     csel    w12, w16, w17, ge
     fmov    s1, w13
     fmov    s2, w12
 
-    // ---- satellite 2: orbit=base/2, counter-rotating, ~17s ----
-    lsl     w9, w3, #6
+    // ---- satellite 2: counter-rotating, own dice ----
+    ubfx    w10, w23, #4, #5
+    add     w10, w10, #20
+    mul     w9, w22, w10
+    tbnz    w21, #25, Ls2_d             // opposite of sat1's direction
     neg     w9, w9
+Ls2_d:
+    add     w9, w9, w23, lsr #12
     bl      Lsin16
     mov     w16, w12
-    lsl     w9, w3, #6
+    ubfx    w10, w23, #4, #5
+    add     w10, w10, #20
+    mul     w9, w22, w10
+    tbnz    w21, #25, Ls2_e
     neg     w9, w9
+Ls2_e:
+    add     w9, w9, w23, lsr #12
     add     w9, w9, #16384
     bl      Lsin16
     mov     w17, w12
     cmp     w1, w2
     csel    w10, w1, w2, lt
     add     w10, w10, w10, lsl #1
-    lsr     w10, w10, #4                // base/2
+    lsr     w10, w10, #4                // base/2 core
+    ubfx    w12, w23, #9, #2
+    add     w12, w12, #2
+    mul     w10, w10, w12
+    lsr     w10, w10, #2
     mul     w16, w16, w10
     asr     w16, w16, #14
     mul     w17, w17, w10
     asr     w17, w17, #14
-    fmov    s26, w16                    // unfolded c2 (moire mode)
+    fmov    s26, w16
     fmov    s27, w17
     cmp     w16, #0
     cneg    w16, w16, lt
@@ -158,40 +251,58 @@ _draw_frame:
     fmov    s6, w13
     fmov    s7, w12
 
-    // ---- color scheme: pseg = frame>>10 (~17s), pair (pseg%6, +1) ----
-    lsr     w9, w3, #10
-    mov     w13, #6
-    udiv    w10, w9, w13
-    msub    w10, w10, w13, w9
-    add     w11, w10, #1
-    cmp     w11, #6
-    csel    w11, wzr, w11, eq
+    // ---- color: RANDOM scheme pair + random yin-yang partners ----
     adrp    x9, palette@PAGE
     add     x9, x9, palette@PAGEOFF
-    lsl     w10, w10, #17
-    add     x20, x9, x10                // + schemeA*131072
-    lsl     w11, w11, #17
-    add     x21, x9, x11
-    lsr     w10, w3, #10                // recompute pseg for partner pair
     mov     w13, #6
-    udiv    w12, w10, w13
-    msub    w10, w12, w13, w10
-    add     w10, w10, #3                // yin-yang partner: schemes +3
-    cmp     w10, #6
-    sub     w12, w10, #6
-    csel    w10, w12, w10, ge
-    add     w11, w10, #1
+    lsr     w12, w21, #8
+    udiv    w10, w12, w13
+    msub    w10, w10, w13, w12          // A = rand 6
+    lsr     w12, w21, #21
+    udiv    w11, w12, w13
+    msub    w11, w11, w13, w12          // B = rand 6
+    cmp     w11, w10
+    b.ne    Lsch_ok
+    add     w11, w11, #1
     cmp     w11, #6
     csel    w11, wzr, w11, eq
+Lsch_ok:
     lsl     w10, w10, #17
-    add     x22, x9, x10                // opposite pair A
+    add     x20, x9, x10
     lsl     w11, w11, #17
-    add     x23, x9, x11                // opposite pair B
-    ubfx    w25, w3, #2, #8             // fade t 0..255
-    mov     w9, #256
-    sub     w28, w9, w25                // 256 - t
+    add     x21, x9, x11
+    lsr     w25, w22, #3                // fade FIRST — while w22 is still
+    mov     w9, #256                    //   sl, before x22 becomes a
+    sub     w28, w9, w25                //   palette pointer (bug #3 tonight)
 
-    lsl     w27, w3, #5                 // color flow phase
+    // ---- flow: rolled speed & direction (also needs sl in w22) ----
+    ubfx    w10, w23, #7, #6
+    add     w10, w10, #24
+    mul     w27, w22, w10
+    tbz     w23, #13, Lfl_d
+    neg     w27, w27
+Lfl_d:
+    add     w27, w27, w21, lsl #1       // random phase offset
+
+    // ---- yang pair: x22/x23 may now shadow sl ----
+    lsr     w12, w23, #14
+    udiv    w10, w12, w13
+    msub    w10, w10, w13, w12          // yang A = rand 6
+    lsr     w12, w23, #24
+    udiv    w11, w12, w13
+    msub    w11, w11, w13, w12
+    cmp     w11, w10
+    b.ne    Lsch_ok2
+    add     w11, w11, #1
+    cmp     w11, #6
+    csel    w11, wzr, w11, eq
+Lsch_ok2:
+    adrp    x12, palette@PAGE           // own base: x9 was killed by the
+    add     x12, x12, palette@PAGEOFF   //   'mov w9,#256' fade constant
+    lsl     w10, w10, #17
+    add     x22, x12, x10
+    lsl     w11, w11, #17
+    add     x23, x12, x11
 
     // ---- accent colors: 4 drifting taps from the JEWELS palette ----
     lsl     w10, w3, #2                 // accent drift: 4 idx/frame
@@ -227,15 +338,15 @@ _draw_frame:
     // (0 calm-interf, 1 rays, 2 moire, 3 corridor, 4 dense-ripple)
     // modes 15..20: accumulators in pairs, s31 = variant bit
     fmov    w9, s19
+    ubfx    w16, w9, #6, #1             // duo die for this segment
+    and     w9, w9, #63                 // mode
     cmp     w9, #15
     b.ge    Lacc_dispatch
     mov     w13, #3
     udiv    w10, w9, w13
     msub    w12, w10, w13, w9
     fmov    s29, w12                    // transform
-    fmov    w12, s28
-    ubfx    w12, w12, #10, #1
-    orr     w10, w10, w12, lsl #3       // bit3: yin-yang duo epoch (~17s)
+    orr     w10, w10, w16, lsl #3       // bit3: yin-yang duo
     fmov    s30, w10                    // field | duo
     b       Luy_loop
 Lacc_dispatch:

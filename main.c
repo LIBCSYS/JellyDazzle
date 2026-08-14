@@ -10,6 +10,9 @@
 
 #include <SDL.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
 
 #define W 1280
 #define H 960
@@ -36,7 +39,9 @@ int main(void)
         SDL_TEXTUREACCESS_STREAMING, W, H);
 
     int running = 1;
-    int frame = 0;
+    /* random launch seed: every run starts somewhere new in time-space */
+    srand((unsigned)time(NULL) ^ (unsigned)(getpid() * 2654435761u));
+    int frame = rand() & 0x3FFFFF;
     while (running) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
