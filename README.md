@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.0-ffb02e?style=flat-square" alt="version 2.1.0">
+  <img src="https://img.shields.io/badge/version-2.2.1-ffb02e?style=flat-square" alt="version 2.1.0">
   <img src="https://img.shields.io/badge/routines-225-52e0ff?style=flat-square" alt="225 routines">
   <img src="https://img.shields.io/badge/audio-reactive-ff7ad9?style=flat-square" alt="audio reactive">
   <img src="https://img.shields.io/badge/patterns-201-ff5ec8?style=flat-square" alt="201 patterns">
@@ -94,6 +94,11 @@ a record, a guitar in the room — and the kaleidoscope moves with it:
 - **No flashing.** Brightness moves at most 1.06×, eased in over ~8 frames and
   out over ~32. The music is carried by colour and structure, deliberately not
   by luminance — a screensaver should never be a strobe.
+
+**Full screen is native resolution.** Press `F` (or the green button) and the
+engine re-renders at your display's real pixel size — Retina included — rather
+than stretching a fixed buffer. Measured at 103 fps at 3456×2160 with the layer
+stack running.
 
 macOS asks for microphone permission the first time. Nothing is recorded, stored
 or transmitted: audio is analysed in memory, frame by frame, and discarded. With
