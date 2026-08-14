@@ -643,7 +643,8 @@ def build(patterns, palettes, asm, stats):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>JellyDazzle Library &mdash; {len(patterns)} Patterns / {len(palettes)} Palettes</title>
-<style>{CSS}</style></head><body>
+<style>{CSS}</style><script defer src='https://umami.jelia.nyc/script.js' data-website-id='6020d1b0-2017-46b2-a8a2-790180b29374'></script>
+</head><body>
 
 <div class="top"><div class="wrap">
 <p class="kicker">JellyDazzle v2.1 &middot; the library</p>
