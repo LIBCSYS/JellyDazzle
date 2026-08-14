@@ -17,21 +17,38 @@ N = 32768
 
 # ---------------- six color schemes ----------------
 # (position, hue, sat, val, shimmer) — same sampler as v1
-SCHEMES = {}  # generated analytically below: SIX FULL-SPECTRUM RAINBOWS
-# (J: "we have 32k colors, lets fucking use them") — every scheme contains
-# the entire hue wheel; they differ in character, not in gamut.
-#   name      hue cycles, hue phase, sat base, sat wave, val base, val wave
-RAINBOWS = {
-    'vivid':   (6, 0.00, 0.95, 0.05, 0.72, 0.25),
-    'neon':    (8, 0.15, 1.00, 0.00, 0.80, 0.20),
-    'pastel':  (5, 0.40, 0.50, 0.15, 0.90, 0.10),
-    'deep':    (5, 0.60, 0.90, 0.10, 0.48, 0.30),
-    'sunset':  (7, 0.85, 0.85, 0.15, 0.65, 0.30),
-    'ocean':   (6, 0.50, 0.78, 0.18, 0.60, 0.30),
+SCHEMES = {
+    'jewels': [   # the original materials ramp
+        (0.00, 0.615, 0.97, 0.28, 0.05), (0.10, 0.760, 0.95, 0.42, 0.08),
+        (0.20, 0.380, 0.97, 0.36, 0.06), (0.30, 0.130, 0.80, 0.97, 0.30),
+        (0.40, 0.070, 0.85, 0.58, 0.26), (0.50, 0.520, 0.65, 0.85, 0.32),
+        (0.60, 0.580, 0.08, 0.94, 0.36), (0.70, 0.950, 0.34, 0.98, 0.06),
+        (0.80, 0.450, 0.32, 0.97, 0.05), (0.90, 0.720, 0.36, 0.97, 0.06),
+        (1.00, 0.615, 0.97, 0.28, 0.05)],
+    'ember': [    # near-black -> DARK RED -> crimson -> orange -> gold
+        (0.00, 0.990, 0.90, 0.10, 0.03), (0.18, 0.985, 0.97, 0.34, 0.06),
+        (0.36, 0.000, 0.95, 0.55, 0.12), (0.55, 0.030, 0.90, 0.75, 0.20),
+        (0.72, 0.080, 0.85, 0.95, 0.30), (0.88, 0.120, 0.70, 0.99, 0.24),
+        (1.00, 0.990, 0.90, 0.10, 0.03)],
+    'royal': [    # deep PURPLE -> violet -> magenta, GOLD filigree
+        (0.00, 0.740, 0.98, 0.20, 0.04), (0.20, 0.760, 0.95, 0.45, 0.10),
+        (0.40, 0.800, 0.85, 0.70, 0.16), (0.55, 0.880, 0.75, 0.85, 0.14),
+        (0.70, 0.130, 0.75, 0.95, 0.32), (0.85, 0.720, 0.90, 0.55, 0.10),
+        (1.00, 0.740, 0.98, 0.20, 0.04)],
+    'gilded': [   # bronze -> GOLD -> white-gold — the treasure room
+        (0.00, 0.090, 0.90, 0.25, 0.08), (0.25, 0.110, 0.88, 0.55, 0.20),
+        (0.50, 0.130, 0.80, 0.92, 0.38), (0.70, 0.140, 0.45, 1.00, 0.30),
+        (0.85, 0.110, 0.75, 0.65, 0.22), (1.00, 0.090, 0.90, 0.25, 0.08)],
+    'ice': [      # navy -> LIGHT BLUE -> cyan -> white
+        (0.00, 0.620, 0.95, 0.22, 0.04), (0.25, 0.590, 0.80, 0.55, 0.10),
+        (0.50, 0.550, 0.55, 0.90, 0.22), (0.70, 0.520, 0.30, 1.00, 0.30),
+        (0.85, 0.560, 0.65, 0.75, 0.14), (1.00, 0.620, 0.95, 0.22, 0.04)],
+    'spring': [   # forest -> LIGHT GREEN -> mint -> cream
+        (0.00, 0.360, 0.95, 0.20, 0.04), (0.22, 0.340, 0.85, 0.50, 0.10),
+        (0.45, 0.310, 0.60, 0.85, 0.20), (0.65, 0.280, 0.35, 0.98, 0.26),
+        (0.82, 0.400, 0.55, 0.70, 0.12), (1.00, 0.360, 0.95, 0.20, 0.04)],
 }
-# 5-8 hue cycles across 32768: even a NARROW calm-moment index window
-# (~2000 idx) spans half a rainbow — no more monochrome walls, ever.
-ORDER = ['vivid', 'neon', 'pastel', 'deep', 'sunset', 'ocean']
+ORDER = ['jewels', 'ember', 'royal', 'gilded', 'ice', 'spring']
 
 def hlerp(a, b, t):
     d = (b - a + 0.5) % 1.0 - 0.5
@@ -48,16 +65,14 @@ def sample(keys, p):
 
 with open('palette.bin', 'wb') as f:
     for name in ORDER:
-        cyc, ph, sb, sw, vb, vw = RAINBOWS[name]
+        keys = SCHEMES[name]
         for i in range(N):
-            p = i / N
-            fr = p * 2 * math.pi
-            h = (p * cyc + ph) % 1.0                      # FULL hue wheel
-            s = sb + sw * math.sin(fr * 5)
-            v = vb + vw * math.sin(fr * 7 + 1.3)          # broad soft waves
-            v += 0.08 * math.sin(fr * 17)                 # mild sheen only
-            s = max(0.15, min(1.0, s))
-            v = max(0.06, min(1.0, v))
+            h, s, v, sh = sample(keys, i / N)
+            fr = i * 2 * math.pi / N
+            v += sh * (0.55 * math.sin(fr * 48) + 0.45 * math.sin(fr * 131))
+            v += 0.38 * max(0.0, math.sin(fr * 24)) ** 9        # filaments
+            v -= 0.22 * max(0.0, math.sin(fr * 24 + 2.1)) ** 7  # grooves
+            v = max(0.02, min(1.0, v))
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
             f.write(struct.pack('<I', 0xFF000000 | (int(r*255) << 16)
                                      | (int(g*255) << 8) | int(b*255)))

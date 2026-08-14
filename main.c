@@ -10,14 +10,9 @@
 
 #include <SDL.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
 
-#define W 800
-#define H 600
-/* internal render size; SDL stretches to the window — smoothness
-   over sharpness, and the original ran 320x200 anyway */
+#define W 1280
+#define H 960
 
 /* implemented in draw.s */
 extern void draw_frame(uint32_t *fb, int width, int height, int frame);
@@ -31,7 +26,7 @@ int main(void)
     SDL_Window *win = SDL_CreateWindow(
         "dazzle64",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        1280, 960, SDL_WINDOW_RESIZABLE);
+        W, H, SDL_WINDOW_RESIZABLE);
 
     SDL_Renderer *ren = SDL_CreateRenderer(
         win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -41,9 +36,7 @@ int main(void)
         SDL_TEXTUREACCESS_STREAMING, W, H);
 
     int running = 1;
-    /* random launch seed: every run starts somewhere new in time-space */
-    srand((unsigned)time(NULL) ^ (unsigned)(getpid() * 2654435761u));
-    int frame = rand() & 0x3FFFFF;
+    int frame = 0;
     while (running) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
