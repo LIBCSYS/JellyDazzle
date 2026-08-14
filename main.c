@@ -14,8 +14,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#define W 1280
-#define H 960
+#define W 800
+#define H 600
+/* internal render size; SDL stretches to the window — smoothness
+   over sharpness, and the original ran 320x200 anyway */
 
 /* implemented in draw.s */
 extern void draw_frame(uint32_t *fb, int width, int height, int frame);
@@ -29,7 +31,7 @@ int main(void)
     SDL_Window *win = SDL_CreateWindow(
         "dazzle64",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        W, H, SDL_WINDOW_RESIZABLE);
+        1280, 960, SDL_WINDOW_RESIZABLE);
 
     SDL_Renderer *ren = SDL_CreateRenderer(
         win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
