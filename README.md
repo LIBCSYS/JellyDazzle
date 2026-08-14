@@ -1,11 +1,32 @@
-<a href="https://libcsys.github.io/JellyDazzle/"><img src="lab/banner.jpg" alt="Five JellyDazzle patterns: Plasma Mandala, BZ Pinwheel, Mirror Truchet, Moiré Silk, Pinwheel Swirl" width="100%"></a>
+<p align="center">
+  <a href="https://libcsys.github.io/JellyDazzle/">
+    <img src="lab/jellydazzle.gif" width="560" alt="JellyDazzle running — eight of its 124 kaleidoscope routines">
+  </a>
+</p>
 
-# JellyDazzle
+<h1 align="center">JellyDazzle</h1>
 
-**An homage to DAZZLE.EXE — the magical DOS kaleidoscope — hand-written in
-ARMv9.2-A assembly for Apple Silicon.**
+<p align="center">
+  <b>An homage to DAZZLE.EXE — the magical DOS kaleidoscope —<br>
+  hand-written in ARMv9.2-A assembly for Apple Silicon.</b>
+</p>
 
-<p align="center"><b><a href="https://libcsys.github.io/JellyDazzle/">▶ &nbsp;Browse the full gallery — 100 patterns · 30 palettes</a></b></p>
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-ffb02e?style=flat-square" alt="version 2.0.0">
+  <img src="https://img.shields.io/badge/routines-124-52e0ff?style=flat-square" alt="124 routines">
+  <img src="https://img.shields.io/badge/patterns-100-ff5ec8?style=flat-square" alt="100 patterns">
+  <img src="https://img.shields.io/badge/palettes-30-a0e060?style=flat-square" alt="30 palettes">
+  <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-lightgrey?style=flat-square" alt="Apple Silicon">
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT">
+</p>
+
+<p align="center">
+  <a href="https://github.com/LIBCSYS/JellyDazzle/releases/latest"><b>Download for macOS</b></a> ·
+  <a href="https://dazzle.jelia.nyc"><b>Browse all 100 patterns</b></a> ·
+  <a href="HOW_TO_OPEN.md"><b>First-launch help</b></a>
+</p>
+
+
 
 > "I spent hours and hours staring at that magical kaleidoscope. Never the
 > same pattern, never the same color scheme. It was amazing, and everything
