@@ -170,3 +170,39 @@ Design sketch (target 2.4.b):
 - Same lifetime rules as any other overlay (a turn of its own length, fade in/out),
   and the same weight from the panel — so a user can say "more Amanda, less cat."
 - Privacy: images never leave the machine, never bundled into the app, never in git.
+
+## Depth exchange — the foreground falls back (J, 2026-08-16)
+
+Watching a rotating tiled figure in 2.5.0, J: *"I wondered if it could fly apart
+and reveal what's underneath. I often wish the foreground animation would fall
+back and become the background, letting what was in back become the foreground."*
+
+This is a **transition between layers rather than within one**, and we have
+nothing like it. Today a layer fades out and a new one fades in; the stack order
+never changes and nothing is ever *revealed*.
+
+Two halves, and they are separable:
+
+**1. Fly apart.** The outgoing figure breaks into pieces that scatter outward and
+fade, uncovering the layer beneath as they go. Cheap version: modulate the
+layer's per-pixel weight by a moving radial or cellular mask so it erodes rather
+than dims — dissolve with structure. Richer version needs the pieces to be real
+(cells with velocity), which suits the `C_INDEXED` class in
+`PALETTE_CYCLE_CLASS.md`: an index plane can be diced into regions and each
+region given a drift, because it is a static image being *transformed*, not
+redrawn.
+
+**2. Depth exchange.** The FIGURE recedes — shrinks slightly, loses contrast,
+drops in the stack — while the GROUND rises to meet it. They swap slots. The
+composition keeps both routines but reverses which one commands attention.
+
+Why it is worth doing: it answers the thing that makes our output feel flat
+compared to the original. DAZZLE piled patterns up and then cleared them, so
+there was always a sense of accumulation and release. We cross-fade, which is
+smooth but eventless. A swap is an *event* — the viewer notices something
+happened, and it costs nothing but scheduling.
+
+Note the ordering constraint: the compositor blends by brightness with slot 0 at
+the bottom, so a genuine swap means exchanging the layers' slot indices AND
+their blend modes, not just their draw order. Do it during a fade so no frame
+shows the stack mid-flip.

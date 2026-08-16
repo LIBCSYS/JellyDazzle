@@ -614,12 +614,20 @@ static const char *probe_cache_path(void)
 
 /* stamp = magic + routine count + version string, so any change to the
  * library or the build invalidates the cached measurements. */
+/* The stamp must invalidate the cache when the MEASUREMENTS would change —
+ * that means the routine count and the scheme count, and nothing else.
+ *
+ * It used to hash JD_VERSION as well, which was a mistake with real teeth:
+ * every point release invalidated the cache, so the first launch of each new
+ * build fell back to a cold start.  A cold start is not neutral — before the
+ * probe finishes, GROUND holds ~35 routines of which 24 are the asm modes,
+ * FIELD holds 1 and SPARK holds 0.  Ship six builds in a day and the user
+ * sees six cold starts, every one of them opening on fireworks or gears.
+ * That is exactly what was reported.  A version bump does not change what a
+ * pattern looks like, so it has no business here. */
 static uint32_t probe_stamp(void)
 {
-    uint32_t h = mix32(JD_CACHE_MAGIC ^ (uint32_t)g_nr);
-    const char *v = JD_VERSION;
-    while (*v) h = mix32(h ^ (uint32_t)(unsigned char)*v++);
-    return h;
+    return mix32(JD_CACHE_MAGIC ^ ((uint32_t)g_nr << 8) ^ (uint32_t)g_ns);
 }
 
 static int probe_cache_load(void)
