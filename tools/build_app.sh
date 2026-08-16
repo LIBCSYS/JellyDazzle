@@ -6,7 +6,10 @@ VER=$(cat VERSION)
 APP=dist/JellyDazzle.app
 make
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resources"
+if [ -f assets/brand/JellyDazzle.icns ]; then
+    cp assets/brand/JellyDazzle.icns "$APP/Contents/Resources/JellyDazzle.icns"
+fi
 cp jellydazzle "$APP/Contents/MacOS/JellyDazzle"
 # sdl2-compat shim + the SDL3 it dlopens as @loader_path/libSDL3.dylib
 SHIM=$(otool -L jellydazzle | awk '/libSDL2/{print $1}')
@@ -26,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>nyc.jelia.jd${VER}</string>
   <key>CFBundleVersion</key><string>${VER}</string>
   <key>CFBundleShortVersionString</key><string>${VER}</string>
+  <key>CFBundleIconFile</key><string>JellyDazzle</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAudioCaptureUsageDescription</key><string>JellyDazzle listens to what the Mac is playing (Spotify, any app) so the kaleidoscope can move with the music. Audio is analysed in memory only — never recorded, stored, or sent anywhere.</string>

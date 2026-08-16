@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>JellyDazzle Command Panel</title>
+<link rel="icon" type="image/png" href="/brand/favicon-64.png">
 <style>
 :root{--ink:#0a0f17;--panel:#111a26;--line:#1e2c3d;--cy:#22d3ee;--gold:#e9b65a;--tx:#dbe6f0;--dim:#7d90a5;
 --less:#e0644f;--more:#4fd28a;}
@@ -9,7 +10,8 @@
 body{margin:0;background:var(--ink);color:var(--tx);font:14px/1.45 -apple-system,Segoe UI,Helvetica,sans-serif}
 header{position:sticky;top:0;z-index:20;background:rgba(10,15,23,.97);border-bottom:1px solid var(--line);
 backdrop-filter:blur(8px);padding:9px 16px 7px}
-h1{margin:0;font-size:16px;letter-spacing:.03em}
+h1{margin:0;font-size:16px;letter-spacing:.03em;display:flex;align-items:center;gap:9px}
+.mark{width:26px;height:26px;border-radius:6px;display:block}
 h1 span{color:var(--cy)}
 .hint{color:var(--dim);font-size:11.5px;margin-top:1px}
 .row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px}
@@ -86,7 +88,7 @@ padding:9px 18px;border-radius:8px;font-weight:700;opacity:0;transition:.25s;poi
 </style></head><body>
 
 <header>
-  <h1>JellyDazzle <span>Command Panel</span> · v2.4</h1>
+  <h1><img src="/brand/emblem.png" alt="" class="mark">JellyDazzle <span>Command Panel</span></h1>
   <div class="hint">Hover any tile to see it move and shift colour. Thumbnails are one fixed palette — the app cycles 180 schemes, so judge <b>shape</b> here, not colour.</div>
   <div class="row"><span class="lbl">Layer</span><span id="fL"></span></div>
   <div class="row"><span class="lbl">Set</span><span id="fS"></span></div>
