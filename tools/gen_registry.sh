@@ -12,6 +12,13 @@ files=$(ls [0-9][0-9][0-9]_*.c [0-9][0-9][0-9].c 2>/dev/null | sort)
   echo 'const jd_pattern_fn jd_patterns[] = {'
   for f in $files; do echo "    pattern_${f:0:3},"; done
   echo '};'
+  # names, so the ABOUT card can say what is on screen right now
+  echo 'const char *const jd_pattern_names[] = {'
+  for f in $files; do
+    nm="${f:4}"; nm="${nm%.c}"; nm="${nm//_/ }"
+    echo "    \"${f:0:3} ${nm}\","
+  done
+  echo '};'
   echo "const int jd_pattern_count = $(echo "$files" | wc -w | tr -d ' ');"
 } > _registry.c
 echo "registry: $(echo "$files" | wc -w | tr -d ' ') patterns"

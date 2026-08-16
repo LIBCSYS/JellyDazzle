@@ -2066,3 +2066,49 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         } } else g_cool = 0;
     }
 }
+
+/* ---- what is on screen right now -------------------------------------
+ * Reported to the ABOUT card so a viewer can name what they are looking at
+ * instead of describing it. Cheap, read-only, no locking: the compositor and
+ * the HUD run on the same thread. */
+static const char *const ROLE_NAME[R_NROLE] = { "GROUND", "FIELD", "FIGURE", "SPARK" };
+
+const char *jd_routine_name(int rt)
+{
+    static char buf[64];
+    if (rt < 0) return "-";
+    if (rt < JD_NASM) {
+        static const char *A[] = {
+            "calm interference","calm interf twist","calm interf tile",
+            "rays spin","rays twist","rays tile",
+            "moire spin","moire twist","moire tile",
+            "corridor spin","corridor twist","corridor tile",
+            "ripple spin","ripple twist","ripple tile",
+            "spirograph","spirograph mirrored","slash canvas","web",
+            "curl garden","frost","string-art fans","vector panels","fireworks" };
+        snprintf(buf, sizeof buf, "A%02d %s", rt,
+                 rt < (int)(sizeof A / sizeof *A) ? A[rt] : "asm");
+        return buf;
+    }
+    { int i = rt - JD_NASM;
+      if (i >= 0 && i < jd_pattern_count) return jd_pattern_names[i]; }
+    return "?";
+}
+
+int jd_now_playing(jd_nowplaying *out, int max)
+{
+    int n = 0;
+    for (int i = 0; i < JD_NBUF && n < max; i++) {
+        if (!g_L[i].live) continue;
+        out[n].routine = g_L[i].routine;
+        out[n].role    = g_st[g_L[i].routine].role;
+        out[n].live    = 1;
+        n++;
+    }
+    return n;
+}
+
+const char *jd_role_name(int role)
+{
+    return (role >= 0 && role < R_NROLE) ? ROLE_NAME[role] : "?";
+}

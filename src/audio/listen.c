@@ -54,6 +54,7 @@
 #include <string.h>
 #include <math.h>
 #include "jellydazzle.h"
+extern const char *jd_role_name(int role);
 
 #define AU_N      2048                 /* FFT size: 42.7 ms @ 48k, 23 Hz/bin */
 #define AU_RING   (AU_N * 4)
@@ -685,5 +686,25 @@ void jd_about_draw(uint32_t *fb, int w, int h)
                    : (i == 3 || i == 4) ? 0xFFE9B65Au  /* links  */
                    : 0xFFA8B6C4u;
         au_text(fb, w, h, x0 + pad, y0 + pad + i * lh, s, c, L[i]);
+    }
+
+    /* NOW PLAYING — name what is actually on screen, bottom to top, so a
+     * viewer can report "I keep seeing 083 patch quilt" instead of
+     * describing it.  This is the readout that turns an impression into a
+     * fact, and it is the whole reason the registry carries names. */
+    {
+        jd_nowplaying np[8];
+        int k = jd_now_playing(np, 8);
+        int ly = y0 + panel_h + 6 * s;
+        au_dim(fb, w, h, x0, ly - 3 * s, panel_w, (k + 1) * lh + 6 * s);
+        au_text(fb, w, h, x0 + pad, ly, s, 0xFF7F8C99u, "NOW PLAYING");
+        for (int i = 0; i < k; i++) {
+            char row[96];
+            snprintf(row, sizeof row, "%-6s %s",
+                     jd_role_name(np[i].role), jd_routine_name(np[i].routine));
+            int maxc2 = (panel_w - 2 * pad) / (4 * s);
+            if (maxc2 > 0 && maxc2 < (int)sizeof row) row[maxc2] = 0;
+            au_text(fb, w, h, x0 + pad, ly + (i + 1) * lh, s, 0xFFC8D4DEu, row);
+        }
     }
 }
