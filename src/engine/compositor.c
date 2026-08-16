@@ -1557,6 +1557,17 @@ static int try_spawn(int slot, int frame)
      * that shrinks would expose the frame edge. */
     {
         uint32_t m = mix32(L->seed ^ 0xB17E5EEDu);
+        /* ADAPTIVE MOBILITY (2.6.2).  The transform is the only life a frozen
+         * routine has, so give it the most.  Measured from the probe's own
+         * delta: 14 of 227 routines change by less than 0.1 per frame and two
+         * are EXACTLY 0.00 — a still image held for the whole tenancy. Those
+         * get up to 2.6x the drift and spin. A routine that is already busy
+         * gets less, so adding motion never tips it into chaos. */
+        uint32_t dq = g_st[v].probed ? g_st[v].delta_q8 : 256;
+        float life = (float)dq / 256.0f;               /* 0 = frozen */
+        float mob  = life < 1.6f ? (2.6f - life * 1.0f) : 1.0f;
+        if (mob < 1.0f) mob = 1.0f;
+        if (mob > 2.6f) mob = 2.6f;
         if (slot == 0 || slot == JD_SHADOW) {
             /* GROUND: zoom IN only, never out — the warp reads out-of-bounds
              * as black, so a ground smaller than the frame would show a border.
@@ -1566,9 +1577,9 @@ static int try_spawn(int slot, int frame)
             L->tx  = L->ty = 0.0f;
             L->tr  = (float)((m >> 9) & 63) / 63.0f * 6.2832f;
             uint32_t d = mix32(m ^ 0x51F0A7u);
-            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00055f;
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00055f * mob;
             L->tx_v = L->ty_v = 0.0f;
-            L->tr_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00030f;
+            L->tr_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00030f * mob;
             L->moving = 1;
         } else {
             /* OVERLAYS: the full range. Layers genuinely recede and loom,
@@ -1578,10 +1589,10 @@ static int try_spawn(int slot, int frame)
             L->ty  = ((float)((m >> 18) & 255) / 255.0f - 0.5f) * 0.60f;
             L->tr  = (float)((m >> 26) & 63) / 63.0f * 6.2832f;
             uint32_t d = mix32(m ^ 0x9E3779B9u);
-            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00190f;   /* 4.8x */
-            L->tx_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00105f;
-            L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00105f;
-            L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00240f;  /* ~7x */
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00190f * mob;
+            L->tx_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00105f * mob;
+            L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00105f * mob;
+            L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00240f * mob;
             L->moving = 1;
         }
     }
