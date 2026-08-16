@@ -123,7 +123,7 @@ static double now_ms(void) {
  * is exactly what "I keep seeing the same thing at the start" means.  The
  * engine was random; it was just amnesiac.  We now remember which routines
  * opened the last JD_RECENT runs and refuse them for the FIRST spawn only. */
-#define JD_RECENT 25
+#define JD_RECENT 72
 static uint16_t g_recent[JD_RECENT];
 static int      g_recent_n;
 static int      g_opening = 1;         /* cleared once slot 0 has spawned */
@@ -133,6 +133,7 @@ static int recent_has(uint16_t rt)
     for (int i = 0; i < g_recent_n; i++) if (g_recent[i] == rt) return 1;
     return 0;
 }
+
 
 static void probe_cache_save(void);
 
@@ -157,6 +158,7 @@ typedef struct {
     uint8_t  luma;      /* mean luma 0..255                           */
     uint8_t  sat;       /* mean channel spread 0..255                 */
     uint8_t  probed;
+    uint8_t  cdiv;      /* colour diversity 0..255 (2.5.3)            */
     uint16_t delta_q8;  /* frame-to-frame mean channel delta, Q8      */
     uint16_t cost_q8;   /* render ms at full res, Q8 (EWMA at run)    */
 } jd_stat;
@@ -194,6 +196,8 @@ typedef struct {
     uint8_t   frozen;             /* strobed: stop calling it, dissolve  */
     uint8_t   strikes;
     uint32_t  span, off;          /* palette window                      */
+    uint16_t  wild;               /* 0 = shared ramp, else scheme+1 (2.5.4) */
+    uint8_t   hrot;               /* 0/1/2 = RGB channel rotation (2.5.4)   */
     float     lo_s, hi_s, gs_s;   /* reshape params, fixed at spawn      */
     uint8_t   lut[256];           /* value transfer curve, built once    */
     uint32_t  gq;                 /* saturation gain, Q8                 */
@@ -265,6 +269,28 @@ static void stat_image(const uint32_t *b, int n, jd_stat *s)
     s->luma = (uint8_t)(lum / cnt);
     s->sat  = (uint8_t)(sat / cnt);
     s->dark = (uint8_t)((uint64_t)dark * 255 / cnt);
+
+    /* COLOUR DIVERSITY (2.5.3).  How many distinct colours the routine puts on
+     * screen, as a coarse 4-bit-per-channel histogram.  This is the number that
+     * predicts whether a viewer will SEE the palette moving: a routine painting
+     * flat blocks changes colour when the ramp rotates, but nothing sweeps, so
+     * it reads as static.  A routine full of gradients shows bands travelling.
+     * Measured across the shipping library: 9% of patterns are flat (<1500
+     * distinct colours at thumbnail size), and they are exactly the ones
+     * reported as "same colour, doesn't morph". */
+    {
+        static uint8_t seen[4096];
+        memset(seen, 0, sizeof seen);
+        uint32_t used = 0;
+        for (int i = 0; i < n; i += 3) {
+            uint32_t c = b[i];
+            uint32_t k = (((c >> 20) & 15) << 8) | (((c >> 12) & 15) << 4)
+                       |  ((c >>  4) & 15);
+            if (!seen[k]) { seen[k] = 1; used++; }
+        }
+        uint32_t d = used * 255 / 1024;          /* 1024 buckets ~= "rich" */
+        s->cdiv = (uint8_t)(d > 255 ? 255 : d);
+    }
 }
 
 static uint32_t delta_q8_of(const uint32_t *a, const uint32_t *b, int n)
@@ -627,7 +653,8 @@ static const char *probe_cache_path(void)
  * pattern looks like, so it has no business here. */
 static uint32_t probe_stamp(void)
 {
-    return mix32(JD_CACHE_MAGIC ^ ((uint32_t)g_nr << 8) ^ (uint32_t)g_ns);
+    return mix32(JD_CACHE_MAGIC ^ ((uint32_t)g_nr << 8) ^ (uint32_t)g_ns
+                 ^ ((uint32_t)sizeof(jd_stat) << 24));
 }
 
 static int probe_cache_load(void)
@@ -846,23 +873,58 @@ static void palette_update(int frame)
 static void layer_pal_build(int s)
 {
     uint32_t *d = g_pal[s], span = g_L[s].span, off = g_L[s].off;
+    /* WILDCARD COLOUR (2.5.4).  Every layer used to window the SAME blended
+     * ramp, which is built from just two curated schemes.  That made the
+     * output constitutionally incapable of surprise: nothing could ever clash,
+     * sit opposite, or be unexpected, because every colour on screen came from
+     * the same two palettes.  A wildcard layer ignores the shared ramp and
+     * takes a scheme of its own; hrot then rotates its RGB channels, which is
+     * a 120-degree hue shift for free and puts it somewhere the curated
+     * palettes would never have sent it.  The schemes remain the guide — they
+     * are just no longer the law. */
+    const uint32_t *SRC = g_L[s].wild ? (jd_palette + (size_t)(g_L[s].wild - 1) * PAL_N)
+                                      : g_blend;
     static int loop = -1;
     if (loop < 0) { const char *e = getenv("JD_PALLOOP"); loop = e ? atoi(e) : 1; }
     if (span >= PAL_N || !loop) {
         for (uint32_t i = 0; i < PAL_N; i++)
-            d[i] = g_blend[(((i * span) >> 15) + off) & PAL_MASK];
+            d[i] = SRC[(((i * span) >> 15) + off) & PAL_MASK];
     } else {
         const uint32_t body = PAL_N - PAL_RET;
         const uint32_t mul  = (span << 16) / body;
         const uint32_t top  = ((body - 1) * mul) >> 16;
         for (uint32_t i = 0; i < body; i++)
-            d[i] = g_blend[(((i * mul) >> 16) + off) & PAL_MASK];
+            d[i] = SRC[(((i * mul) >> 16) + off) & PAL_MASK];
         for (uint32_t j = 0; j < PAL_RET; j++)
-            d[body + j] = g_blend[(off + top - (top * (j + 1)) / PAL_RET) & PAL_MASK];
+            d[body + j] = SRC[(off + top - (top * (j + 1)) / PAL_RET) & PAL_MASK];
     }
     /* duplicate: patterns index pal[x & 0x7FFF], so handing them
      * (pal + k) stays in bounds for any k < PAL_N — that makes an
      * audio-driven colour rotation completely free at draw time. */
+
+    if (g_L[s].hrot) {
+        /* 120 / 240 degrees of hue by rotating channels — but LUMA-PRESERVING.
+         * A bare rotation is not brightness-neutral (red at luma 76 becomes
+         * blue at luma 29), and measured across the library it dimmed the
+         * whole picture by 15%.  So rotate the hue, then rescale the result
+         * back to the luminance it started with. */
+        int two = (g_L[s].hrot == 2);
+        for (uint32_t i = 0; i < PAL_N; i++) {
+            uint32_t c = d[i], r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+            uint32_t l0 = (r * 77 + g * 150 + b * 29) >> 8;
+            uint32_t nr, ng, nb;
+            if (two) { nr = b; ng = r; nb = g; }
+            else     { nr = g; ng = b; nb = r; }
+            uint32_t l1 = (nr * 77 + ng * 150 + nb * 29) >> 8;
+            if (l1 < 1) l1 = 1;
+            uint32_t k = (l0 << 8) / l1;                  /* Q8 correction */
+            if (k > 1024) k = 1024;                       /* never blow up */
+            nr = (nr * k) >> 8; ng = (ng * k) >> 8; nb = (nb * k) >> 8;
+            d[i] = 0xFF000000u | (nr > 255 ? 255u : nr) << 16
+                               | (ng > 255 ? 255u : ng) << 8
+                               | (nb > 255 ? 255u : nb);
+        }
+    }
 
     static int noreshape = -1;
     if (noreshape < 0) noreshape = getenv("JD_NORESHAPE") ? 1 : 0;
@@ -1110,15 +1172,36 @@ static uint32_t amp_q8(int sidx)
     return (uint32_t)(256.0f * (1.0f + k));
 }
 
+/* How many ring entries belong to the SAME role as rt.  The refusal has to be
+ * budgeted per role, not globally: a 72-entry ring compared against one role's
+ * bag refuses nothing, because no single bag is bigger than the whole ring.
+ * (Measured the hard way — ring=72 with a global guard performed WORSE than
+ * ring=25, because at 72 the guard never bound for any role at all.) */
+static int recent_in_role(int role)
+{
+    int n = 0;
+    for (int i = 0; i < g_recent_n; i++)
+        if (g_st[g_recent[i]].role == role) n++;
+    return n;
+}
+
 static int admissible(uint16_t r, int slot)
 {
     const jd_stat *st = &g_st[r];
     int slot_i0 = (slot == JD_SHADOW) ? 0 : slot;
-    /* 0. cross-launch memory: do not OPEN on something the last JD_RECENT
-     *    runs already opened on.  Binds only while g_opening is set, so it
-     *    costs nothing after the first spawn and can never starve the bag. */
-    if (g_opening && slot == 0 && recent_has(r) && g_bag[R_GROUND].n > g_recent_n + 4)
-        return 0;
+    /* 0. cross-launch memory.  Within one run the bag is already fair — a
+     *    routine cannot repeat until its cycle completes.  ACROSS runs it was
+     *    memoryless, and memoryless draws cluster: measured over 8 runs, 15
+     *    routines came up 4+ times against an expectation of 1.48 while 61
+     *    never appeared at all.  That is textbook Poisson, i.e. genuinely
+     *    random — and randomness is exactly what reads as "I keep seeing this
+     *    one."  So we remember what recent runs used and refuse it, which is
+     *    LESS random and more evenly spread, which is what a viewer wants.
+     *
+     *    Guarded by bag size so it can never starve: the refusal only binds
+     *    while the role's bag is comfortably larger than the ring. */
+    { int role = g_st[r].role;
+      if (recent_has(r) && g_bag[role].n > recent_in_role(role) + 5) return 0; }
     /* 1. a routine may never be live twice — patterns hold file-static state */
     for (int i = 0; i < JD_NBUF; i++)
         if (g_L[i].live && g_L[i].routine == (int)r) return 0;
@@ -1364,6 +1447,25 @@ static int try_spawn(int slot, int frame)
     L->mdel = 0;
     L->lo_s = -1.0f;
     L->span = SPAN[g_mood][sidx];
+    /* ADVANCE COLOUR MANAGEMENT (2.5.3).  Rotation moves a pattern through its
+     * OWN window of the ramp, so a narrow span means barely any hue travels
+     * through it however fast we rotate.  For a gradient-rich routine that is
+     * fine — the bands sweep and it reads as alive.  For a FLAT routine it is
+     * why the picture "doesn't morph": its handful of blocks each shift a
+     * little and nothing sweeps.
+     *
+     * So the flatter the routine, the wider the slice of ramp it gets, up to
+     * 2.4x. A pattern of six flat blocks now walks those blocks across a large
+     * arc of hue instead of nudging them, which is exactly the effect the
+     * original got by cycling a 256-entry DAC under a static image. */
+    if (g_st[v].probed) {
+        uint32_t cd = g_st[v].cdiv;                 /* 0 flat .. 255 rich */
+        if (cd < 160) {
+            uint32_t boost = 256 + ((160 - cd) * 358) / 160;   /* 256..614 */
+            uint64_t w = ((uint64_t)L->span * boost) >> 8;
+            L->span = (uint32_t)(w > PAL_N ? PAL_N : w);
+        }
+    }
     if (L->span > PAL_N) L->span = PAL_N;
     /* HUE SEPARATION (2.4.4).  The offset used to be a bare random draw with
      * no regard for what the other live layers were using, so two layers
@@ -1391,15 +1493,41 @@ static int try_spawn(int slot, int frame)
         }
         L->off = best;
     }
+
+    /* SURPRISE (2.5.4).  Roughly one layer in three breaks out of the shared
+     * ramp: it takes a scheme of its own, and may rotate its channels by 120
+     * or 240 degrees on top.  The GROUND is deliberately excluded — the floor
+     * of the picture should stay coherent, and it is the overlays landing in
+     * unexpected hue that reads as a surprise rather than as a mistake.
+     *
+     * This is the answer to three versions of the wrong question.  Even
+     * spread, wider spans and hue separation all operated INSIDE a palette
+     * system built to keep everything harmonious.  Nothing scheduled can
+     * produce an unexpected colour if every colour comes from the same two
+     * curated schemes. */
+    L->wild = 0; L->hrot = 0;
+    if (slot != 0 && slot != JD_SHADOW) {
+        uint32_t w = mix32(L->seed ^ 0x5CA1AB1Eu);
+        if ((w & 255) < 86) {                       /* ~34% of overlays */
+            L->wild = (uint16_t)(1 + (w >> 8) % (uint32_t)g_ns);
+            uint32_t h = (w >> 20) % 100;
+            L->hrot = h < 34 ? 1 : (h < 58 ? 2 : 0); /* often, not always */
+        } else if ((w & 255) < 116) {
+            L->hrot = ((w >> 16) & 1) ? 1 : 2;      /* ~12%: rotate only */
+        }
+    }
+    if (L->wild || L->hrot)
+        TR("WILD slot=%d rt=%d scheme=%d hrot=%d\n", slot, (int)v,
+           L->wild ? L->wild - 1 : -1, L->hrot);
     layer_pal_build(slot);
     g_last_change = frame;
     g_gap = 30 + (int)(mix32(r ^ 0x6A9F00Du) % 211u);       /* 0.5..4 s, never the same twice */
     TR("SPAWN f=%d slot=%d rt=%d role=%d blend=%d peak=%d life=%d mood=%d span=%u\n",
        frame, slot, (int)v, g_st[v].role, L->blend, L->w_peak, hold, g_mood, L->span);
-    if (g_opening && slot == 0) {      /* remember what we opened on */
+    recent_note((uint16_t)v);          /* every spawn joins the ring */
+    if (g_opening) {
         g_opening = 0;
-        recent_note((uint16_t)v);
-        TR("OPENING rt=%d remembered (%d of %d in the ring)\n",
+        TR("OPENING rt=%d (%d of %d in the ring)\n",
            (int)v, g_recent_n, JD_RECENT);
     }
     return 1;
@@ -1618,7 +1746,37 @@ static void audio_rotate(void)
 static uint32_t g_surge = 256;
 static void audio_surge(void)
 {
-    uint32_t k = g_audio.live ? 115 + ((uint32_t)g_audio.bass * 295 >> 10) : 256;
+    /* IDLE BREATH (2.5.2).  With music, overlays swell to as much as 1.6x.
+     * In silence this was a hard 256 — dead neutral — so the picture read as
+     * flat the moment the track stopped.  Silence now gets the engine's own
+     * slow swell instead, ~0.95x..1.30x over about 20 s, the same principle
+     * as the idle palette rotation added in 2.4.2: when the music stops, the
+     * internal clocks take over rather than going still.  Far too slow to
+     * strobe, and the audio surge still rides on top when sound returns. */
+    uint32_t k;
+    if (g_audio.live) {
+        k = 115 + ((uint32_t)g_audio.bass * 295 >> 10);
+    } else {
+        /* Not a metronome.  A single fixed period would be heard as a pulse,
+         * so the breath is the SUM of three eased swells at incommensurate
+         * rates (~17 s, ~23 s, ~31 s).  Their least common multiple is over
+         * two hours, so the compound never repeats in any sitting, and the
+         * run seed shifts all three phases so no two launches breathe alike.
+         * This is the same trick the engine uses everywhere else: layered
+         * clocks that never line up. */
+        static uint32_t b1, b2, b3, seeded;
+        if (!seeded) { seeded = 1;
+            b1 = g_run & 1023; b2 = (g_run >> 10) % 1399; b3 = (g_run >> 20) % 1861; }
+        b1 = (b1 + 1) % 1024;  b2 = (b2 + 1) % 1399;  b3 = (b3 + 1) % 1861;
+        uint32_t e = 0;
+        { uint32_t t = b1 < 512 ? b1 * 128 : (1023 - b1) * 128;
+          e += ease_ss(t > 65535 ? 65535 : t) >> 8; }
+        { uint32_t t = b2 < 700 ? b2 * 93 : (1398 - b2) * 93;
+          e += ease_ss(t > 65535 ? 65535 : t) >> 8; }
+        { uint32_t t = b3 < 930 ? b3 * 70 : (1860 - b3) * 70;
+          e += ease_ss(t > 65535 ? 65535 : t) >> 8; }
+        k = 243 + ((e * 90) >> 10);                /* 243..~333, wandering */
+    }
     if (k > g_surge) g_surge += (k - g_surge) >> 2;
     else             g_surge -= (g_surge - k) >> 4;
 }

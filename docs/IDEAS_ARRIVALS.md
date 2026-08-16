@@ -206,3 +206,28 @@ Note the ordering constraint: the compositor blends by brightness with slot 0 at
 the bottom, so a genuine swap means exchanging the layers' slot indices AND
 their blend modes, not just their draw order. Do it during a fade so no frame
 shows the stack mid-flip.
+
+## Beams that live — grow, narrow, curve, tint, go translucent (J, 2026-08-16)
+
+Watching the radial beam/corridor figure: *"I wonder if it can get bigger,
+narrower, and curve in other directions, along with change colour and be
+translucent."*
+
+Four independent axes, and none of them exist today — a beam pattern picks its
+width and direction at spawn and holds both for its whole turn:
+
+1. **Scale over life** — the fan opens and closes across the turn instead of
+   being fixed. Cheap: modulate the radius/length term by a slow eased envelope.
+2. **Width independent of scale** — beams narrowing to blades while the figure
+   itself grows is the interesting combination, and it is what makes something
+   read as *moving through space* rather than being rescaled.
+3. **Curve** — beams as arcs rather than straight rays, with the curvature
+   itself drifting. This is the single biggest visual change; a straight fan is
+   a starburst, a curved fan is a vortex.
+4. **Translucency** — currently a beam is opaque where drawn. Giving it real
+   alpha would let two beam layers cross and *both* survive the intersection,
+   instead of the brighter one simply winning under MAX blend.
+
+(4) is the one with engine implications: it wants a blend mode that is not MAX,
+which is close to the depth-exchange note above. (1)-(3) are per-pattern and
+could be prototyped in a single new routine without touching the compositor.
