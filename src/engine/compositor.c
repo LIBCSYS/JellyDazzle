@@ -196,6 +196,8 @@ typedef struct {
     uint8_t   frozen;             /* strobed: stop calling it, dissolve  */
     uint8_t   strikes;
     uint32_t  span, off;          /* palette window                      */
+    uint16_t  wild;               /* 0 = shared ramp, else scheme+1 (2.5.4) */
+    uint8_t   hrot;               /* 0/1/2 = RGB channel rotation (2.5.4)   */
     float     lo_s, hi_s, gs_s;   /* reshape params, fixed at spawn      */
     uint8_t   lut[256];           /* value transfer curve, built once    */
     uint32_t  gq;                 /* saturation gain, Q8                 */
@@ -871,23 +873,58 @@ static void palette_update(int frame)
 static void layer_pal_build(int s)
 {
     uint32_t *d = g_pal[s], span = g_L[s].span, off = g_L[s].off;
+    /* WILDCARD COLOUR (2.5.4).  Every layer used to window the SAME blended
+     * ramp, which is built from just two curated schemes.  That made the
+     * output constitutionally incapable of surprise: nothing could ever clash,
+     * sit opposite, or be unexpected, because every colour on screen came from
+     * the same two palettes.  A wildcard layer ignores the shared ramp and
+     * takes a scheme of its own; hrot then rotates its RGB channels, which is
+     * a 120-degree hue shift for free and puts it somewhere the curated
+     * palettes would never have sent it.  The schemes remain the guide — they
+     * are just no longer the law. */
+    const uint32_t *SRC = g_L[s].wild ? (jd_palette + (size_t)(g_L[s].wild - 1) * PAL_N)
+                                      : g_blend;
     static int loop = -1;
     if (loop < 0) { const char *e = getenv("JD_PALLOOP"); loop = e ? atoi(e) : 1; }
     if (span >= PAL_N || !loop) {
         for (uint32_t i = 0; i < PAL_N; i++)
-            d[i] = g_blend[(((i * span) >> 15) + off) & PAL_MASK];
+            d[i] = SRC[(((i * span) >> 15) + off) & PAL_MASK];
     } else {
         const uint32_t body = PAL_N - PAL_RET;
         const uint32_t mul  = (span << 16) / body;
         const uint32_t top  = ((body - 1) * mul) >> 16;
         for (uint32_t i = 0; i < body; i++)
-            d[i] = g_blend[(((i * mul) >> 16) + off) & PAL_MASK];
+            d[i] = SRC[(((i * mul) >> 16) + off) & PAL_MASK];
         for (uint32_t j = 0; j < PAL_RET; j++)
-            d[body + j] = g_blend[(off + top - (top * (j + 1)) / PAL_RET) & PAL_MASK];
+            d[body + j] = SRC[(off + top - (top * (j + 1)) / PAL_RET) & PAL_MASK];
     }
     /* duplicate: patterns index pal[x & 0x7FFF], so handing them
      * (pal + k) stays in bounds for any k < PAL_N — that makes an
      * audio-driven colour rotation completely free at draw time. */
+
+    if (g_L[s].hrot) {
+        /* 120 / 240 degrees of hue by rotating channels — but LUMA-PRESERVING.
+         * A bare rotation is not brightness-neutral (red at luma 76 becomes
+         * blue at luma 29), and measured across the library it dimmed the
+         * whole picture by 15%.  So rotate the hue, then rescale the result
+         * back to the luminance it started with. */
+        int two = (g_L[s].hrot == 2);
+        for (uint32_t i = 0; i < PAL_N; i++) {
+            uint32_t c = d[i], r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+            uint32_t l0 = (r * 77 + g * 150 + b * 29) >> 8;
+            uint32_t nr, ng, nb;
+            if (two) { nr = b; ng = r; nb = g; }
+            else     { nr = g; ng = b; nb = r; }
+            uint32_t l1 = (nr * 77 + ng * 150 + nb * 29) >> 8;
+            if (l1 < 1) l1 = 1;
+            uint32_t k = (l0 << 8) / l1;                  /* Q8 correction */
+            if (k > 1024) k = 1024;                       /* never blow up */
+            nr = (nr * k) >> 8; ng = (ng * k) >> 8; nb = (nb * k) >> 8;
+            d[i] = 0xFF000000u | (nr > 255 ? 255u : nr) << 16
+                               | (ng > 255 ? 255u : ng) << 8
+                               | (nb > 255 ? 255u : nb);
+        }
+    }
 
     static int noreshape = -1;
     if (noreshape < 0) noreshape = getenv("JD_NORESHAPE") ? 1 : 0;
@@ -1456,6 +1493,32 @@ static int try_spawn(int slot, int frame)
         }
         L->off = best;
     }
+
+    /* SURPRISE (2.5.4).  Roughly one layer in three breaks out of the shared
+     * ramp: it takes a scheme of its own, and may rotate its channels by 120
+     * or 240 degrees on top.  The GROUND is deliberately excluded — the floor
+     * of the picture should stay coherent, and it is the overlays landing in
+     * unexpected hue that reads as a surprise rather than as a mistake.
+     *
+     * This is the answer to three versions of the wrong question.  Even
+     * spread, wider spans and hue separation all operated INSIDE a palette
+     * system built to keep everything harmonious.  Nothing scheduled can
+     * produce an unexpected colour if every colour comes from the same two
+     * curated schemes. */
+    L->wild = 0; L->hrot = 0;
+    if (slot != 0 && slot != JD_SHADOW) {
+        uint32_t w = mix32(L->seed ^ 0x5CA1AB1Eu);
+        if ((w & 255) < 86) {                       /* ~34% of overlays */
+            L->wild = (uint16_t)(1 + (w >> 8) % (uint32_t)g_ns);
+            uint32_t h = (w >> 20) % 100;
+            L->hrot = h < 34 ? 1 : (h < 58 ? 2 : 0); /* often, not always */
+        } else if ((w & 255) < 116) {
+            L->hrot = ((w >> 16) & 1) ? 1 : 2;      /* ~12%: rotate only */
+        }
+    }
+    if (L->wild || L->hrot)
+        TR("WILD slot=%d rt=%d scheme=%d hrot=%d\n", slot, (int)v,
+           L->wild ? L->wild - 1 : -1, L->hrot);
     layer_pal_build(slot);
     g_last_change = frame;
     g_gap = 30 + (int)(mix32(r ^ 0x6A9F00Du) % 211u);       /* 0.5..4 s, never the same twice */
