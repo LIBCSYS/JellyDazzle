@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>James R. Shiflett and DAZZLE.EXE &mdash; the program this one is for</title>
+<title>To the Original Creator of Dazzle &mdash; James R. Shiflett</title>
 <meta name="description" content="The story of DAZZLE.EXE and the man who wrote it at night in Houston: James R. Shiflett, 1990.">
 <link rel="icon" type="image/png" href="/brand/favicon-64.png">
 <meta property="og:title" content="James R. Shiflett and DAZZLE.EXE">
@@ -17,7 +17,7 @@ a{color:var(--cy)}
 .wrap{max-width:760px;margin:0 auto;padding:0 22px}
 nav{border-bottom:1px solid var(--line);background:rgba(7,8,13,.94);position:sticky;top:0;z-index:10;
 backdrop-filter:blur(8px)}
-nav .wrap{display:flex;align-items:center;gap:18px;padding-top:12px;padding-bottom:12px;
+nav .wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px;
 max-width:1080px;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
 nav img{width:26px;height:26px;border-radius:6px;display:block}
 nav a{text-decoration:none;color:var(--dim)}
@@ -56,19 +56,20 @@ font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
 .end{text-align:center;color:var(--gold);font-size:21px;line-height:1.6;margin:44px 0 10px}
 .end small{display:block;color:var(--dim);font-size:13.5px;margin-top:12px;
 font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+@media(max-width:760px){nav .wrap{gap:12px 16px}.tribute-link{flex-basis:100%;order:5}}
 </style></head><body>
 
 <nav><div class="wrap">
   <a class="home" href="/"><img src="/brand/emblem.png" alt="JellyDazzle"></a>
   <a class="home" href="/">JellyDazzle</a>
   <a href="/library/">Library</a>
-  <a href="/tribute/">Tribute</a>
+  <a class="tribute-link" href="/tribute/">To the Original Creator of Dazzle</a>
   <a href="https://github.com/LIBCSYS/JellyDazzle">GitHub</a>
 </div></nav>
 
 <div class="wrap">
 <header>
-  <div class="kicker">The program this one is for</div>
+  <div class="kicker">To the Original Creator of Dazzle</div>
   <h1>James R. Shiflett<br>and DAZZLE.EXE</h1>
   <div class="standfirst">He ran a supercomputer by day and wrote a kaleidoscope at
   night. Thirty algorithms, mirrored into symmetry, animated by moving the colours
@@ -76,14 +77,18 @@ font-family:-apple-system,BlinkMacSystemFont,sans-serif}
 </header>
 
 <h2>The man</h2>
-<p>James R. Shiflett worked at the Houston Advanced Research Center in The Woodlands,
-Texas, where from the 1980s his job was administering the centre's <b>NEC SX-2</b> — a
-supercomputer of the era, the kind of machine that filled a room and was booked by the
-hour. His work there was administrative. The interesting part happened after hours.</p>
+<p>James R. Shiflett worked at the
+<a href="https://en.wikipedia.org/wiki/Houston_Advanced_Research_Center">Houston Advanced
+Research Center</a> (<a href="https://harcresearch.org/">still going today</a>) in The
+Woodlands, Texas, where from the 1980s his job was administering the centre's
+<a href="https://en.wikipedia.org/wiki/NEC_SX-2"><b>NEC SX-2</b></a> &mdash; a vector
+supercomputer announced in 1983, roughly 1.3 GFLOPS peak, the kind of machine that filled
+a room and was booked by the hour.<sup><a href="#s1">1</a></sup> His work there was
+administrative. The interesting part happened after hours.</p>
 
 <blockquote>I'd do my administrative trick during the day, and at night I'd sit on my
 computer and think up new algorithms to add to Dazzle.
-<cite>James R. Shiflett</cite></blockquote>
+<cite>James R. Shiflett, quoted in the <i>Houston Chronicle</i><sup><a href="#s4">4</a></sup></cite></blockquote>
 
 <p>He called it <b>a sort of therapy</b>. That is worth sitting with for a second: the
 most popular kaleidoscope program of the DOS era, a thing that ended up on hundreds of
@@ -92,15 +97,32 @@ thousands of screens and in a feature film, was somebody's way of unwinding afte
 <p>He was a devout Christian, and he signed off accordingly — more on that at the end.</p>
 
 <h2>What he built</h2>
-<p>Dazzle was written in <b>Turbo C</b>, with the image-generation cores dropped down into
-<b>x86 assembly</b>. It supported EGA, VGA and IBM's 8514/A, shipped both as a standalone
-DOS executable and as a TSR that fired on a keyboard-idle timer, and it carried roughly
-<b>thirty distinct image-generation algorithms</b> that it hopped between with fades,
-dissolves, scrolls, wraps and melts.</p>
+<p>Dazzle was written in <a href="https://en.wikipedia.org/wiki/Borland_Turbo_C"><b>Turbo
+C</b></a>, with the image-generation cores dropped down into <b>x86 assembly</b>.<sup><a
+href="#s1">1</a></sup> It supported EGA, VGA and IBM's 8514/A, and shipped both as a
+standalone DOS executable and as a TSR that fired on a keyboard-idle timer.</p>
 
-<p>The signature was kaleidoscopic mirrored symmetry — plot a shape once, reflect it into
-every octant — and particle simulations. The fireworks, he said, came from watching an
-explosion scene in <i>Star Trek</i>.</p>
+<p>How many patterns did it have? You will see &ldquo;about thirty algorithms&rdquo;
+repeated in a lot of places, this site's own earlier draft included. It is worth being
+straight about that: <b>the primary source gives no number.</b> Shiflett described his
+own engine this way:</p>
+
+<blockquote>The image engine has numerous primary image drawing algorithms, most of which
+have at least two styles of presentation, many of which have multiple internal drawing
+variations.
+<cite>J.R. Shiflett, DAZZLE 5.0 package description<sup><a href="#s2">2</a></sup></cite>
+</blockquote>
+
+<p><i>Numerous</i>, not thirty &mdash; and the structure he describes (algorithms &times;
+presentation styles &times; internal variations) means any single count is a
+simplification anyway. The Wikipedia article gives no figure either.<sup><a
+href="#s1">1</a></sup> If you want the real answer, the binary is preserved and you can
+go and count.</p>
+
+<p>The signature was kaleidoscopic mirrored symmetry &mdash; plot a shape once, reflect it
+into every octant &mdash; and particle simulations, moved between with fades, dissolves,
+scrolls, wraps and melts. The fireworks, he said, came from watching an explosion scene
+in <i>Star Trek</i>.<sup><a href="#s1">1</a></sup></p>
 
 <div class="card">
   <h3>The trick that made it fluid on an 8088</h3>
@@ -114,8 +136,9 @@ explosion scene in <i>Star Trek</i>.</p>
   motion lives in the DAC.</p>
   <p style="margin:0 0 12px"><b>Hardware panning.</b> Ask the CRT controller to start
   reading from a different offset and the whole image scrolls, again without redrawing.</p>
-  <p style="margin:0"><b>Mode X.</b> The unchained planar 256-colour modes Michael Abrash
-  popularised, which bought page flipping and faster fills.</p>
+  <p style="margin:0"><b><a href="https://en.wikipedia.org/wiki/Mode_X">Mode X</a>.</b> The
+  unchained planar 256-colour modes <a href="https://en.wikipedia.org/wiki/Michael_Abrash">Michael
+  Abrash</a> popularised in <i>Dr. Dobb's</i> in 1991, which bought page flipping and faster fills.</p>
 </div>
 
 <p>Cheap geometry, mirrored into symmetry, coloured by a palette that never stops
@@ -126,16 +149,22 @@ brute force is not what made it beautiful.</p>
 <h2>What happened to it</h2>
 <ul class="time">
   <li><b>1990</b> Released as $15 shareware through his own home business, MicroTronics:
-  <i>"DAZZLE EGA/VGA SUPER-KALEIDOSCOPE SCREEN SAVER"</i>.</li>
-  <li><b>1990</b> Named Best New Graphics Program of the year. <i>Compute!</i> wrote:
-  "The results are simply beautiful… I can't recommend the program too highly."</li>
-  <li><b>1992</b> Road Scholar Software of Houston picked it up for retail. Renamed
-  <b>Razzle Dazzle</b>. He added TSR support and Windows 3.0.</li>
-  <li><b>1993</b> Shareware registrations alone were running <b>$1,200–1,500 a week</b> —
-  on top of retail. It went head to head with After Dark and Johnny Castaway.</li>
-  <li><b>1993</b> Miramar Productions and Radio Shack cut a <b>45-minute art film</b> from
-  the visuals, scored by Jonn Serrie, released on LaserDisc and VHS.</li>
-  <li><b>1994</b> <b>Razzle Dazzle 3D</b> for Windows NT 3.1, with 3D and MIDI.</li>
+  <i>"DAZZLE EGA/VGA SUPER-KALEIDOSCOPE SCREEN SAVER"</i>. The users manual is dated
+  30 December 1990.<sup><a href="#s5">5</a></sup></li>
+  <li><b>1992</b> Reviewed in <i>PC Magazine</i>.<sup><a href="#s6">6</a></sup> Road Scholar
+  Software of Houston picked it up for retail late that year and renamed it
+  <b>Razzle Dazzle</b>; Shiflett added TSR support and Windows 3.0.<sup><a href="#s1">1</a></sup></li>
+  <li><b>1993</b> Press year: <i>The New York Times</i>,<sup><a href="#s3">3</a></sup>
+  <i>Compute!</i>,<sup><a href="#s7">7</a></sup> the <i>Houston Chronicle</i>,<sup><a href="#s4">4</a></sup>
+  <i>The Ledger</i> and <i>New Age Journal</i>. It went head to head with
+  <a href="https://en.wikipedia.org/wiki/After_Dark_(software)">After Dark</a>.</li>
+  <li><b>1993</b> Shareware registrations alone were running <b>$1,200&ndash;1,500 a
+  week</b> in late 1993 &mdash; on top of retail.<sup><a href="#s1">1</a></sup></li>
+  <li><b>1993</b> Miramar Productions released a <b>45-minute art film</b> called
+  <i>Dazzle</i> on LaserDisc and VHS, scored by
+  <a href="https://en.wikipedia.org/wiki/Jonn_Serrie">Jonn Serrie</a>.<sup><a href="#s1">1</a></sup></li>
+  <li><b>1994</b> <b>Razzle Dazzle 3D</b> for Windows NT, reviewed in <i>Newsbytes</i> and
+  <i>Computer Shopper</i>.<sup><a href="#s1">1</a></sup></li>
 </ul>
 
 <h2>What this project is, and is not</h2>
@@ -173,6 +202,41 @@ way, which is its own kind of answer about how software history gets kept.</p>
 <p><b>If you knew Dazzle, or knew Jim — if you have a photograph, a letter, a registration
 card, a memory — I would genuinely like to hear from you.</b> This page will be updated,
 gladly, and with credit.</p>
+
+<h2>Sources</h2>
+<p style="font-size:15px;color:var(--dim)">Everything above is either linked inline or
+listed here. Where I could not source a claim, I have said so on the page rather than
+quietly repeating it. Items 3&ndash;17 are the contemporary press and primary documents
+catalogued by the Wikipedia article; I have not personally read the paywalled or
+print-only ones, and have marked what rests on them.</p>
+<ol style="font-size:14.5px;line-height:1.7;color:var(--dim);font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding-left:22px">
+  <li id="s1"><a href="https://en.wikipedia.org/wiki/Razzle_Dazzle_(software)">Razzle Dazzle
+  (software)</a> &mdash; Wikipedia. Source for HARC, the NEC SX-2, Turbo C + x86 assembly,
+  the revenue figures, the film, and the <i>Star Trek</i> inspiration.</li>
+  <li id="s2"><a href="https://archive.org/details/msdos_festival_DAZZLE50">DAZZLE 5.0</a>
+  &mdash; the shareware package, archive.org. Playable in-browser, 40+ screenshots.
+  <b>Primary source</b> for the engine description quoted above.</li>
+  <li id="s3">Shannon, L. R. &mdash; "The Best of All Possible Weddings", <i>The New York
+  Times</i>, 9 March 1993.</li>
+  <li id="s4">Silverman, Dwight &mdash; "Marketing the Beast", <i>Houston Chronicle</i>,
+  26 November 1993. Source of the "administrative trick" quote.</li>
+  <li id="s5">Shiflett, James R. &mdash; <i>Dazzle Users Manual</i>, 30 December 1990.</li>
+  <li id="s6">Salemi, Joe &mdash; "Advisor", <i>PC Magazine</i>, 14 January 1992.</li>
+  <li id="s7">Idol, Charles &mdash; "Reviews: Three Screen Savers", <i>Compute!</i>,
+  October 1993.</li>
+  <li>Fisher, Daniel &mdash; "Road Scholar's path to profit began with gamble",
+  <i>The Houston Post</i>, 5 April 1993.</li>
+  <li>Browne, Lonnie &mdash; "Razzle Dazzle your screen", <i>The Ledger</i>, 27 Feb 1993.</li>
+  <li>Cragin, Sally &mdash; "Eye Candy", <i>New Age Journal</i>, December 1993.</li>
+  <li>Blankenhorn, Dana &mdash; "Review of Razzle Dazzle 3D", <i>Newsbytes</i>, 24 June 1994.</li>
+  <li>Brenesal, Barry &mdash; "Razzle Dazzle 3D Screen Saver Takes Color to a New
+  Dimension", <i>Computer Shopper</i>, August 1994.</li>
+  <li><a href="https://archive.org/details/DAZZLE_4.0">DAZZLE 4.0</a> &mdash; archive.org,
+  the 1989&ndash;90 MicroTronics build.</li>
+  <li><a href="https://en.wikipedia.org/wiki/NEC_SX-2">NEC SX-2</a> and
+  <a href="https://en.wikipedia.org/wiki/Mode_X">Mode X</a> &mdash; Wikipedia, for the
+  hardware context.</li>
+</ol>
 
 <div class="end">
   &ldquo;Our Creator, evidenced by our creativity.&rdquo;

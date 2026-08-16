@@ -51,7 +51,8 @@ footer{padding:30px 0 60px;color:var(--dim);font-size:13.5px}
 footer a{color:var(--dim)}
 @media (prefers-color-scheme:light){}
 nav{border-bottom:1px solid var(--line);background:rgba(7,8,13,.94);position:sticky;top:0;z-index:20;backdrop-filter:blur(8px)}
-.navwrap{max-width:1080px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:20px;font-size:14px}
+.navwrap{max-width:1080px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:20px;font-size:14px;flex-wrap:wrap}
+@media(max-width:760px){.navwrap{gap:12px 16px}.tribute-link{flex-basis:100%;order:5}.dl{margin-left:0!important}}
 nav a{text-decoration:none;color:var(--dim)}
 nav a:hover{color:var(--cy)}
 .brand{display:flex;align-items:center;gap:9px;color:var(--tx)!important;font-weight:650;margin-right:6px}
@@ -63,7 +64,7 @@ header{padding-top:34px!important}
 <nav><div class="navwrap">
   <a class="brand" href="/"><img src="/brand/emblem.png" alt=""><span>JellyDazzle</span></a>
   <a href="/library/">Library</a>
-  <a href="/tribute/">Tribute</a>
+  <a class="tribute-link" href="/tribute/">To the Original Creator of Dazzle</a>
   <a href="https://github.com/LIBCSYS/JellyDazzle">GitHub</a>
   <a class="dl" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download</a>
 </div></nav>
