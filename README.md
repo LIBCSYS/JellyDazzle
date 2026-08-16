@@ -5,7 +5,7 @@
 Clean-room reorganisation of JellyDazzle 2.3 (LIBCSYS/JellyDazzle) with a
 proper layout, verified system-audio capture, and a rebuilt startup path.
 
-What the built app actually contains: **24 hand-written ARM64 assembly engine
+What the built app actually contains: **24 ARMv9.2-A assembly engine
 modes + 201 C pattern plug-ins**. A further 400 candidate patterns live in
 `src/patterns_hold/` — they are NOT compiled into the binary. They are kept in
 the tree deliberately (no work is discarded) and are being reviewed a family at
@@ -36,3 +36,25 @@ Build: `make` · run: `make run` · app bundle: `make app`
 
 Engine port verified byte-identical to 2.3.0 at the time of the port (frame
 hashes at 3 sample points); the changes listed above came after.
+
+
+---
+
+## In tribute
+
+JellyDazzle exists because of **DAZZLE.EXE**, written by **James R. Shiflett** of
+Houston, Texas. He administered an NEC SX-2 supercomputer at the Houston Advanced
+Research Center by day, and wrote Dazzle at night — "I'd do my administrative trick
+during the day, and at night I'd sit on my computer and think up new algorithms to
+add to Dazzle."
+
+Released as $15 shareware through his own MicroTronics in 1990; picked up by Road
+Scholar Software and sold at retail as *Razzle Dazzle* from late 1992. Around thirty
+image-generation algorithms, mirrored into kaleidoscopic symmetry, animated almost
+entirely by cycling the VGA palette rather than pushing pixels.
+
+Its source was never released. This project is not a port and not a reverse
+engineering — nothing was disassembled. It is an homage written from scratch, after
+the same feeling.
+
+Shiflett's exit splash read: *"Our Creator, evidenced by our creativity."*
