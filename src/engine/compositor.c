@@ -250,6 +250,7 @@ static uint32_t g_gain = 256;              /* dead-air lift, Q8            */
 static uint32_t g_prot = 0;       /* audio palette rotation, 0..PAL_N-1 */
 void jd_audio_meter_draw(uint32_t *fb, int w, int h);   /* AUDIO: HUD, src/audio/listen.c */
 void jd_about_draw(uint32_t *fb, int w, int h);         /* ABOUT card (key A), src/audio/listen.c */
+void jd_status_draw(uint32_t *fb, int w, int h, int pct);  /* first-run notice */
 static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
@@ -1247,6 +1248,26 @@ static int admissible(uint16_t r, int slot)
      *    while the role's bag is comfortably larger than the ring. */
     { int role = g_st[r].role;
       if (recent_has(r) && g_bag[role].n > recent_in_role(role) + 5) return 0; }
+
+    /* SHAPE SEPARATION (2.6.4).  Measured across the shipping library: 20% of
+     * patterns are string-art X / curve-weaves and another 20% are radial
+     * mandalas. With four layers up, seeing an X was near-certain in every
+     * frame — which is why 'why always in a fucking X' was a fair question.
+     * 2.4.4 stopped two layers sharing a HUE; nothing ever stopped them
+     * sharing a SHAPE. A family already on screen is refused, unless the bag
+     * is too thin to afford it. Family 0 ('other') is exempt: it is a
+     * catch-all, not a look. */
+    if (r >= JD_NASM) {
+        unsigned fam = jd_pattern_family[r - JD_NASM];
+        if (fam) {
+            int clash = 0;
+            for (int i = 0; i < JD_NBUF; i++) {
+                if (!g_L[i].live || g_L[i].routine < JD_NASM) continue;
+                if (jd_pattern_family[g_L[i].routine - JD_NASM] == fam) { clash = 1; break; }
+            }
+            if (clash && g_bag[g_st[r].role].n > 12) return 0;
+        }
+    }
     /* 1. a routine may never be live twice — patterns hold file-static state */
     for (int i = 0; i < JD_NBUF; i++)
         if (g_L[i].live && g_L[i].routine == (int)r) return 0;
@@ -2326,6 +2347,9 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             }
         }
     }
+
+    if (!g_probe_done && g_nr > 0)
+        jd_status_draw(fb, w, h, (int)((long)g_probe_i * 100 / g_nr));
 
     /* ---- health: frame time and composite motion ---- */
     motion_probe(fb, npix);

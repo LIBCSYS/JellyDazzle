@@ -711,3 +711,38 @@ void jd_about_draw(uint32_t *fb, int w, int h)
         }
     }
 }
+
+/* ---- first-run status --------------------------------------------------
+ * The engine measures every routine once on a new install — with 603 patterns
+ * that is roughly half a minute. Without a word on screen it reads as "the
+ * app is broken", so say what is happening and how far along it is. Drawn
+ * bottom-left, small, and it disappears the moment measuring finishes. */
+void jd_status_draw(uint32_t *fb, int w, int h, int pct)
+{
+    if (!fb || w < 240 || h < 180) return;
+    if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+    int s = h / 200; if (s < 2) s = 2; if (s > 9) s = 9;   /* big: this matters */
+    static const char *L1 = "FIRST RUN";
+    static const char *L2 = "BUILDING THE PATTERN DATABASE";
+    static const char *L3 = "THIS HAPPENS ONCE - ABOUT 30 SECONDS";
+    int w1 = (int)strlen(L1) * 4 * s, w2 = (int)strlen(L2) * 4 * s;
+    int w3 = (int)strlen(L3) * 4 * s;
+    int tw = w2 > w3 ? w2 : w3;
+    int pad = 10 * s, lh = 9 * s;
+    int panel_w = tw + 2 * pad, panel_h = pad + lh * 3 + 8 * s + pad;
+    if (panel_w > w) { s = s > 2 ? s - 1 : 2; }            /* shrink once if tight */
+    int x0 = (w - panel_w) / 2, y0 = (h - panel_h) / 2;
+    if (x0 < 0) x0 = 0;
+    au_dim(fb, w, h, x0, y0, panel_w, panel_h);
+    au_dim(fb, w, h, x0, y0, panel_w, panel_h);            /* twice: readable card */
+    au_rect(fb, w, h, x0, y0, panel_w, s > 2 ? s / 2 : 1, 0xFF3A4652u);
+    au_rect(fb, w, h, x0, y0 + panel_h - (s > 2 ? s / 2 : 1), panel_w,
+            s > 2 ? s / 2 : 1, 0xFF3A4652u);
+    au_text(fb, w, h, x0 + (panel_w - w1) / 2, y0 + pad,            s, 0xFFE9B65Au, L1);
+    au_text(fb, w, h, x0 + (panel_w - w2) / 2, y0 + pad + lh,       s, 0xFFE8EEF4u, L2);
+    au_text(fb, w, h, x0 + (panel_w - w3) / 2, y0 + pad + lh * 2,   s, 0xFF8FA2B4u, L3);
+    /* progress bar, full width of the card */
+    int bx = x0 + pad, by = y0 + pad + lh * 3 + 2 * s, bw = panel_w - 2 * pad;
+    au_rect(fb, w, h, bx, by, bw, 2 * s, 0xFF243040u);
+    au_rect(fb, w, h, bx, by, bw * pct / 100, 2 * s, 0xFF22D3EEu);
+}

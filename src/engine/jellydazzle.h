@@ -37,6 +37,7 @@ typedef void (*jd_pattern_fn)(uint32_t *fb, int w, int h,
  * you guess from a screenshot. */
 extern const jd_pattern_fn jd_patterns[];
 extern const char *const jd_pattern_names[];
+extern const unsigned char jd_pattern_family[];
 extern const int jd_pattern_count;
 
 /* what the compositor is showing, for the ABOUT readout */
