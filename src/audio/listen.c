@@ -658,9 +658,12 @@ void jd_about_draw(uint32_t *fb, int w, int h)
     static const char *L[] = {
         "JELLYDAZZLE " JD_VERSION,
         "AN HOMAGE TO DAZZLE.EXE",
+        "BY JAMES R. SHIFLETT, 1990",
         "",
-        "GITHUB.COM/LIBCSYS/JELLYDAZZLE",
+        "DAZZLE.JELIA.NYC",
         "DAZZLE.JELIA.NYC/LIBRARY",
+        "DAZZLE.JELIA.NYC/TRIBUTE",
+        "GITHUB.COM/LIBCSYS/JELLYDAZZLE",
         "",
         "F FULLSCREEN   M METER",
         "A ABOUT        ESC QUIT",
@@ -682,8 +685,8 @@ void jd_about_draw(uint32_t *fb, int w, int h)
             s > 1 ? s / 2 : 1, 0xFF3A4652u);
     for (int i = 0; i < n; i++) {
         if (!L[i][0]) continue;
-        uint32_t c = (i == 0) ? 0xFF22D3EEu            /* title  */
-                   : (i == 3 || i == 4) ? 0xFFE9B65Au  /* links  */
+        uint32_t c = (i == 0) ? 0xFF22D3EEu               /* title */
+                   : (i >= 4 && i <= 7) ? 0xFFE9B65Au     /* the sites */
                    : 0xFFA8B6C4u;
         au_text(fb, w, h, x0 + pad, y0 + pad + i * lh, s, c, L[i]);
     }

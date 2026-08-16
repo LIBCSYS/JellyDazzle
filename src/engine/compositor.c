@@ -123,7 +123,7 @@ static double now_ms(void) {
  * is exactly what "I keep seeing the same thing at the start" means.  The
  * engine was random; it was just amnesiac.  We now remember which routines
  * opened the last JD_RECENT runs and refuse them for the FIRST spawn only. */
-#define JD_RECENT 25
+#define JD_RECENT 72
 static uint16_t g_recent[JD_RECENT];
 static int      g_recent_n;
 static int      g_opening = 1;         /* cleared once slot 0 has spawned */
@@ -133,6 +133,7 @@ static int recent_has(uint16_t rt)
     for (int i = 0; i < g_recent_n; i++) if (g_recent[i] == rt) return 1;
     return 0;
 }
+
 
 static void probe_cache_save(void);
 
@@ -1110,15 +1111,36 @@ static uint32_t amp_q8(int sidx)
     return (uint32_t)(256.0f * (1.0f + k));
 }
 
+/* How many ring entries belong to the SAME role as rt.  The refusal has to be
+ * budgeted per role, not globally: a 72-entry ring compared against one role's
+ * bag refuses nothing, because no single bag is bigger than the whole ring.
+ * (Measured the hard way — ring=72 with a global guard performed WORSE than
+ * ring=25, because at 72 the guard never bound for any role at all.) */
+static int recent_in_role(int role)
+{
+    int n = 0;
+    for (int i = 0; i < g_recent_n; i++)
+        if (g_st[g_recent[i]].role == role) n++;
+    return n;
+}
+
 static int admissible(uint16_t r, int slot)
 {
     const jd_stat *st = &g_st[r];
     int slot_i0 = (slot == JD_SHADOW) ? 0 : slot;
-    /* 0. cross-launch memory: do not OPEN on something the last JD_RECENT
-     *    runs already opened on.  Binds only while g_opening is set, so it
-     *    costs nothing after the first spawn and can never starve the bag. */
-    if (g_opening && slot == 0 && recent_has(r) && g_bag[R_GROUND].n > g_recent_n + 4)
-        return 0;
+    /* 0. cross-launch memory.  Within one run the bag is already fair — a
+     *    routine cannot repeat until its cycle completes.  ACROSS runs it was
+     *    memoryless, and memoryless draws cluster: measured over 8 runs, 15
+     *    routines came up 4+ times against an expectation of 1.48 while 61
+     *    never appeared at all.  That is textbook Poisson, i.e. genuinely
+     *    random — and randomness is exactly what reads as "I keep seeing this
+     *    one."  So we remember what recent runs used and refuse it, which is
+     *    LESS random and more evenly spread, which is what a viewer wants.
+     *
+     *    Guarded by bag size so it can never starve: the refusal only binds
+     *    while the role's bag is comfortably larger than the ring. */
+    { int role = g_st[r].role;
+      if (recent_has(r) && g_bag[role].n > recent_in_role(role) + 5) return 0; }
     /* 1. a routine may never be live twice — patterns hold file-static state */
     for (int i = 0; i < JD_NBUF; i++)
         if (g_L[i].live && g_L[i].routine == (int)r) return 0;
@@ -1396,10 +1418,10 @@ static int try_spawn(int slot, int frame)
     g_gap = 30 + (int)(mix32(r ^ 0x6A9F00Du) % 211u);       /* 0.5..4 s, never the same twice */
     TR("SPAWN f=%d slot=%d rt=%d role=%d blend=%d peak=%d life=%d mood=%d span=%u\n",
        frame, slot, (int)v, g_st[v].role, L->blend, L->w_peak, hold, g_mood, L->span);
-    if (g_opening && slot == 0) {      /* remember what we opened on */
+    recent_note((uint16_t)v);          /* every spawn joins the ring */
+    if (g_opening) {
         g_opening = 0;
-        recent_note((uint16_t)v);
-        TR("OPENING rt=%d remembered (%d of %d in the ring)\n",
+        TR("OPENING rt=%d (%d of %d in the ring)\n",
            (int)v, g_recent_n, JD_RECENT);
     }
     return 1;
@@ -1618,7 +1640,37 @@ static void audio_rotate(void)
 static uint32_t g_surge = 256;
 static void audio_surge(void)
 {
-    uint32_t k = g_audio.live ? 115 + ((uint32_t)g_audio.bass * 295 >> 10) : 256;
+    /* IDLE BREATH (2.5.2).  With music, overlays swell to as much as 1.6x.
+     * In silence this was a hard 256 — dead neutral — so the picture read as
+     * flat the moment the track stopped.  Silence now gets the engine's own
+     * slow swell instead, ~0.95x..1.30x over about 20 s, the same principle
+     * as the idle palette rotation added in 2.4.2: when the music stops, the
+     * internal clocks take over rather than going still.  Far too slow to
+     * strobe, and the audio surge still rides on top when sound returns. */
+    uint32_t k;
+    if (g_audio.live) {
+        k = 115 + ((uint32_t)g_audio.bass * 295 >> 10);
+    } else {
+        /* Not a metronome.  A single fixed period would be heard as a pulse,
+         * so the breath is the SUM of three eased swells at incommensurate
+         * rates (~17 s, ~23 s, ~31 s).  Their least common multiple is over
+         * two hours, so the compound never repeats in any sitting, and the
+         * run seed shifts all three phases so no two launches breathe alike.
+         * This is the same trick the engine uses everywhere else: layered
+         * clocks that never line up. */
+        static uint32_t b1, b2, b3, seeded;
+        if (!seeded) { seeded = 1;
+            b1 = g_run & 1023; b2 = (g_run >> 10) % 1399; b3 = (g_run >> 20) % 1861; }
+        b1 = (b1 + 1) % 1024;  b2 = (b2 + 1) % 1399;  b3 = (b3 + 1) % 1861;
+        uint32_t e = 0;
+        { uint32_t t = b1 < 512 ? b1 * 128 : (1023 - b1) * 128;
+          e += ease_ss(t > 65535 ? 65535 : t) >> 8; }
+        { uint32_t t = b2 < 700 ? b2 * 93 : (1398 - b2) * 93;
+          e += ease_ss(t > 65535 ? 65535 : t) >> 8; }
+        { uint32_t t = b3 < 930 ? b3 * 70 : (1860 - b3) * 70;
+          e += ease_ss(t > 65535 ? 65535 : t) >> 8; }
+        k = 243 + ((e * 90) >> 10);                /* 243..~333, wandering */
+    }
     if (k > g_surge) g_surge += (k - g_surge) >> 2;
     else             g_surge -= (g_surge - k) >> 4;
 }

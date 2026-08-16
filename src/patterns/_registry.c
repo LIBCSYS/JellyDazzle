@@ -201,7 +201,7 @@ extern void pattern_198(uint32_t*, int, int, int, int, uint32_t, const uint32_t*
 extern void pattern_199(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_200(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_201(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
-extern void pattern_202(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_602(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 const jd_pattern_fn jd_patterns[] = {
     pattern_001,
     pattern_002,
@@ -404,7 +404,7 @@ const jd_pattern_fn jd_patterns[] = {
     pattern_199,
     pattern_200,
     pattern_201,
-    pattern_202,
+    pattern_602,
 };
 const char *const jd_pattern_names[] = {
     "001 kaleido rose",
@@ -608,6 +608,6 @@ const char *const jd_pattern_names[] = {
     "199 talbot carpet",
     "200 lorenz ribbon",
     "201 lava lamp",
-    "202 string envelope",
+    "602 string envelope",
 };
 const int jd_pattern_count = 202;
