@@ -2616,7 +2616,7 @@
   "n": "202",
   "name": "silk veil",
   "family": "FIELD",
-  "desc": "SILK VEIL (field): a hanging silk with slow vertical folds",
+  "desc": "a drifting veil of silk threads",
   "role": "FIELD",
   "plays": "Overlay body \u2014 covers most of the frame with gaps; sits over a background (~15-25 s).",
   "acc": false,
@@ -7810,6 +7810,19 @@
   "active": false,
   "img": true,
   "broken": false,
+  "anim": true
+ },
+ {
+  "n": "602",
+  "name": "string envelope",
+  "family": "CORE (2.3)",
+  "desc": "THE DAZZLE METHOD: drawn once into a plane of palette indices, then animated for its whole turn by moving the palette underneath. The geometry never moves; only the colour travels. Line-sweep string art \u2014 straight lines whose envelope curves.",
+  "role": "MIXED",
+  "plays": "Renders once per turn, then costs one table lookup per pixel per frame. The engine measures it at startup and assigns it a layer.",
+  "acc": false,
+  "active": true,
+  "broken": false,
+  "img": true,
   "anim": true
  },
  {
