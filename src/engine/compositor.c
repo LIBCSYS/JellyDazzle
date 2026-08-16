@@ -1501,14 +1501,26 @@ static void engine_init(uint32_t *fb, int w, int h, int frame)
 static void audio_rotate(void)
 {
     static uint32_t rot, vel;
+    /* IDLE FLOOR (2.4.2).  Rotation used to be purely audio-driven, so in
+     * silence it decayed to zero and the hues stopped travelling — they still
+     * MORPHED, because the scheme crossfade never stops, but nothing swept
+     * across the frame.  DAZZLE.EXE cycled its palette continuously and that
+     * travelling sweep is most of why a still composition looked alive, so we
+     * now keep a floor: about one full turn of the ramp every 50 s with no
+     * sound at all.  Audio adds on top of it, exactly as before.  A constant
+     * slow rotation cannot strobe by construction — it is a shear along the
+     * ramp, not a jump. */
+    const uint32_t IDLE_VEL = 12;
     if (g_audio.live) {
         uint32_t target = ((uint32_t)g_audio.level  * 2
                          + (uint32_t)g_audio.treble * 3
                          + (uint32_t)g_audio.beat   * 8) >> 4;
+        if (target < IDLE_VEL) target = IDLE_VEL;
         vel = vel + ((target > vel ? target - vel : 0) >> 3)   /* attack ~8 f */
                   - ((vel > target ? vel - target : 0) >> 4);  /* release ~16 */
     } else {
-        vel -= vel >> 5;
+        vel -= (vel - (vel > IDLE_VEL ? IDLE_VEL : vel)) >> 5;
+        if (vel < IDLE_VEL) vel = IDLE_VEL;
     }
     rot += vel >> 3;
     g_prot = rot & (PAL_N - 1);
