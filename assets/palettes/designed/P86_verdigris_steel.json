@@ -1,0 +1,31 @@
+{
+ "id": "P86",
+ "slug": "verdigris_steel",
+ "name": "Verdigris Steel",
+ "class": "metallic",
+ "scheme": "verdigris steel 182-228 on a full value ramp; warm return leg",
+ "mood": "Oxidised bronze on a cold day \u2014 tin, patina, and the blue-green that lives in weathered metal.",
+ "count": 20,
+ "colors": [
+  "000101",
+  "0d0504",
+  "2b211e",
+  "4d423e",
+  "726662",
+  "998c88",
+  "c1b4b0",
+  "ecded9",
+  "edfbfe",
+  "aeebf7",
+  "7ed6e4",
+  "48c1d0",
+  "2aa9b5",
+  "228f98",
+  "1a777c",
+  "135f62",
+  "0c4849",
+  "063233",
+  "021e1d",
+  "000b0b"
+ ]
+}

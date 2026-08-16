@@ -1,0 +1,30 @@
+{
+ "id": "P32",
+ "slug": "oxblood_chapel",
+ "name": "Oxblood Chapel",
+ "class": "mono_accent",
+ "scheme": "red 17-33 field; verdigris 186-194 accent",
+ "mood": "Deep red velvet in an unlit chapel, with one cold verdigris votive glass still catching light.",
+ "count": 19,
+ "colors": [
+  "0a0001",
+  "100606",
+  "2f2423",
+  "524544",
+  "786a69",
+  "a09190",
+  "00948a",
+  "00d2c9",
+  "c9b9b8",
+  "fdc0b8",
+  "fc9990",
+  "f4726b",
+  "e24f4f",
+  "cc2836",
+  "ab1229",
+  "860c20",
+  "630617",
+  "42020d",
+  "240105"
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "id": "P49",
+ "slug": "moss_and_stone",
+ "name": "Moss & Stone",
+ "class": "earth",
+ "scheme": "olive -> sage -> slate, all low chroma",
+ "mood": "A cold wall in a wet wood \u2014 lichen, slate, olive and the grey-green of old rain.",
+ "count": 19,
+ "colors": [
+  "2f2905",
+  "403d0d",
+  "515222",
+  "616837",
+  "667952",
+  "727f4d",
+  "848b5e",
+  "a39e6b",
+  "9cbd8a",
+  "93af7b",
+  "7fa67b",
+  "829763",
+  "648f6b",
+  "4b785c",
+  "4a6648",
+  "33624d",
+  "2f543e",
+  "1d4c3e",
+  "164134"
+ ]
+}

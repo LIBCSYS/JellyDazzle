@@ -1,0 +1,31 @@
+{
+ "id": "P44",
+ "slug": "sea_glass_morning",
+ "name": "Sea Glass Morning",
+ "class": "pastel_wash",
+ "scheme": "cool pastels, mint through periwinkle, all L 0.78-0.95",
+ "mood": "Beach glass on a white table \u2014 mint, sky, periwinkle and the faintest lilac, all of it lit from above.",
+ "count": 20,
+ "colors": [
+  "a5bed4",
+  "abbdd4",
+  "b1bfd5",
+  "b6c2d8",
+  "b9c7dd",
+  "bbcde4",
+  "bad3ea",
+  "b7daef",
+  "b3e0f1",
+  "ade5ef",
+  "a9e8ea",
+  "a6e9e3",
+  "a2e7dc",
+  "9fe4d7",
+  "9adfd4",
+  "96d9d3",
+  "94d2d4",
+  "95ccd5",
+  "98c6d6",
+  "9ec1d5"
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "id": "P75",
+ "slug": "fuchsia_and_verdigris",
+ "name": "Fuchsia & Verdigris",
+ "class": "duotone",
+ "scheme": "fuchsia 312-328 vs verdigris 194-210",
+ "mood": "Hot pink neon reflected in oxidised copper. Two inks, both loud, and no referee between them.",
+ "count": 18,
+ "colors": [
+  "010003",
+  "000101",
+  "001111",
+  "032e2e",
+  "084e4e",
+  "11706f",
+  "1a9492",
+  "24bbb7",
+  "46e1da",
+  "a8fef7",
+  "f6e3fe",
+  "e4affc",
+  "c882ea",
+  "a858d1",
+  "8630b1",
+  "620c89",
+  "3a0455",
+  "170126"
+ ]
+}

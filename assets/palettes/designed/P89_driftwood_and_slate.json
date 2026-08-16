@@ -1,0 +1,30 @@
+{
+ "id": "P89",
+ "slug": "driftwood_and_slate",
+ "name": "Driftwood & Slate",
+ "class": "earth",
+ "scheme": "weathered blue-grey -> slate -> driftwood, all low chroma",
+ "mood": "A grey beach in winter: bleached wood, wet slate, and the blue that only shows up when the light is flat.",
+ "count": 19,
+ "colors": [
+  "04242b",
+  "0a3a49",
+  "1c526a",
+  "396987",
+  "5d7599",
+  "5781a6",
+  "6893b1",
+  "75b2c6",
+  "a6bdf2",
+  "95b2e4",
+  "949dd0",
+  "7599c5",
+  "817fae",
+  "6d628c",
+  "53587d",
+  "59476c",
+  "473e5e",
+  "442e4c",
+  "382540"
+ ]
+}

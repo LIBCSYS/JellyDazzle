@@ -1,0 +1,32 @@
+{
+ "id": "P53",
+ "slug": "frost_signal",
+ "name": "Frost Signal",
+ "class": "mono_accent",
+ "scheme": "ice blue 204-216 field; one red signal at 0",
+ "mood": "A cold room in full daylight: pale blue walls, frost on the glass, and a single red indicator burning on a panel.",
+ "count": 21,
+ "colors": [
+  "000c0e",
+  "0a1618",
+  "2c393c",
+  "526063",
+  "7b8a8d",
+  "b7617d",
+  "d08094",
+  "a6b6b9",
+  "d4e5e8",
+  "e6f9ff",
+  "a4ecfd",
+  "3edefc",
+  "27c6e2",
+  "21afc6",
+  "1b98aa",
+  "168190",
+  "106b77",
+  "0b565f",
+  "064249",
+  "032f33",
+  "011c20"
+ ]
+}

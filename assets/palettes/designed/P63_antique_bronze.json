@@ -1,0 +1,32 @@
+{
+ "id": "P63",
+ "slug": "antique_bronze",
+ "name": "Antique Bronze",
+ "class": "metallic",
+ "scheme": "green-gold bronze 110-154 on a full value ramp; warm return",
+ "mood": "Bronze that has been handled for a century \u2014 green-gold in the body, a hard polished hit on the high edge, warm grey in the shadow.",
+ "count": 21,
+ "colors": [
+  "040400",
+  "140b08",
+  "322824",
+  "544845",
+  "786c68",
+  "9e918d",
+  "c6b8b4",
+  "efe1dc",
+  "f5fcf5",
+  "e8f2e8",
+  "dbe7da",
+  "cddccd",
+  "ccddc9",
+  "acc4a4",
+  "8faa7f",
+  "75905c",
+  "5f763c",
+  "4a5c1f",
+  "384309",
+  "252b04",
+  "131501"
+ ]
+}

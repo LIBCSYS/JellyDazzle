@@ -1,0 +1,31 @@
+{
+ "id": "P43",
+ "slug": "sugared_almond",
+ "name": "Sugared Almond",
+ "class": "pastel_wash",
+ "scheme": "warm pastels, blush through butter, all L 0.77-0.94",
+ "mood": "Confectionery light \u2014 blush, apricot, butter and shell. Nothing in it is louder than a whisper and nothing in it is dark.",
+ "count": 20,
+ "colors": [
+  "c2c4a5",
+  "bcc6ac",
+  "bbcab3",
+  "bdceb8",
+  "c3d2bb",
+  "ccd6bb",
+  "d8d9ba",
+  "e7dab8",
+  "f7d9ba",
+  "fcd8c7",
+  "fcd7d3",
+  "fcd5d9",
+  "fcd1db",
+  "fccbda",
+  "fbc4d3",
+  "f9bfc5",
+  "f3bcb5",
+  "e8bca8",
+  "dbbea0",
+  "cdc19f"
+ ]
+}

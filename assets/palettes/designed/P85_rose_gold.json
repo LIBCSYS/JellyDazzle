@@ -1,0 +1,31 @@
+{
+ "id": "P85",
+ "slug": "rose_gold",
+ "name": "Rose Gold",
+ "class": "metallic",
+ "scheme": "rose gold 314-360 on a full value ramp; neutral return leg",
+ "mood": "Polished rose gold under a single lamp: black in the recess, white on the rim, and every value between is the metal.",
+ "count": 20,
+ "colors": [
+  "010001",
+  "070203",
+  "23191c",
+  "44393c",
+  "675b5e",
+  "8d8084",
+  "b5a7ab",
+  "ded0d4",
+  "fde2f5",
+  "edc3e4",
+  "dca6d3",
+  "c989c2",
+  "b46eb0",
+  "9d559e",
+  "853e8a",
+  "6c2875",
+  "54135f",
+  "3a0545",
+  "200229",
+  "09000f"
+ ]
+}

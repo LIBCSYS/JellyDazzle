@@ -1,0 +1,27 @@
+{
+ "id": "P67",
+ "slug": "magenta_press",
+ "name": "Magenta Press",
+ "class": "stark",
+ "scheme": "near-black / paper white / magenta slash",
+ "mood": "A press run with the magenta plate landing where nothing asked it to. Black, paper, and one violent stripe.",
+ "count": 16,
+ "colors": [
+  "000000",
+  "010200",
+  "060904",
+  "0b0e09",
+  "141711",
+  "cfd2cd",
+  "e3e5e1",
+  "e8eae5",
+  "ecefea",
+  "f1f3ef",
+  "f6f8f3",
+  "fafdf8",
+  "da4ada",
+  "c000b4",
+  "890085",
+  "030402"
+ ]
+}

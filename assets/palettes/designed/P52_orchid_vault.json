@@ -1,0 +1,33 @@
+{
+ "id": "P52",
+ "slug": "orchid_vault",
+ "name": "Orchid Vault",
+ "class": "mono_accent",
+ "scheme": "orchid magenta 314-326 field; green embers at 140",
+ "mood": "A stone vault lit through orchid glass, with three green service lamps burning low behind the far pillars.",
+ "count": 22,
+ "colors": [
+  "010003",
+  "050206",
+  "251e27",
+  "0b3800",
+  "00550c",
+  "1a7031",
+  "4b444d",
+  "756d77",
+  "a199a3",
+  "d0c7d2",
+  "fdcafd",
+  "f6a5fb",
+  "e686ef",
+  "d466e2",
+  "c046d3",
+  "aa22c1",
+  "8d12a5",
+  "700c86",
+  "550768",
+  "3b034a",
+  "23012e",
+  "0d0015"
+ ]
+}

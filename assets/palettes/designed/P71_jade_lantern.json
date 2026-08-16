@@ -1,0 +1,30 @@
+{
+ "id": "P71",
+ "slug": "jade_lantern",
+ "name": "Jade Lantern",
+ "class": "mono_accent",
+ "scheme": "jade 138-150 field; ember orange 28-40 accent",
+ "mood": "A jade room lit from one corner \u2014 everything in it is green stone except the single paper lantern burning at the far end.",
+ "count": 19,
+ "colors": [
+  "000000",
+  "010301",
+  "182018",
+  "3b433b",
+  "626b61",
+  "b65e3f",
+  "8b958b",
+  "e79c7e",
+  "b7c1b6",
+  "99e7a6",
+  "69d17c",
+  "2fbb50",
+  "1b9f39",
+  "148327",
+  "0d6818",
+  "074e09",
+  "053503",
+  "031e01",
+  "010900"
+ ]
+}

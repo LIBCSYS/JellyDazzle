@@ -1,0 +1,5 @@
+jellydazzle
+dist/
+*.o
+__pycache__/
+.DS_Store
