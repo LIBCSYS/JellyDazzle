@@ -116,6 +116,37 @@ static double now_ms(void) {
     return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
 }
 
+/* ---- cross-launch memory (2.4.3) --------------------------------------
+ * The shuffled bag guarantees no repeat WITHIN a run.  Across runs it
+ * guaranteed nothing: every launch drew uniformly from ~77 grounds, so by
+ * the birthday paradox an opening repeated about every ten launches — which
+ * is exactly what "I keep seeing the same thing at the start" means.  The
+ * engine was random; it was just amnesiac.  We now remember which routines
+ * opened the last JD_RECENT runs and refuse them for the FIRST spawn only. */
+#define JD_RECENT 25
+static uint16_t g_recent[JD_RECENT];
+static int      g_recent_n;
+static int      g_opening = 1;         /* cleared once slot 0 has spawned */
+
+static int recent_has(uint16_t rt)
+{
+    for (int i = 0; i < g_recent_n; i++) if (g_recent[i] == rt) return 1;
+    return 0;
+}
+
+static void probe_cache_save(void);
+
+static void recent_note(uint16_t rt)
+{
+    if (!recent_has(rt)) {
+        if (g_recent_n < JD_RECENT) g_recent[g_recent_n++] = rt;
+        else { memmove(g_recent, g_recent + 1, (JD_RECENT - 1) * sizeof *g_recent);
+               g_recent[JD_RECENT - 1] = rt; }
+    }
+    probe_cache_save();                /* persist immediately: a screensaver
+                                          is killed, not exited cleanly */
+}
+
 static void probe_cache_save(void);
 
 /* ---------------- routine statistics ---------------- */
@@ -604,6 +635,13 @@ static int probe_cache_load(void)
           && magic == JD_CACHE_MAGIC && stamp == probe_stamp()
           && n == (int32_t)g_nr;
     if (ok) ok = (int)fread(g_st, sizeof(jd_stat), (size_t)n, f) == n;
+    if (ok) {                          /* optional tail: older caches lack it */
+        int32_t rn = 0;
+        if (fread(&rn, 4, 1, f) == 1 && rn > 0 && rn <= JD_RECENT) {
+            if ((int)fread(g_recent, sizeof(uint16_t), (size_t)rn, f) == rn)
+                g_recent_n = rn;
+        }
+    }
     fclose(f);
     TR("PROBE cache %s (%s)\n", ok ? "hit" : "miss", p);
     return ok;
@@ -619,6 +657,9 @@ static void probe_cache_save(void)
     int32_t n = (int32_t)g_nr;
     fwrite(&magic, 4, 1, f); fwrite(&stamp, 4, 1, f); fwrite(&n, 4, 1, f);
     fwrite(g_st, sizeof(jd_stat), (size_t)n, f);
+    { int32_t rn = g_recent_n;         /* which routines opened recent runs */
+      fwrite(&rn, 4, 1, f);
+      fwrite(g_recent, sizeof(uint16_t), (size_t)g_recent_n, f); }
     fclose(f);
     TR("PROBE cache written: %s\n", p);
 }
@@ -1065,6 +1106,11 @@ static int admissible(uint16_t r, int slot)
 {
     const jd_stat *st = &g_st[r];
     int slot_i0 = (slot == JD_SHADOW) ? 0 : slot;
+    /* 0. cross-launch memory: do not OPEN on something the last JD_RECENT
+     *    runs already opened on.  Binds only while g_opening is set, so it
+     *    costs nothing after the first spawn and can never starve the bag. */
+    if (g_opening && slot == 0 && recent_has(r) && g_bag[R_GROUND].n > g_recent_n + 4)
+        return 0;
     /* 1. a routine may never be live twice — patterns hold file-static state */
     for (int i = 0; i < JD_NBUF; i++)
         if (g_L[i].live && g_L[i].routine == (int)r) return 0;
@@ -1317,6 +1363,12 @@ static int try_spawn(int slot, int frame)
     g_gap = 30 + (int)(mix32(r ^ 0x6A9F00Du) % 211u);       /* 0.5..4 s, never the same twice */
     TR("SPAWN f=%d slot=%d rt=%d role=%d blend=%d peak=%d life=%d mood=%d span=%u\n",
        frame, slot, (int)v, g_st[v].role, L->blend, L->w_peak, hold, g_mood, L->span);
+    if (g_opening && slot == 0) {      /* remember what we opened on */
+        g_opening = 0;
+        recent_note((uint16_t)v);
+        TR("OPENING rt=%d remembered (%d of %d in the ring)\n",
+           (int)v, g_recent_n, JD_RECENT);
+    }
     return 1;
 }
 
