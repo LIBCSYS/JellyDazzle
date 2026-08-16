@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/brand/jellydazzle-logo.jpg" alt="JellyDazzle" width="820"></p>
+
 # JellyDazzle v2.4 — Audio
 
 Clean-room reorganisation of JellyDazzle 2.3 (LIBCSYS/JellyDazzle) with a
