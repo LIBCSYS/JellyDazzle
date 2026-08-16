@@ -14,10 +14,18 @@ cp jellydazzle "$APP/Contents/MacOS/JellyDazzle"
 # sdl2-compat shim + the SDL3 it dlopens as @loader_path/libSDL3.dylib
 SHIM=$(otool -L jellydazzle | awk '/libSDL2/{print $1}')
 cp "$SHIM" "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
-cp /opt/homebrew/opt/sdl3/lib/libSDL3.0.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+# Homebrew ships sdl2-compat, a shim that dlopens SDL3 — bundling SDL3 was only
+# ever to satisfy that. With a real SDL2 (vendor/sdl2, built against MACMIN)
+# there is nothing to load, and the Homebrew SDL3 would drag the whole bundle
+# back up to whatever macOS this machine runs.
+if otool -L "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib" | grep -q SDL3; then
+    cp /opt/homebrew/opt/sdl3/lib/libSDL3.0.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 install_name_tool -change "$SHIM" @executable_path/../Frameworks/libSDL2-2.0.0.dylib \
     "$APP/Contents/MacOS/JellyDazzle"
-install_name_tool -id @loader_path/libSDL3.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
+    install_name_tool -id @loader_path/libSDL3.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 chmod u+w "$APP/Contents/Frameworks/"*.dylib      # Homebrew ships them read-only
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

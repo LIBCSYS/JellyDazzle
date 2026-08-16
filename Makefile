@@ -12,8 +12,23 @@ VERSION  = $(shell cat VERSION)
 # compositor's palette bag covers EVERY scheme in palette.bin (2.3 passed
 # -DJD_NS from the .bin size; the port dropped it and fell back to 30/180)
 NSCHEMES = $(shell awk '/define JD_SCHEMES/{print $$3}' src/engine/palette_count.h)
-CFLAGS   = -O2 -Isrc/engine -DJD_VERSION='"$(VERSION)"' -DJD_NS=$(NSCHEMES)
-SDLFLAGS = $(shell sdl2-config --cflags --libs)
+# Deployment target. Without this the binary inherits whatever macOS it was
+# built on — a build made on macOS 26 refuses to launch on anything older, so
+# the public download only worked for people already on the newest OS. The
+# Core Audio process tap is guarded by a runtime @available(macOS 14.2) check
+# and falls back to the microphone, so nothing here needs a modern OS.
+MACMIN   = 11.0
+CFLAGS   = -O2 -mmacosx-version-min=$(MACMIN) -Isrc/engine -DJD_VERSION='"$(VERSION)"' -DJD_NS=$(NSCHEMES)
+# Prefer a portable SDL2 built against MACMIN. Homebrew's SDL is compiled for
+# whatever macOS the machine runs, so bundling it pins the app to that OS no
+# matter what we target — the app said macOS 11 while the dylib beside it said
+# 26. tools/build_sdl.sh produces this; falls back to Homebrew if absent.
+SDL2_PORTABLE = vendor/sdl2
+SDLFLAGS = $(if $(wildcard $(SDL2_PORTABLE)/lib/libSDL2-2.0.0.dylib),\
+             -I$(SDL2_PORTABLE)/include/SDL2 -D_THREAD_SAFE -L$(SDL2_PORTABLE)/lib -lSDL2 -Wl$(comma)-framework$(comma)Cocoa,\
+             $(shell sdl2-config --cflags --libs))
+comma := ,
+LDFLAGS += -mmacosx-version-min=$(MACMIN)
 
 ENGINE   = src/engine/compositor.c src/engine/routines_asm.s
 AUDIO    = src/audio/listen.c src/audio/systap.m
