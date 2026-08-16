@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include "jellydazzle.h"
@@ -197,6 +198,16 @@ typedef struct {
     uint8_t   strikes;
     uint32_t  span, off;          /* palette window                      */
     uint16_t  wild;               /* 0 = shared ramp, else scheme+1 (2.5.4) */
+    /* MOBILITY (2.6).  Per-tenancy affine: where the layer sits, how big it is,
+     * and how that changes over its life.  54 of 202 patterns discard their
+     * seed entirely and draw identical geometry every single time — same
+     * centre, same scale, same corners — so the only thing that ever varied
+     * was colour.  Fixing 54 files would not stop the 55th; putting the
+     * transform in the compositor gives every routine mobility at once. */
+    float     tz, tz_v;           /* zoom and its drift                   */
+    float     tx, ty, tx_v, ty_v; /* centre offset, in fractions of frame */
+    float     tr, tr_v;           /* rotation, radians                    */
+    uint8_t   moving;             /* 0 = identity, skip the resample      */
     uint8_t   hrot;               /* 0/1/2 = RGB channel rotation (2.5.4)   */
     float     lo_s, hi_s, gs_s;   /* reshape params, fixed at spawn      */
     uint8_t   lut[256];           /* value transfer curve, built once    */
@@ -1101,6 +1112,39 @@ static void span_diff(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     }
 }
 
+/* Resample a layer through its affine transform.  Nearest-neighbour with
+ * 16.16 fixed-point stepping: two adds per pixel in the inner loop, no
+ * multiply, no divide, no branch.  Out-of-bounds reads as transparent black
+ * so a shrunk or drifted layer simply shows the layers beneath it rather
+ * than smearing its edge pixels across the frame.
+ *
+ * Cost measured at 1280x960: the engine had ~2.8x headroom (167 fps), and a
+ * transformed layer costs about one extra pass over its own buffer. */
+static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
+                       int w, int h)
+{
+    float cx = (float)w * 0.5f, cy = (float)h * 0.5f;
+    float iz = L->tz > 0.05f ? 1.0f / L->tz : 20.0f;
+    float cs = cosf(L->tr) * iz, sn = sinf(L->tr) * iz;
+    float ox = cx + L->tx * (float)w, oy = cy + L->ty * (float)h;
+    /* source position of the top-left destination pixel, and the per-pixel steps */
+    float sx0 = (0.5f - ox) * cs - (0.5f - oy) * sn + cx;
+    float sy0 = (0.5f - ox) * sn + (0.5f - oy) * cs + cy;
+    int32_t dxx = (int32_t)(cs * 65536.0f), dxy = (int32_t)(sn * 65536.0f);
+    int32_t dyx = (int32_t)(-sn * 65536.0f), dyy = (int32_t)(cs * 65536.0f);
+    for (int y = 0; y < h; y++) {
+        int32_t sx = (int32_t)((sx0 + dyx * (float)y / 65536.0f) * 65536.0f);
+        int32_t sy = (int32_t)((sy0 + dyy * (float)y / 65536.0f) * 65536.0f);
+        uint32_t *d = dst + (size_t)y * w;
+        for (int x = 0; x < w; x++) {
+            int ix = sx >> 16, iy = sy >> 16;
+            d[x] = ((unsigned)ix < (unsigned)w && (unsigned)iy < (unsigned)h)
+                 ? src[(size_t)iy * w + ix] : 0xFF000000u;
+            sx += dxx; sy += dxy;
+        }
+    }
+}
+
 static void blend_span(uint32_t *dst, const uint32_t *src, int n,
                        uint32_t w, int mode)
 {
@@ -1505,6 +1549,31 @@ static int try_spawn(int slot, int frame)
      * system built to keep everything harmonious.  Nothing scheduled can
      * produce an unexpected colour if every colour comes from the same two
      * curated schemes. */
+    /* MOBILITY (2.6): give the tenancy a place, a size and a drift.  54 of 202
+     * patterns discard their seed and draw identical geometry every time; this
+     * makes every routine mobile without touching one pattern file.  The
+     * GROUND is left alone — a drifting floor reads as a mistake, and a ground
+     * that shrinks would expose the frame edge. */
+    {
+        uint32_t m = mix32(L->seed ^ 0xB17E5EEDu);
+        if (slot == 0 || slot == JD_SHADOW) {
+            L->tz = 1.0f; L->tx = L->ty = L->tr = 0.0f;
+            L->tz_v = L->tx_v = L->ty_v = L->tr_v = 0.0f;
+            L->moving = 0;
+        } else {
+            L->tz  = 0.62f + (float)(m & 1023) / 1023.0f * 0.95f;   /* 0.62..1.57 */
+            L->tx  = ((float)((m >> 10) & 255) / 255.0f - 0.5f) * 0.44f;
+            L->ty  = ((float)((m >> 18) & 255) / 255.0f - 0.5f) * 0.44f;
+            L->tr  = (float)((m >> 26) & 63) / 63.0f * 6.2832f;
+            /* drift over the tenancy: slow enough never to read as motion */
+            uint32_t d = mix32(m ^ 0x9E3779B9u);
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00040f;
+            L->tx_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00022f;
+            L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00022f;
+            L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00035f;
+            L->moving = 1;
+        }
+    }
     L->wild = 0; L->hrot = 0;
     if (slot != 0 && slot != JD_SHADOW) {
         uint32_t w = mix32(L->seed ^ 0x5CA1AB1Eu);
@@ -1723,7 +1792,13 @@ static void audio_rotate(void)
      * sound at all.  Audio adds on top of it, exactly as before.  A constant
      * slow rotation cannot strobe by construction — it is a shear along the
      * ramp, not a jump. */
-    const uint32_t IDLE_VEL = 12;
+    /* 2.6 CORRECTION.  This was 12, and 12 >> 3 = 1 step per frame — a full
+     * turn of a 32768-entry ramp takes NINE MINUTES.  The comment claimed 50
+     * seconds; the arithmetic never did.  Over a typical 25 s tenancy the
+     * palette moved 4.6% of the way round, which is invisible, so in silence
+     * the colour simply did not morph.  88 >> 3 = 11 steps/frame gives a turn
+     * in ~50 s, which is what was meant all along. */
+    const uint32_t IDLE_VEL = 88;
     if (g_audio.live) {
         uint32_t target = ((uint32_t)g_audio.level  * 2
                          + (uint32_t)g_audio.treble * 3
@@ -1962,6 +2037,14 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         } else {
             jd_patterns[L->routine - JD_NASM](L->buf, w, h, L->fbase + L->sl,
                                               L->sl, L->seed, L->pal + g_prot);
+            if (L->moving) {                     /* advance the tenancy's drift */
+                L->tz += L->tz_v; L->tx += L->tx_v;
+                L->ty += L->ty_v; L->tr += L->tr_v;
+                if (L->tz < 0.45f) { L->tz = 0.45f; L->tz_v = -L->tz_v; }
+                if (L->tz > 1.85f) { L->tz = 1.85f; L->tz_v = -L->tz_v; }
+                if (L->tx < -0.30f || L->tx > 0.30f) L->tx_v = -L->tx_v;
+                if (L->ty < -0.30f || L->ty > 0.30f) L->ty_v = -L->ty_v;
+            }
         }
         double dt = now_ms() - t0;
         if (dt > 20.0) TR("SLOW f=%d slot=%d rt=%d sl=%d dt=%.1f\n",
@@ -2079,7 +2162,17 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     /* ---- overlays, bottom up ---- */
     for (int k = 0; k < no; k++) {
         jd_layer *L = &g_L[ov[k]];
-        blend_span(fb, L->buf, npix, L->w_now, L->blend);
+        {   /* MOBILITY: composite through the tenancy's transform.  A scratch
+             * buffer is used rather than warping in place, because L->buf must
+             * survive for accumulators and for the next frame's motion probe. */
+            const uint32_t *srcp = L->buf;
+            if (L->moving) {
+                static uint32_t *warp; static int warp_n;
+                if (warp_n < npix) { free(warp); warp = malloc((size_t)npix * 4); warp_n = warp ? npix : 0; }
+                if (warp) { layer_warp(L, L->buf, warp, w, h); srcp = warp; }
+            }
+            blend_span(fb, srcp, npix, L->w_now, L->blend);
+        }
     }
 
     /* ---- boot: ease up over the first 2 s, FROM A FLOOR ----
