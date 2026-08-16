@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include "jellydazzle.h"
+#include "../patterns/_emblem.h"
 
 /* JD_DEBUG=1 traces spawns/retires and per-frame occupancy on stderr */
 #ifndef JD_TRACE
@@ -1557,20 +1558,30 @@ static int try_spawn(int slot, int frame)
     {
         uint32_t m = mix32(L->seed ^ 0xB17E5EEDu);
         if (slot == 0 || slot == JD_SHADOW) {
-            L->tz = 1.0f; L->tx = L->ty = L->tr = 0.0f;
-            L->tz_v = L->tx_v = L->ty_v = L->tr_v = 0.0f;
-            L->moving = 0;
+            /* GROUND: zoom IN only, never out — the warp reads out-of-bounds
+             * as black, so a ground smaller than the frame would show a border.
+             * Slight rotation is safe because it is sampled from inside a
+             * region we always cover. No offset, for the same reason. */
+            L->tz  = 1.02f + (float)(m & 511) / 511.0f * 0.42f;   /* 1.02..1.44 */
+            L->tx  = L->ty = 0.0f;
+            L->tr  = (float)((m >> 9) & 63) / 63.0f * 6.2832f;
+            uint32_t d = mix32(m ^ 0x51F0A7u);
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00055f;
+            L->tx_v = L->ty_v = 0.0f;
+            L->tr_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00030f;
+            L->moving = 1;
         } else {
-            L->tz  = 0.62f + (float)(m & 1023) / 1023.0f * 0.95f;   /* 0.62..1.57 */
-            L->tx  = ((float)((m >> 10) & 255) / 255.0f - 0.5f) * 0.44f;
-            L->ty  = ((float)((m >> 18) & 255) / 255.0f - 0.5f) * 0.44f;
+            /* OVERLAYS: the full range. Layers genuinely recede and loom,
+             * travel across the frame, and spin perceptibly over a tenancy. */
+            L->tz  = 0.40f + (float)(m & 1023) / 1023.0f * 2.10f;  /* 0.40..2.50 */
+            L->tx  = ((float)((m >> 10) & 255) / 255.0f - 0.5f) * 0.60f;
+            L->ty  = ((float)((m >> 18) & 255) / 255.0f - 0.5f) * 0.60f;
             L->tr  = (float)((m >> 26) & 63) / 63.0f * 6.2832f;
-            /* drift over the tenancy: slow enough never to read as motion */
             uint32_t d = mix32(m ^ 0x9E3779B9u);
-            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00040f;
-            L->tx_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00022f;
-            L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00022f;
-            L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00035f;
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00190f;   /* 4.8x */
+            L->tx_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00105f;
+            L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00105f;
+            L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00240f;  /* ~7x */
             L->moving = 1;
         }
     }
@@ -2040,10 +2051,10 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             if (L->moving) {                     /* advance the tenancy's drift */
                 L->tz += L->tz_v; L->tx += L->tx_v;
                 L->ty += L->ty_v; L->tr += L->tr_v;
-                if (L->tz < 0.45f) { L->tz = 0.45f; L->tz_v = -L->tz_v; }
-                if (L->tz > 1.85f) { L->tz = 1.85f; L->tz_v = -L->tz_v; }
-                if (L->tx < -0.30f || L->tx > 0.30f) L->tx_v = -L->tx_v;
-                if (L->ty < -0.30f || L->ty > 0.30f) L->ty_v = -L->ty_v;
+                if (L->tz < 0.34f) { L->tz = 0.34f; L->tz_v = -L->tz_v; }
+                if (L->tz > 2.90f) { L->tz = 2.90f; L->tz_v = -L->tz_v; }
+                if (L->tx < -0.42f || L->tx > 0.42f) L->tx_v = -L->tx_v;
+                if (L->ty < -0.42f || L->ty > 0.42f) L->ty_v = -L->ty_v;
             }
         }
         double dt = now_ms() - t0;
@@ -2252,6 +2263,48 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         if (bump > g_gain) g_gain += (bump - g_gain) >> 3;
         else               g_gain -= (g_gain - bump) >> 5;
         if (g_gain > 260) span_gain(fb, fb, npix, g_gain);
+    }
+
+    /* ---- OPENING SIGNATURE ------------------------------------------
+     * The mark, for the first ~3 seconds of a run, over whatever the engine
+     * opened with. It is NOT drawn over the picture: it lifts the luminance
+     * of the pixels already there, in the shape of the mark, so the opening
+     * pattern shows straight through it and it recolours with the frame.
+     * Rises over 0.4 s, holds 1.4 s, dissolves over 1.4 s, then never again.
+     * (DAZZLE.EXE signed off on exit; this signs on.) */
+    {
+        int age = frame - g_frame0;
+        if (age >= 0 && age < 194) {
+            float e;
+            if      (age <  24) e = (float)age / 24.0f;
+            else if (age < 108) e = 1.0f;
+            else                e = (float)(194 - age) / 86.0f;
+            e = e * e * (3.0f - 2.0f * e);
+            float cx = (float)w * 0.5f, cy = (float)h * 0.5f;
+            float sc = (float)(w < h ? w : h) * 0.46f;
+            /* a breath of zoom so it settles rather than sits */
+            float zoom = 1.06f - 0.10f * e;
+            for (int y = 0; y < h; y++) {
+                float v = ((float)y - cy) / (sc * zoom);
+                if (v < -1.0f || v > 1.0f) continue;
+                int my = (int)((v * 0.5f + 0.5f) * (JD_EMB_N - 1));
+                uint32_t *row = fb + (size_t)y * w;
+                for (int x = 0; x < w; x++) {
+                    float u = ((float)x - cx) / (sc * zoom);
+                    if (u < -1.0f || u > 1.0f) continue;
+                    int mx = (int)((u * 0.5f + 0.5f) * (JD_EMB_N - 1));
+                    uint32_t m = jd_emblem[my * JD_EMB_N + mx];
+                    if (m < 10) continue;
+                    uint32_t lift = (uint32_t)(m * e * 0.78f);
+                    uint32_t c = row[x];
+                    uint32_t r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+                    r += lift; g += lift; b += lift;
+                    row[x] = 0xFF000000u | (r > 255 ? 255u : r) << 16
+                                         | (g > 255 ? 255u : g) << 8
+                                         | (b > 255 ? 255u : b);
+                }
+            }
+        }
     }
 
     /* ---- health: frame time and composite motion ---- */
