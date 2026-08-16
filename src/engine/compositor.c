@@ -202,6 +202,7 @@ static uint32_t g_run = 0;
 static uint32_t g_gain = 256;              /* dead-air lift, Q8            */
 static uint32_t g_prot = 0;       /* audio palette rotation, 0..PAL_N-1 */
 void jd_audio_meter_draw(uint32_t *fb, int w, int h);   /* AUDIO: HUD, src/audio/listen.c */
+void jd_about_draw(uint32_t *fb, int w, int h);         /* ABOUT card (key A), src/audio/listen.c */
 static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
@@ -1537,10 +1538,10 @@ static int mode_override(uint32_t *fb, int w, int h, int frame)
     int m;
     if (ov >= 1 && ov <= jd_pattern_count) m = JD_NASM + ov - 1;
     else                                   m = ov % JD_NASM;
-    if (m < JD_NASM) { g_mode = (uint32_t)m; draw_frame(fb, w, h, frame); jd_audio_meter_draw(fb, w, h); return 1; }
+    if (m < JD_NASM) { g_mode = (uint32_t)m; draw_frame(fb, w, h, frame); jd_audio_meter_draw(fb, w, h); jd_about_draw(fb, w, h); return 1; }
     int sl = frame & 2047;      /* small animation clock, as the layers use */
     jd_patterns[m - JD_NASM](fb, w, h, 300 + sl, sl, mix32((uint32_t)frame >> 11), g_blend);
-    jd_audio_meter_draw(fb, w, h);      /* AUDIO: HUD in single-pattern mode too */
+    jd_audio_meter_draw(fb, w, h); jd_about_draw(fb, w, h);      /* AUDIO: HUD in single-pattern mode too */
     return 1;
 }
 
@@ -1946,7 +1947,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     /* AUDIO: the on-screen level meter (key M) goes on LAST, after every
      * gain and after the health probes, so it is never brightened, never
      * counted as motion, and always legible. */
-    jd_audio_meter_draw(fb, w, h);
+    jd_audio_meter_draw(fb, w, h); jd_about_draw(fb, w, h);
 
     TRF("F %d n=%d/%d w=%d,%d,%d,%d,%d A=%d key=%d p0=%08x b0=%08x sl0=%d rt0=%d\n",
         frame, ng, no,

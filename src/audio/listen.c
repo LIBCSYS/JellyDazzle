@@ -95,6 +95,8 @@ static float    au_live_thr = 0.001f;  /* absolute "real signal" threshold  */
 /* meter state */
 static int      au_meter;              /* HUD on/off                        */
 static int      au_meter_key_was;
+static int      au_about;              /* ABOUT card on/off                 */
+static int      au_about_key_was;
 static uint16_t au_peak_hold[4];       /* slow-falling peak ticks per bar   */
 static int      au_stale;              /* ticks with no new callbacks       */
 static float    au_rms_now;
@@ -259,6 +261,12 @@ int jd_audio_init(void)
     for (int i = 0; i < AU_N; i++)
         au_win[i] = 0.5f - 0.5f * cosf(2.0f * (float)M_PI * i / (AU_N - 1));
 
+    /* HUD flags are read BEFORE any early return: the meter and the about card
+     * are not audio features, and JD_AUDIO_SRC=off used to disable them as a
+     * side effect of bailing out of this function. */
+    if (getenv("JD_AUDIO_METER")) au_meter = 1;
+    if (getenv("JD_ABOUT")) au_about = 1;
+
     const char *e = getenv("JD_AUDIO_SRC");
     if (e) {
         if (!SDL_strcasecmp(e, "off") || !SDL_strcasecmp(e, "none")) {
@@ -272,8 +280,6 @@ int jd_audio_init(void)
     }
     /* legacy knob from 2.3 */
     if ((e = getenv("JD_AUDIO_DEV")) != NULL) { au_want_src = SRC_MIC; au_want_dev = SDL_atoi(e); }
-    if (getenv("JD_AUDIO_METER")) au_meter = 1;
-
     au_ref = au_floor;
     if (!au_open_any()) return 0;
     au_ref = au_floor;
@@ -319,6 +325,9 @@ void jd_audio_tick(void)
         int m = ks ? ks[SDL_SCANCODE_M] : 0;
         if (m && !au_meter_key_was) au_meter ^= 1;
         au_meter_key_was = m;
+        int a = ks ? ks[SDL_SCANCODE_A] : 0;      /* A toggles the about card */
+        if (a && !au_about_key_was) au_about ^= 1;
+        au_about_key_was = a;
     }
 
     if (!au_on) { au_decay_all(); return; }
@@ -586,16 +595,8 @@ void jd_audio_meter_draw(uint32_t *fb, int w, int h)
     if (!au_meter || !fb || w < 160 || h < 120) return;
     int s = h / 320; if (s < 1) s = 1; if (s > 6) s = 6;   /* 3 @ 960, 6 @ 2160 */
     int bw = 10 * s, gap = 4 * s, bh = 64 * s, pad = 6 * s;
-    /* provenance footer: where the source lives and where the full pattern
-     * library is browsable.  Display only — an SDL fullscreen surface has
-     * nothing to click, so these are meant to be read and typed. */
-    static const char *LINK1 = "GITHUB.COM/LIBCSYS/JELLYDAZZLE";
-    static const char *LINK2 = "DAZZLE.JELIA.NYC/LIBRARY";
-    int link_w = (int)strlen(LINK1) * 4 * s;
     int panel_w = pad + 4 * (bw + gap) + 20 * s + pad;
-    if (pad + link_w + pad > panel_w) panel_w = pad + link_w + pad;
-    int panel_h = pad + 5 * s + 3 * s + 5 * s + 4 * s + bh + 3 * s + 5 * s
-                + 18 * s + pad;
+    int panel_h = pad + 5 * s + 3 * s + 5 * s + 4 * s + bh + 3 * s + 5 * s + pad;
     int x0 = 12 * s, y0 = h - 12 * s - panel_h;
     if (panel_w > w - 2 * x0) return;
     au_dim(fb, w, h, x0, y0, panel_w, panel_h);
@@ -642,14 +643,47 @@ void jd_audio_meter_draw(uint32_t *fb, int w, int h)
             }
         au_text(fb, w, h, cx - 3 * s / 2 - 2 * s, ybot + 3 * s, s, 0xFFC0C0C8u, "BEAT");
     }
+}
 
-    /* footer: source + library, dimmer than the readouts so it never competes
-     * with the meters but stays legible against the dimmed panel */
-    {
-        int ly = ybot + 11 * s;
-        au_rect(fb, w, h, x0 + pad, ly - 4 * s, panel_w - 2 * pad,
-                s > 1 ? s / 2 : 1, 0xFF303038u);       /* hairline separator */
-        au_text(fb, w, h, x0 + pad, ly,          s, 0xFF7F8C99u, LINK1);
-        au_text(fb, w, h, x0 + pad, ly + 8 * s,  s, 0xFF7F8C99u, LINK2);
+/* ---- ABOUT (key A) -----------------------------------------------------
+ * Where this came from, where the library lives, and the key map.  It lives
+ * in this file because the 3x5 bitmap font and the panel primitives do; it
+ * has nothing to do with audio beyond sharing them. Centred, so it reads as
+ * a card rather than a debug readout. */
+void jd_about_draw(uint32_t *fb, int w, int h)
+{
+    if (!au_about || !fb || w < 200 || h < 160) return;
+    int s = h / 300; if (s < 1) s = 1; if (s > 7) s = 7;
+    static const char *L[] = {
+        "JELLYDAZZLE " JD_VERSION,
+        "AN HOMAGE TO DAZZLE.EXE",
+        "",
+        "GITHUB.COM/LIBCSYS/JELLYDAZZLE",
+        "DAZZLE.JELIA.NYC/LIBRARY",
+        "",
+        "F FULLSCREEN   M METER",
+        "A ABOUT        ESC QUIT",
+        "",
+        "MIT LICENCE - JOHN ELIA",
+    };
+    const int n = (int)(sizeof L / sizeof L[0]);
+    int maxlen = 0;
+    for (int i = 0; i < n; i++) { int l = (int)strlen(L[i]); if (l > maxlen) maxlen = l; }
+    int pad = 8 * s, lh = 8 * s;
+    int panel_w = pad + maxlen * 4 * s + pad;
+    int panel_h = pad + n * lh + pad;
+    if (panel_w > w || panel_h > h) return;
+    int x0 = (w - panel_w) / 2, y0 = (h - panel_h) / 2;
+    au_dim(fb, w, h, x0, y0, panel_w, panel_h);
+    au_dim(fb, w, h, x0, y0, panel_w, panel_h);           /* twice: darker card */
+    au_rect(fb, w, h, x0, y0, panel_w, s > 1 ? s / 2 : 1, 0xFF3A4652u);
+    au_rect(fb, w, h, x0, y0 + panel_h - (s > 1 ? s / 2 : 1), panel_w,
+            s > 1 ? s / 2 : 1, 0xFF3A4652u);
+    for (int i = 0; i < n; i++) {
+        if (!L[i][0]) continue;
+        uint32_t c = (i == 0) ? 0xFF22D3EEu            /* title  */
+                   : (i == 3 || i == 4) ? 0xFFE9B65Au  /* links  */
+                   : 0xFFA8B6C4u;
+        au_text(fb, w, h, x0 + pad, y0 + pad + i * lh, s, c, L[i]);
     }
 }
