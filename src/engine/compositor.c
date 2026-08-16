@@ -1506,9 +1506,18 @@ static int try_spawn(int slot, int frame)
     if (g_st[v].probed) {
         uint32_t cd = g_st[v].cdiv;                 /* 0 flat .. 255 rich */
         if (cd < 160) {
-            uint32_t boost = 256 + ((160 - cd) * 358) / 160;   /* 256..614 */
+            uint32_t boost = 256 + ((160 - cd) * 230) / 160;   /* 256..486 */
             uint64_t w = ((uint64_t)L->span * boost) >> 8;
-            L->span = (uint32_t)(w > PAL_N ? PAL_N : w);
+            /* 2.6.3 CORRECTION.  This used to allow the FULL ramp, and 51% of
+             * flat routines were reaching it. A flat routine handed the whole
+             * spectrum renders as full-rainbow banding — so every flat pattern
+             * started looking like every other flat pattern, which is exactly
+             * the 'I see this exact image all the time' complaint. Widening
+             * the window makes colour TRAVEL; letting it reach the full ramp
+             * destroys colour IDENTITY. Cap at 17000, about half the ramp:
+             * still plenty of travel, still a recognisable hue family. */
+            const uint32_t SPAN_CAP = 17000;
+            L->span = (uint32_t)(w > SPAN_CAP ? SPAN_CAP : w);
         }
     }
     if (L->span > PAL_N) L->span = PAL_N;
