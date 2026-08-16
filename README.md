@@ -3,7 +3,7 @@
 Clean-room reorganisation of JellyDazzle 2.3 (LIBCSYS/JellyDazzle) with a
 proper layout, verified system-audio capture, and a rebuilt startup path.
 
-What the built app actually contains: **24 hand-written ARM64 assembly engine
+What the built app actually contains: **24 ARMv9.2-A assembly engine
 modes + 201 C pattern plug-ins**. A further 400 candidate patterns live in
 `src/patterns_hold/` — they are NOT compiled into the binary. They are kept in
 the tree deliberately (no work is discarded) and are being reviewed a family at
