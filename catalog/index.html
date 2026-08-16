@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JellyDazzle Command Panel</title>
+<link rel="icon" type="image/png" href="/brand/favicon-64.png">
+<style>
+:root{--ink:#0a0f17;--panel:#111a26;--line:#1e2c3d;--cy:#22d3ee;--gold:#e9b65a;--tx:#dbe6f0;--dim:#7d90a5;
+--less:#e0644f;--more:#4fd28a;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--tx);font:14px/1.45 -apple-system,Segoe UI,Helvetica,sans-serif}
+header{position:sticky;top:0;z-index:20;background:rgba(10,15,23,.97);border-bottom:1px solid var(--line);
+backdrop-filter:blur(8px);padding:9px 16px 7px}
+h1{margin:0;font-size:16px;letter-spacing:.03em;display:flex;align-items:center;gap:9px}
+.mark{width:26px;height:26px;border-radius:6px;display:block}
+h1 span{color:var(--cy)}
+.hint{color:var(--dim);font-size:11.5px;margin-top:1px}
+.row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px}
+.row .lbl{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);
+width:74px;flex:none;font-weight:700}
+.chip{font:inherit;font-size:12px;background:var(--panel);color:var(--tx);border:1px solid var(--line);
+border-radius:99px;padding:3px 11px;cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:var(--cy)}
+.chip .c{color:var(--dim);font-size:10.5px;margin-left:5px}
+.chip.on{background:var(--cy);color:#06202a;border-color:var(--cy);font-weight:700}
+.chip.on .c{color:#06202a;opacity:.7}
+.chip.zero{opacity:.3;cursor:default;pointer-events:none}
+.chip.L_GROUND.on{background:#3f7fd8;border-color:#3f7fd8;color:#eaf4ff}
+.chip.L_FIELD.on{background:#22d3ee;border-color:#22d3ee;color:#06202a}
+.chip.L_FIGURE.on{background:#e9b65a;border-color:#e9b65a;color:#241a02}
+.chip.L_SPARK.on{background:#f07acb;border-color:#f07acb;color:#2b0620}
+.chip.L_MIXED.on{background:#8f9db0;border-color:#8f9db0;color:#0b1119}
+input#q{font:inherit;background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:6px;
+padding:4px 9px;min-width:190px}
+button.act{font:inherit;font-size:12px;border-radius:6px;padding:4px 11px;cursor:pointer;
+background:var(--panel);color:var(--tx);border:1px solid var(--line)}
+#save{background:var(--gold);color:#241a02;border-color:var(--gold);font-weight:700}
+#reset{border-color:#5a2b22;color:#e0644f}
+.tally{margin-left:auto;color:var(--dim);font-size:11.5px}
+.tally b{color:var(--gold)}
+main{padding:13px 16px 90px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(214px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden;display:flex;
+flex-direction:column}
+.card.w2{border-color:var(--more);box-shadow:0 0 0 1px var(--more) inset}
+.card.w1{border-color:#2f7f57}
+.card.wm1{border-color:#7a3a30}
+.card.wm2{border-color:var(--less);opacity:.7}
+.thumbwrap{position:relative;aspect-ratio:4/3;background:#050a10}
+.thumb{width:100%;height:100%;object-fit:cover;display:block}
+.playhint{position:absolute;right:5px;bottom:5px;background:rgba(4,10,16,.82);color:var(--cy);
+font-size:9.5px;padding:1.5px 6px;border-radius:99px;border:1px solid #24404f;pointer-events:none}
+.noimg{width:100%;height:100%;display:grid;place-items:center;color:#3f5266;font-size:11px;text-align:center;
+padding:8px;background:repeating-linear-gradient(45deg,#070d15,#070d15 8px,#0a121c 8px,#0a121c 16px)}
+.body{padding:8px 9px 9px;flex:1;display:flex;flex-direction:column;gap:5px}
+.nm{font-weight:600;font-size:13px;line-height:1.25}
+.nm em{font-style:normal;color:var(--cy);font-weight:400;margin-right:5px}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-size:10px;padding:1.5px 6px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
+.tag.role{font-weight:700}
+.tag.GROUND{background:#3f7fd8;border-color:#3f7fd8;color:#031225}
+.tag.FIELD{background:#22d3ee;border-color:#22d3ee;color:#06202a}
+.tag.FIGURE{background:#e9b65a;border-color:#e9b65a;color:#241a02}
+.tag.SPARK{background:#f07acb;border-color:#f07acb;color:#2b0620}
+.tag.MIXED{background:#8f9db0;border-color:#8f9db0;color:#0b1119}
+.tag.acc{color:var(--gold);border-color:#4a3a17}
+.tag.asm{color:#b48cff;border-color:#3f2f66}
+.tag.hold{color:var(--less);border-color:#5a2b22}
+.tag.broke{background:#5a2b22;border-color:#e0644f;color:#ffd9d2}
+.desc{font-size:11.5px;color:var(--dim);flex:1}
+.plays{font-size:11px;color:#93a7bd;border-top:1px dashed var(--line);padding-top:5px}
+.plays b{color:var(--tx);font-weight:600}
+.vote{display:flex;gap:3px;margin-top:2px}
+.vote button{flex:1;padding:4px 0;font-size:11px;border-radius:5px;background:var(--panel);color:var(--tx);
+border:1px solid var(--line);cursor:pointer}
+.vote button[data-w="-2"].sel,.vote button[data-w="-1"].sel{background:var(--less);border-color:var(--less);color:#25090a;font-weight:700}
+.vote button[data-w="0"].sel{background:#44586e;border-color:#44586e;color:#eaf2f8;font-weight:700}
+.vote button[data-w="1"].sel,.vote button[data-w="2"].sel{background:var(--more);border-color:var(--more);color:#052515;font-weight:700}
+.note{background:#121d2b;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;
+padding:10px 13px;margin:0 0 13px;font-size:12.5px;color:#b9c9d9}
+.note b{color:var(--gold)}
+.empty{text-align:center;color:var(--dim);padding:50px 20px}
+.empty b{color:var(--gold);display:block;font-size:16px;margin-bottom:6px}
+h2.sec{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:20px 0 9px;
+border-bottom:1px solid var(--line);padding-bottom:5px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--gold);color:#241a02;
+padding:9px 18px;border-radius:8px;font-weight:700;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+#toast.show{opacity:1}
+.sitenav{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:9px 16px;
+background:#070b12;border-bottom:1px solid var(--line);font-size:13.5px}
+.sitenav a{color:var(--dim);text-decoration:none}
+.sitenav a:hover{color:var(--cy)}
+.sitenav .brand{display:flex;align-items:center;gap:8px;color:var(--tx);font-weight:650}
+.sitenav .brand img{width:22px;height:22px;border-radius:5px;display:block}
+.sitenav .dl{margin-left:auto;color:var(--gold);font-weight:650}
+@media(max-width:760px){.sitenav .dl{margin-left:0}}
+</style></head><body>
+
+<div class="sitenav">
+  <a class="brand" href="/"><img src="/brand/emblem.png" alt=""><span>JellyDazzle</span></a>
+  <a href="/">Home</a>
+  <a href="/tribute/">To the Original Creator of Dazzle</a>
+  <a href="https://github.com/LIBCSYS/JellyDazzle">GitHub</a>
+  <a class="dl" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download 2.4.4</a>
+</div>
+<header>
+  <h1><img src="/brand/emblem.png" alt="" class="mark">JellyDazzle <span>Command Panel</span></h1>
+  <div class="hint">Hover any tile to see it move and shift colour. Thumbnails are one fixed palette — the app cycles 180 schemes, so judge <b>shape</b> here, not colour.</div>
+  <div class="row"><span class="lbl">Layer</span><span id="fL"></span></div>
+  <div class="row"><span class="lbl">Set</span><span id="fS"></span></div>
+  <div class="row"><span class="lbl">Behaviour</span><span id="fB"></span></div>
+  <div class="row"><span class="lbl">Your call</span><span id="fW"></span></div>
+  <div class="row"><span class="lbl">Find</span>
+    <input id="q" placeholder="search name or description…">
+    <button class="act" id="reset">Reset filters</button>
+    <button class="act" id="save">Save weights</button>
+    <div class="tally" id="tally"></div>
+  </div>
+</header>
+
+<main>
+<div class="note">
+<b>How a frame is built.</b> Up to four layers run at once, bottom to top: a <b>GROUND</b> fills the screen, a <b>FIELD</b> covers most of it with gaps, a <b>FIGURE</b> drops distinct shapes over that, and a <b>SPARK</b> adds glints. They blend by brightness, so dark parts of an upper layer let the one below show through. Each layer takes a turn of its own length, then a new routine is drawn from the bag and fades in — timing is random by design, never a fixed loop. An <b>accumulator</b> doesn't repaint each frame: it clears once and keeps drawing onto itself for its whole turn, which is how the line-art builds up.
+<br><br><b>Your weights drive the bag.</b> ▲▲ puts a routine in the bag several times, ▼▼ puts it in once and rarely — it still shows up, just not often. Nothing is discarded.
+</div>
+<div id="out"></div>
+</main>
+<div id="toast"></div>
+
+<script>
+let DB=[], W={};
+const $=s=>document.querySelector(s), out=$('#out'), toast=$('#toast');
+const F={layer:new Set(), set:new Set(), beh:new Set(), rate:new Set()};
+
+const LAYERS=['GROUND','FIELD','FIGURE','SPARK','MIXED'];
+const SETS=[['CORE (2.3)','Core 2.3'],['FIELD','New field'],['GROUND','New ground'],
+            ['LIGHTNING','Lightning'],['FIGURE/GEARS','Figures & gears'],
+            ['SPARK/MATRIX','Spark & matrix'],['ASSEMBLY (core engine)','Assembly']];
+const BEH=[['repaint','Repaints each frame'],['acc','Accumulates'],
+           ['active','In the app now'],['held','Held out'],['broken','Won\'t build']];
+const RATE=[['unrated','Unrated'],['more','Marked more ▲'],['less','Marked less ▼']];
+
+fetch('patterns.json?v='+Date.now()).then(r=>r.json()).then(d=>{DB=d;
+  fetch('weights.json?v='+Date.now()).then(r=>r.ok?r.json():{}).then(w=>{W=w||{};boot();}).catch(boot);
+});
+
+/* does row `skip` get ignored when counting? yes — so a chip's count shows what
+   you'd get if you picked it, which is why no chip can ever lead to an empty screen */
+function match(r,skip){
+  const q=$('#q')?$('#q').value.toLowerCase():'';
+  if(q && !(r.name+' '+r.desc+' '+r.n).toLowerCase().includes(q)) return false;
+  if(skip!=='layer' && F.layer.size && !F.layer.has(r.role)) return false;
+  if(skip!=='set'   && F.set.size   && !F.set.has(r.family)) return false;
+  if(skip!=='beh'   && F.beh.size){
+    for(const b of F.beh){
+      if(b==='repaint' && r.acc) return false;
+      if(b==='acc' && !r.acc) return false;
+      if(b==='active' && !r.active) return false;
+      if(b==='held' && r.active) return false;
+      if(b==='broken' && !r.broken) return false;
+    }
+  }
+  if(skip!=='rate' && F.rate.size){
+    const w=W[r.n];
+    let ok=false;
+    for(const b of F.rate){
+      if(b==='unrated' && w===undefined) ok=true;
+      if(b==='more' && w>0) ok=true;
+      if(b==='less' && w<0) ok=true;
+    }
+    if(!ok) return false;
+  }
+  return true;
+}
+const count=(k,test)=>DB.filter(r=>match(r,k)&&test(r)).length;
+
+function chips(){
+  const mk=(host,row,items)=>{
+    host.innerHTML='';
+    items.forEach(([val,label,test])=>{
+      const n=count(row,test);
+      const b=document.createElement('button');
+      b.className='chip '+(row==='layer'?'L_'+val+' ':'')+(F[row].has(val)?'on ':'')+(n===0&&!F[row].has(val)?'zero':'');
+      b.innerHTML=label+'<span class="c">'+n+'</span>';
+      b.onclick=()=>{F[row].has(val)?F[row].delete(val):F[row].add(val); render();};
+      host.appendChild(b);
+    });
+  };
+  mk($('#fL'),'layer',LAYERS.map(l=>[l,l,r=>r.role===l]));
+  mk($('#fS'),'set',SETS.map(([v,l])=>[v,l,r=>r.family===v]));
+  mk($('#fB'),'beh',BEH.map(([v,l])=>[v,l,r=>v==='repaint'?!r.acc:v==='acc'?r.acc:
+      v==='active'?r.active:v==='held'?!r.active:r.broken]));
+  mk($('#fW'),'rate',RATE.map(([v,l])=>[v,l,r=>{const w=W[r.n];
+      return v==='unrated'?w===undefined:v==='more'?w>0:w<0;}]));
+}
+
+function boot(){
+  $('#q').oninput=render;
+  $('#save').onclick=save;
+  $('#reset').onclick=()=>{Object.values(F).forEach(s=>s.clear());$('#q').value='';render();};
+  render();
+}
+
+function render(){
+  chips();
+  const rows=DB.filter(r=>match(r,null));
+  out.innerHTML='';
+  if(!rows.length){
+    out.innerHTML='<div class="empty"><b>Nothing matches that combination.</b>'+
+      'Those filters cancel each other out — hit <i>Reset filters</i>.</div>';
+  } else {
+    const groups={};
+    rows.forEach(r=>{(groups[r.family]=groups[r.family]||[]).push(r);});
+    Object.keys(groups).forEach(f=>{
+      const h=document.createElement('h2'); h.className='sec';
+      h.textContent=f+' — '+groups[f].length; out.appendChild(h);
+      const g=document.createElement('div'); g.className='grid';
+      groups[f].forEach(r=>g.appendChild(card(r)));
+      out.appendChild(g);
+    });
+  }
+  const more=Object.values(W).filter(v=>v>0).length, less=Object.values(W).filter(v=>v<0).length;
+  $('#tally').innerHTML=`showing <b>${rows.length}</b> of ${DB.length} · <b>${more}</b> more · <b>${less}</b> less`;
+}
+
+function card(r){
+  const w=W[r.n];
+  const d=document.createElement('div');
+  d.className='card '+(w===2?'w2':w===1?'w1':w===-1?'wm1':w===-2?'wm2':'');
+  const still=`img/${r.n}.png`;
+  const media = r.img
+    ? `<div class="thumbwrap"><img class="thumb" loading="lazy" src="${still}" alt="">
+         ${r.anim?'<span class="playhint">hover to play</span>':''}</div>`
+    : `<div class="thumbwrap"><div class="noimg">${r.broken?'will not build<br>(missing kit header)':'render pending'}</div></div>`;
+  d.innerHTML = media + `<div class="body">
+    <div class="nm"><em>${r.n}</em>${esc(r.name)}</div>
+    <div class="tags">
+      <span class="tag role ${r.role}">${r.role}</span>
+      ${r.acc?'<span class="tag acc">accumulator</span>':''}
+      ${r.family.startsWith('ASSEMBLY')?'<span class="tag asm">assembly</span>':''}
+      ${r.active?'':'<span class="tag hold">held out</span>'}
+      ${r.broken?'<span class="tag broke">won\'t build</span>':''}
+    </div>
+    <div class="desc">${esc(r.desc||'—')}</div>
+    <div class="plays"><b>Plays:</b> ${esc(r.plays)}</div>
+    <div class="vote">
+      ${[[-2,'▼▼'],[-1,'▼'],[0,'—'],[1,'▲'],[2,'▲▲']].map(([v,l])=>
+        `<button data-w="${v}" class="${w===v?'sel':''}">${l}</button>`).join('')}
+    </div></div>`;
+  /* try the animation on hover regardless of the flag — the batch renderer is
+     still filling anim/, and onerror quietly falls back to the still. */
+  if(r.img){
+    const im=d.querySelector('.thumb');
+    const hint=d.querySelector('.playhint');
+    im.onerror=()=>{im.onerror=null;im.src=still;if(hint)hint.remove();};
+    d.onmouseenter=()=>{im.src=`anim/${r.n}.gif`;};
+    d.onmouseleave=()=>{im.src=still;};
+  }
+  d.querySelectorAll('.vote button').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    W[r.n]=+b.dataset.w; localStorage.setItem('jd_weights',JSON.stringify(W));
+    d.replaceWith(card(r)); chips(); tally();});
+  return d;
+}
+function tally(){
+  const more=Object.values(W).filter(v=>v>0).length, less=Object.values(W).filter(v=>v<0).length;
+  $('#tally').innerHTML=`<b>${more}</b> more · <b>${less}</b> less · <b>${Object.keys(W).length}</b> rated`;
+}
+function esc(s){return (s||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
+function save(){
+  fetch('save.php',{method:'POST',body:JSON.stringify(W)}).then(r=>r.json()).then(j=>{
+    toast.textContent=`Saved ${j.count} weights → weights.json`; toast.className='show';
+    setTimeout(()=>toast.className='',2200);
+  }).catch(()=>{
+    /* public mirror has no save endpoint — hand over a file instead, so you
+       can rate from anywhere and bring the weights back to the build box */
+    const blob=new Blob([JSON.stringify(W,null,1)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='weights.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast.textContent='No save endpoint here — downloaded weights.json instead';
+    toast.className='show'; setTimeout(()=>toast.className='',3000);
+  });
+}
+</script></body></html>

@@ -1,5 +1,7 @@
-jellydazzle
-dist/
-*.o
 __pycache__/
 .DS_Store
+*.o
+catalog/anim/
+catalog/img/
+dist/
+jellydazzle

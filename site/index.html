@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JellyDazzle &mdash; audio-reactive ARM64 screensaver for Apple Silicon</title>
+<link rel="icon" type="image/png" href="/brand/favicon-64.png">
+<link rel="apple-touch-icon" href="/brand/emblem.png">
+<meta property="og:title" content="JellyDazzle">
+<meta property="og:description" content="A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A assembly for Apple Silicon and beyond.">
+<meta property="og:image" content="https://dazzle.jelia.nyc/brand/social-1280x640.png">
+<meta property="og:url" content="https://dazzle.jelia.nyc/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A assembly for Apple Silicon and beyond.">
+<style>
+:root{--ink:#07080d;--panel:#10141c;--line:#1e2735;--cy:#22d3ee;--gold:#e9b65a;--tx:#dde7f0;--dim:#8296aa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--tx);
+font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif}
+a{color:var(--cy)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header{padding:54px 0 30px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:clamp(34px,6vw,58px);letter-spacing:-.02em;line-height:1.05}
+.hero{display:block;width:100%;max-width:1024px;height:auto;border-radius:12px;
+border:1px solid var(--line);margin:0 0 22px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1 span{color:var(--cy)}
+.tag{color:var(--dim);font-size:clamp(15px,2.2vw,19px);margin-top:12px;max-width:65ch}
+.ver{display:inline-block;margin-top:16px;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;
+color:var(--gold);border:1px solid #4a3a17;border-radius:99px;padding:3px 12px}
+.cta{display:flex;gap:11px;flex-wrap:wrap;margin-top:26px}
+.btn{display:inline-block;padding:11px 20px;border-radius:9px;text-decoration:none;font-weight:650;font-size:15px;
+border:1px solid var(--line);background:var(--panel);color:var(--tx)}
+.btn:hover{border-color:var(--cy)}
+.btn.p{background:var(--gold);border-color:var(--gold);color:#241a02}
+.btn.s{background:var(--cy);border-color:var(--cy);color:#06202a}
+section{padding:40px 0;border-bottom:1px solid var(--line)}
+h2{font-size:13px;letter-spacing:.11em;text-transform:uppercase;color:var(--gold);margin:0 0 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.grid img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;border-radius:8px;
+border:1px solid var(--line);background:#050a10}
+figure{margin:0}
+figcaption{font-size:11.5px;color:var(--dim);margin-top:5px}
+ul{margin:0;padding-left:19px}
+li{margin-bottom:9px}
+li b{color:var(--tx)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:26px}
+.stat{font-size:30px;font-weight:700;color:var(--cy);line-height:1}
+.stat+div{color:var(--dim);font-size:13.5px;margin-top:4px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px 15px;
+overflow-x:auto;font-size:13.5px;color:#b9c9d9}
+footer{padding:30px 0 60px;color:var(--dim);font-size:13.5px}
+footer a{color:var(--dim)}
+@media (prefers-color-scheme:light){}
+nav{border-bottom:1px solid var(--line);background:rgba(7,8,13,.94);position:sticky;top:0;z-index:20;backdrop-filter:blur(8px)}
+.navwrap{max-width:1080px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:20px;font-size:14px;flex-wrap:wrap}
+@media(max-width:760px){.navwrap{gap:12px 16px}.tribute-link{flex-basis:100%;order:5}.dl{margin-left:0!important}}
+nav a{text-decoration:none;color:var(--dim)}
+nav a:hover{color:var(--cy)}
+.brand{display:flex;align-items:center;gap:9px;color:var(--tx)!important;font-weight:650;margin-right:6px}
+.brand img{width:26px;height:26px;border-radius:6px;display:block}
+.dl{margin-left:auto;color:var(--gold)!important;font-weight:650}
+header{padding-top:34px!important}
+</style></head><body>
+
+<nav><div class="navwrap">
+  <a class="brand" href="/"><img src="/brand/emblem.png" alt=""><span>JellyDazzle</span></a>
+  <a href="/library/">Library</a>
+  <a class="tribute-link" href="/tribute/">To the Original Creator of Dazzle</a>
+  <a href="https://github.com/LIBCSYS/JellyDazzle">GitHub</a>
+  <a class="dl" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download</a>
+</div></nav>
+
+<div class="wrap">
+<header>
+  <img class="hero" src="/brand/jellydazzle-logo.jpg" alt="JellyDazzle">
+  <h1 class="sr">Jelly<span>Dazzle</span></h1>
+  <div class="tag">A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A
+  assembly for Apple Silicon &mdash; and beyond. It listens to whatever your Mac is
+  playing and paints to it: never the same pattern, never the same colours.</div>
+  <div class="ver">version 2.4.4 &middot; macOS &middot; Apple Silicon &middot; MIT</div>
+  <div class="cta">
+    <a class="btn p" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download for macOS</a>
+    <a class="btn s" href="/library/">Browse all 625 routines</a>
+    <a class="btn" href="https://github.com/LIBCSYS/JellyDazzle">Source on GitHub</a>
+  </div>
+</header>
+
+<section>
+  <h2>What it looks like</h2>
+  <div class="grid">
+    <figure><img loading="lazy" src="/library/anim/A05.gif" alt="rays through a mirror-tile transform"><figcaption>A05 &mdash; rays &middot; mirror-tile (assembly)</figcaption></figure>
+    <figure><img loading="lazy" src="/library/anim/A23.gif" alt="fireworks accumulator"><figcaption>A23 &mdash; fireworks (assembly accumulator)</figcaption></figure>
+    <figure><img loading="lazy" src="/library/anim/476.gif" alt="lightning mandala"><figcaption>476 &mdash; lightning mandala</figcaption></figure>
+    <figure><img loading="lazy" src="/library/anim/007.gif" alt="pinwheel spiral"><figcaption>007 &mdash; pinwheel spiral</figcaption></figure>
+    <figure><img loading="lazy" src="/library/anim/019.gif" alt="moire silk"><figcaption>019 &mdash; moir&eacute; silk</figcaption></figure>
+    <figure><img loading="lazy" src="/library/anim/480.gif" alt="tesla coil"><figcaption>480 &mdash; tesla coil</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>How a frame is built</h2>
+  <div class="cols">
+    <div>
+      <p style="margin-top:0">Up to four layers run at once, bottom to top: a <b>ground</b> fills
+      the screen, a <b>field</b> covers most of it with gaps, a <b>figure</b> drops distinct
+      shapes over that, and a <b>spark</b> adds glints. They blend by brightness, so dark
+      parts of an upper layer let the one below show through.</p>
+      <p>Each layer takes a turn of its own length, then a new routine is drawn from a
+      shuffled bag and fades in. Timing is random by design &mdash; never a fixed loop.
+      At startup the engine measures every routine and assigns it a layer by how much
+      of the screen it actually covers.</p>
+    </div>
+    <div>
+      <div class="stat">24</div><div>ARMv9.2-A assembly engine modes</div>
+      <div class="stat" style="margin-top:18px">201</div><div>C pattern plug-ins in the shipping build</div>
+      <div class="stat" style="margin-top:18px">180</div><div>palette schemes, interpolated in OKLab</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>What's new</h2>
+  <ul>
+    <li><b>2.4.4 &mdash; layers always read apart.</b> A layer's palette window used
+    to be picked at random with no regard for what was already on screen, so an
+    overlay could land on the same hue family as the ground and vanish. Measured
+    across 232 concurrent pairs, the closest sat at <b>0.0% &mdash; identical</b>. A
+    spawning layer now takes the furthest of eight candidate windows; worst
+    separation is 17.6%, with nothing under 15%.</li>
+
+    <li><b>2.4.3 &mdash; it never opens on the same thing.</b> For the first couple of
+    seconds only one layer is on screen, so first impressions came from a single
+    bag of ~77 backgrounds drawn with no memory between launches &mdash; a repeat
+    roughly every ten runs. It now remembers its last 25 openings and refuses
+    them. Thirty launches, thirty unique openings.</li>
+
+    <li><b>2.4.2 &mdash; the colour never stops.</b> Palette rotation was driven
+    entirely by audio, so in silence the hues morphed but stopped travelling.
+    There's now an idle floor of about one turn of the ramp every 50 seconds, with
+    audio stacking on top. Taken straight from video of the original
+    (<a href="/tribute/">see the tribute</a>), where eight of twelve sampled frames
+    are the same geometry with only the colour moving.</li>
+
+    <li><b>2.4.1 &mdash; an icon, and an About card.</b> Press <b>A</b> for version,
+    source, library and the key map.</li>
+
+    <li><b>2.4.0 &mdash; system audio, no strobe, solid fullscreen.</b> Captures what
+    your Mac is actually playing through a Core Audio process tap. Layer palette
+    windows are cyclic, so audio-driven rotation can't drag a pattern across a
+    discontinuity. Fullscreen no longer restarts the engine or crashes. Startup
+    measurements are cached, so every launch begins with the whole library sorted
+    into layers.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Build it yourself</h2>
+  <pre>git clone https://github.com/LIBCSYS/JellyDazzle.git
+cd JellyDazzle
+make          # build
+make run      # build and launch
+make app      # signed self-contained .app</pre>
+  <p style="color:var(--dim);font-size:14px">Needs SDL2 (<code>brew install sdl2</code>) and the
+  Xcode command line tools. macOS will ask for microphone permission on first launch; the
+  visuals run on internal clocks without it.</p>
+</section>
+
+<section>
+  <h2>In tribute</h2>
+  <div class="cols">
+    <div>
+      <p style="margin-top:0">JellyDazzle exists because of <b>DAZZLE.EXE</b>, written by
+      <b>James R. Shiflett</b> of Houston, Texas. He wrote it at night &mdash; &ldquo;a sort of
+      therapy,&rdquo; he called it &mdash; while his day job was administrative work around an
+      NEC SX-2 supercomputer at the Houston Advanced Research Center.</p>
+      <p>MicroTronics released it as shareware in 1990 for $15. Road Scholar Software
+      published it at retail as <i>Razzle Dazzle</i> in 1992, and by 1993 it was earning
+      more in shareware registrations each week than most people made in a month. It went
+      head to head with After Dark, and in 1993 its visuals became a 45-minute art film
+      scored by Jonn Serrie.</p>
+    </div>
+    <div>
+      <p style="margin-top:0">Its source was never released. This is not a port and not a
+      reverse engineering &mdash; nothing was disassembled. It is an homage written from
+      scratch, chasing the same feeling: cheap geometry, mirrored symmetry, and colour that
+      moves because the palette moves rather than because the pixels do.</p>
+      <p style="color:var(--gold)">Shiflett&rsquo;s exit splash read:<br>
+      <i>&ldquo;Our Creator, evidenced by our creativity.&rdquo;</i></p>
+      <p style="margin-top:18px"><a class="btn" style="padding:9px 16px;font-size:14px"
+      href="/tribute/">Read the full story &rarr;</a></p>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap" style="padding-left:0;padding-right:0">
+  <a href="https://github.com/LIBCSYS/JellyDazzle">github.com/LIBCSYS/JellyDazzle</a> &middot;
+  <a href="/library/">the full library</a> &middot;
+  MIT licensed &middot; built by John Elia
+  <br><span style="opacity:.7">An homage to DAZZLE.EXE. Not affiliated with the original.</span>
+</footer>
+</div>
+</body></html>
