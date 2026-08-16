@@ -655,6 +655,8 @@ static uint16_t bag_draw(jd_bag *b, int (*ok)(uint16_t, int), int slot)
  * the pattern set changes, so a stale cache can never mis-sort anything. */
 #define JD_CACHE_MAGIC 0x4A44504Bu       /* 'JDPK' */
 
+static uint32_t probe_stamp(void);
+
 static const char *probe_cache_path(void)
 {
     static char p[1024];
@@ -662,7 +664,12 @@ static const char *probe_cache_path(void)
     if (!home) return NULL;
     snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle", home);
     mkdir(p, 0755);                       /* ok if it already exists */
-    snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle/probe.bin", home);
+    /* One file PER LIBRARY SIZE. A single shared name meant any build with a
+     * different pattern count clobbered the others — running a 203-pattern
+     * build once would force a 603-pattern build to rebuild from scratch on
+     * its next launch, forever. Keyed by the stamp, they coexist. */
+    snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle/probe-%08x.bin",
+             home, probe_stamp());
     return p;
 }
 
