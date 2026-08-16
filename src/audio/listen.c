@@ -261,6 +261,12 @@ int jd_audio_init(void)
     for (int i = 0; i < AU_N; i++)
         au_win[i] = 0.5f - 0.5f * cosf(2.0f * (float)M_PI * i / (AU_N - 1));
 
+    /* HUD flags are read BEFORE any early return: the meter and the about card
+     * are not audio features, and JD_AUDIO_SRC=off used to disable them as a
+     * side effect of bailing out of this function. */
+    if (getenv("JD_AUDIO_METER")) au_meter = 1;
+    if (getenv("JD_ABOUT")) au_about = 1;
+
     const char *e = getenv("JD_AUDIO_SRC");
     if (e) {
         if (!SDL_strcasecmp(e, "off") || !SDL_strcasecmp(e, "none")) {
@@ -274,9 +280,6 @@ int jd_audio_init(void)
     }
     /* legacy knob from 2.3 */
     if ((e = getenv("JD_AUDIO_DEV")) != NULL) { au_want_src = SRC_MIC; au_want_dev = SDL_atoi(e); }
-    if (getenv("JD_AUDIO_METER")) au_meter = 1;
-    if (getenv("JD_ABOUT")) au_about = 1;
-
     au_ref = au_floor;
     if (!au_open_any()) return 0;
     au_ref = au_floor;

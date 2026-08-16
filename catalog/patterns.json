@@ -7431,9 +7431,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "573",
@@ -7444,9 +7444,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "574",
@@ -7457,9 +7457,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "575",
@@ -7470,9 +7470,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "576",
@@ -7483,9 +7483,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "577",
@@ -7496,9 +7496,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "578",
@@ -7509,9 +7509,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "579",
@@ -7522,9 +7522,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "580",
@@ -7535,9 +7535,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "581",
@@ -7548,9 +7548,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "582",
@@ -7561,9 +7561,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "583",
@@ -7574,9 +7574,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "584",
@@ -7587,9 +7587,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "585",
@@ -7600,9 +7600,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "586",
@@ -7613,9 +7613,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "587",
@@ -7626,9 +7626,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "588",
@@ -7639,9 +7639,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "589",
@@ -7652,9 +7652,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "590",
@@ -7665,9 +7665,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "591",
@@ -7678,9 +7678,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "592",
@@ -7691,9 +7691,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "593",
@@ -7704,9 +7704,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "594",
@@ -7717,9 +7717,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "595",
@@ -7730,9 +7730,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "596",
@@ -7743,9 +7743,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "597",
@@ -7756,9 +7756,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "598",
@@ -7769,9 +7769,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "599",
@@ -7782,9 +7782,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s).",
   "acc": false,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "600",
@@ -7795,9 +7795,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "601",
@@ -7808,9 +7808,9 @@
   "plays": "Overlay glints \u2014 sparse, brief and bright, top of the stack (~8-15 s). Builds up over its turn (accumulator).",
   "acc": true,
   "active": false,
-  "img": false,
-  "broken": true,
-  "anim": false
+  "img": true,
+  "broken": false,
+  "anim": true
  },
  {
   "n": "A00",
