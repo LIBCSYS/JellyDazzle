@@ -64,3 +64,47 @@ the homage, and here is the original's actual grammar, faithfully.*
 Recommendation: **(b) first.** It is fast, it is separable, it settles what the original
 grammar really feels like at full speed, and whatever we learn from it can then inform
 (a) with evidence instead of speculation.
+
+
+---
+
+## Second capture (83 s) — the biggest finding yet
+
+`~/Desktop/.tmp.driveupload/685653`, 42 frames sampled. Contact sheet:
+`dazzle_capture_palette_cycle.png`.
+
+**Eight of twelve sampled frames are the same composition.** The geometry does not move
+at all — same bars, same wing spikes, same corner ellipse clusters, pixel for pixel.
+What changes is the colour: yellow/green -> red/purple -> magenta/cyan -> green/cyan ->
+blue/red, sweeping continuously.
+
+That is **palette cycling on a held static image**, and it is not a minor flourish — on
+this evidence it is the engine's dominant animation mode. Shiflett drew a frame once and
+then animated it for ten or fifteen seconds by rotating the DAC. No pixels were touched.
+
+### Why this matters more than anything else in this document
+
+JellyDazzle **redraws every pixel of every layer, every frame, at 60 fps.** The original
+mostly drew *once* and then let the hardware colour-cycle. Those are opposite
+architectures, and it explains several things at once:
+
+- why the original could look this rich on an 8088 while we need an M-series chip;
+- why its colour moves in smooth continuous sweeps (a palette rotation is inherently
+  continuous) while ours has to be carefully enveloped to avoid strobing;
+- why its geometry reads as *crystalline and still* while ours reads as *flowing*.
+
+We already have the ingredients: a 32768-entry palette, a walk offset, and accumulator
+patterns that hold a canvas across a turn. What we have never done is **stop redrawing
+and just move the palette**. A pattern class that renders once, stores an index buffer,
+and then animates purely by advancing the palette offset would be cheap, would be
+completely strobe-free by construction, and would be the single most authentic thing we
+could add.
+
+### Also confirmed by this capture
+
+- **Non-black backgrounds are real.** The final frame is fireworks on a flat **magenta**
+  field. The spec called this and the footage proves it.
+- **Particle fireworks confirmed** — the effect the research attributes to Shiflett
+  watching a *Star Trek* explosion.
+- **Sparse resets confirmed again** — frame 3 is near-empty black with two small cyan
+  chevrons before the next set builds.
