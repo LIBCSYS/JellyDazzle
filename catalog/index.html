@@ -85,8 +85,23 @@ border-bottom:1px solid var(--line);padding-bottom:5px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--gold);color:#241a02;
 padding:9px 18px;border-radius:8px;font-weight:700;opacity:0;transition:.25s;pointer-events:none;z-index:50}
 #toast.show{opacity:1}
+.sitenav{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:9px 16px;
+background:#070b12;border-bottom:1px solid var(--line);font-size:13.5px}
+.sitenav a{color:var(--dim);text-decoration:none}
+.sitenav a:hover{color:var(--cy)}
+.sitenav .brand{display:flex;align-items:center;gap:8px;color:var(--tx);font-weight:650}
+.sitenav .brand img{width:22px;height:22px;border-radius:5px;display:block}
+.sitenav .dl{margin-left:auto;color:var(--gold);font-weight:650}
+@media(max-width:760px){.sitenav .dl{margin-left:0}}
 </style></head><body>
 
+<div class="sitenav">
+  <a class="brand" href="/"><img src="/brand/emblem.png" alt=""><span>JellyDazzle</span></a>
+  <a href="/">Home</a>
+  <a href="/tribute/">To the Original Creator of Dazzle</a>
+  <a href="https://github.com/LIBCSYS/JellyDazzle">GitHub</a>
+  <a class="dl" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download 2.4.4</a>
+</div>
 <header>
   <h1><img src="/brand/emblem.png" alt="" class="mark">JellyDazzle <span>Command Panel</span></h1>
   <div class="hint">Hover any tile to see it move and shift colour. Thumbnails are one fixed palette — the app cycles 180 schemes, so judge <b>shape</b> here, not colour.</div>

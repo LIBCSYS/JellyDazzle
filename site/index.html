@@ -76,7 +76,7 @@ header{padding-top:34px!important}
   <div class="tag">A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A
   assembly for Apple Silicon &mdash; and beyond. It listens to whatever your Mac is
   playing and paints to it: never the same pattern, never the same colours.</div>
-  <div class="ver">version 2.4.0 &middot; macOS &middot; Apple Silicon &middot; MIT</div>
+  <div class="ver">version 2.4.4 &middot; macOS &middot; Apple Silicon &middot; MIT</div>
   <div class="cta">
     <a class="btn p" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download for macOS</a>
     <a class="btn s" href="/library/">Browse all 625 routines</a>
@@ -118,17 +118,37 @@ header{padding-top:34px!important}
 </section>
 
 <section>
-  <h2>New in 2.4</h2>
+  <h2>What's new</h2>
   <ul>
-    <li><b>System audio, not just the microphone.</b> Captures what your Mac is actually
-    playing through a Core Audio process tap.</li>
-    <li><b>No strobe.</b> Layer palette windows are cyclic, so audio-driven rotation can
-    no longer drag a pattern across a discontinuity. Verified: worst frame-to-frame step
-    4.56 over 3000 frames with music live.</li>
-    <li><b>Fullscreen is solid.</b> It no longer restarts the engine, and no longer crashes.</li>
-    <li><b>Instant variety.</b> Startup measurements are cached, so every launch begins
-    with the whole library sorted into layers.</li>
-    <li><b>Audio HUD.</b> Press <b>M</b> for source, bands, beat and BPM.</li>
+    <li><b>2.4.4 &mdash; layers always read apart.</b> A layer's palette window used
+    to be picked at random with no regard for what was already on screen, so an
+    overlay could land on the same hue family as the ground and vanish. Measured
+    across 232 concurrent pairs, the closest sat at <b>0.0% &mdash; identical</b>. A
+    spawning layer now takes the furthest of eight candidate windows; worst
+    separation is 17.6%, with nothing under 15%.</li>
+
+    <li><b>2.4.3 &mdash; it never opens on the same thing.</b> For the first couple of
+    seconds only one layer is on screen, so first impressions came from a single
+    bag of ~77 backgrounds drawn with no memory between launches &mdash; a repeat
+    roughly every ten runs. It now remembers its last 25 openings and refuses
+    them. Thirty launches, thirty unique openings.</li>
+
+    <li><b>2.4.2 &mdash; the colour never stops.</b> Palette rotation was driven
+    entirely by audio, so in silence the hues morphed but stopped travelling.
+    There's now an idle floor of about one turn of the ramp every 50 seconds, with
+    audio stacking on top. Taken straight from video of the original
+    (<a href="/tribute/">see the tribute</a>), where eight of twelve sampled frames
+    are the same geometry with only the colour moving.</li>
+
+    <li><b>2.4.1 &mdash; an icon, and an About card.</b> Press <b>A</b> for version,
+    source, library and the key map.</li>
+
+    <li><b>2.4.0 &mdash; system audio, no strobe, solid fullscreen.</b> Captures what
+    your Mac is actually playing through a Core Audio process tap. Layer palette
+    windows are cyclic, so audio-driven rotation can't drag a pattern across a
+    discontinuity. Fullscreen no longer restarts the engine or crashes. Startup
+    measurements are cached, so every launch begins with the whole library sorted
+    into layers.</li>
   </ul>
 </section>
 
