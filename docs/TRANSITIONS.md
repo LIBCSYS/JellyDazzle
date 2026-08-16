@@ -57,3 +57,41 @@ handover picks one from a bag, the same way routines are picked.
 `src/engine/compositor.c`, in the layer handover path — the same place that currently
 ramps `peak` up and down. The bag machinery for picking a transition can reuse
 `bag_draw()`.
+
+
+---
+
+## Correction from video evidence (2026-08-16)
+
+A 58-second capture of DAZZLE 5.0 running under DOSBox
+(`~/Desktop/dazzle_samples/IMG_5190.MOV.3gp`, frames extracted and reviewed) changes
+the picture. **The main transition is not a fade at all — it is a drawn pattern that
+overwrites the old frame.**
+
+What the footage shows, in order:
+
+1. A set accumulates for ~20 s until the screen is nearly saturated — sparse at first,
+   then dense, exactly as the spec describes.
+2. The clear begins as a **band of concentric rainbow rectangles growing diagonally
+   from the lower-left**, eating the old image as it expands. It is one of the engine's
+   own primitives (`nestedRects`) being used as the wipe. Hard-edged, fully saturated,
+   and it takes several seconds.
+3. It finishes as full-screen rainbow bars, then the screen is briefly near-empty.
+4. The next set opens **sparse** — in this capture, two small line-sweep trapezoid
+   motifs mirrored top-and-bottom (the spec's `'dual'` symmetry mode).
+5. The new set builds in a **different palette family** — the outgoing set was
+   green/yellow/magenta, the incoming one red/blue/purple.
+
+### What this means for us
+
+- **The transition is content, not a dissolve.** That is a much better idea than
+  anything in the table above, and it is cheap: run a primitive with a growing bound
+  and let it paint over. Add it as a transition type: *overwrite-by-pattern*.
+- **The palette family changes with the set**, which is why the reset reads as a whole
+  new scene rather than more of the same. We already have 180 schemes and a walk; what
+  we lack is committing to a new region of the palette at a set boundary.
+- **Sets go from sparse to saturated.** Our coverage policing actively prevents that
+  arc. Density should be allowed to climb across a set and then reset.
+
+The fade/dissolve/melt list above is still worth building, but *overwrite-by-pattern*
+should be first — it is the one actually observed, and it is the most characterful.
