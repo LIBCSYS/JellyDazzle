@@ -1,0 +1,31 @@
+{
+ "id": "P45",
+ "slug": "hammered_copper",
+ "name": "Hammered Copper",
+ "class": "metallic",
+ "scheme": "copper 26-72 on a full value ramp; cool neutral return leg",
+ "mood": "A copper vessel under a single lamp: black in the shadow, white on the rim, and every value between is the metal.",
+ "count": 20,
+ "colors": [
+  "020000",
+  "010508",
+  "182226",
+  "394349",
+  "5d686e",
+  "838f95",
+  "acb9bf",
+  "d7e4ea",
+  "fef7f1",
+  "fdd6ba",
+  "f3b68a",
+  "e39963",
+  "d17c3e",
+  "bb611c",
+  "9b4e15",
+  "7d3b0e",
+  "5f2a08",
+  "431a04",
+  "280c01",
+  "0f0200"
+ ]
+}

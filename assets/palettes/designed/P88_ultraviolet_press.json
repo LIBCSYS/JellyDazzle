@@ -1,0 +1,28 @@
+{
+ "id": "P88",
+ "slug": "ultraviolet_press",
+ "name": "Ultraviolet Press",
+ "class": "stark",
+ "scheme": "near-black / chalk white / ultraviolet",
+ "mood": "A hand-pressed poster in two inks, and someone ran a violet plate over the top of it slightly out of register.",
+ "count": 17,
+ "colors": [
+  "000000",
+  "000001",
+  "6600c4",
+  "8f23ff",
+  "9c72ff",
+  "fbfbfe",
+  "f6f7f9",
+  "f2f2f5",
+  "ededf0",
+  "e9e9eb",
+  "e4e4e7",
+  "d0d1d3",
+  "151619",
+  "0d0d10",
+  "07070a",
+  "030405",
+  "010102"
+ ]
+}

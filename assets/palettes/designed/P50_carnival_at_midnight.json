@@ -1,0 +1,30 @@
+{
+ "id": "P50",
+ "slug": "carnival_at_midnight",
+ "name": "Carnival at Midnight",
+ "class": "full_spectrum",
+ "scheme": "all twelve hue bins over a dark ground",
+ "mood": "The whole wheel, but seen at night \u2014 every hue present and all of them sitting on black instead of on white.",
+ "count": 19,
+ "colors": [
+  "000000",
+  "000002",
+  "020105",
+  "05020a",
+  "0b0510",
+  "130816",
+  "1c0d1c",
+  "4f0b8c",
+  "3129f7",
+  "1ea1e8",
+  "27c6dc",
+  "1da28f",
+  "da7e1b",
+  "fc8d7b",
+  "f51f85",
+  "890f84",
+  "725b0d",
+  "0d642e",
+  "384305"
+ ]
+}

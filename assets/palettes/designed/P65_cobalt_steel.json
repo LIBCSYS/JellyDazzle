@@ -1,0 +1,31 @@
+{
+ "id": "P65",
+ "slug": "cobalt_steel",
+ "name": "Cobalt Steel",
+ "class": "metallic",
+ "scheme": "cobalt blue 252-300 on a full value ramp; warm return leg",
+ "mood": "Blued steel straight off the heat \u2014 cold cobalt through the body and a white edge where the light catches it.",
+ "count": 20,
+ "colors": [
+  "000002",
+  "050201",
+  "231a16",
+  "463b38",
+  "6c605c",
+  "958884",
+  "bfb2ad",
+  "ecded9",
+  "f9f7fe",
+  "e0d8fc",
+  "c5bafa",
+  "a79df9",
+  "887ff7",
+  "6965e6",
+  "4b4dd0",
+  "2f35b6",
+  "151e98",
+  "011568",
+  "010f2f",
+  "00030e"
+ ]
+}

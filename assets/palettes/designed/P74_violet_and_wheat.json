@@ -1,0 +1,29 @@
+{
+ "id": "P74",
+ "slug": "violet_and_wheat",
+ "name": "Violet & Wheat",
+ "class": "duotone",
+ "scheme": "violet 280-296 vs wheat gold 70-86",
+ "mood": "Two inks that should not work together and do: a cold violet and a dry wheat gold, with nothing between them.",
+ "count": 18,
+ "colors": [
+  "000005",
+  "030000",
+  "130900",
+  "311d02",
+  "533405",
+  "774c0b",
+  "9e6512",
+  "c77f19",
+  "f19b2c",
+  "fdc58c",
+  "cbccfd",
+  "a6a6fb",
+  "837efa",
+  "6452f4",
+  "4a26d7",
+  "320da1",
+  "1b0566",
+  "070130"
+ ]
+}

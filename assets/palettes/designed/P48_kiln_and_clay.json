@@ -1,0 +1,30 @@
+{
+ "id": "P48",
+ "slug": "kiln_and_clay",
+ "name": "Kiln & Clay",
+ "class": "earth",
+ "scheme": "terracotta -> ochre -> bark, all low chroma",
+ "mood": "Unglazed pottery in a workshop \u2014 terracotta, slip, ash and bark. Muted rather than dark, which is the whole point of the class.",
+ "count": 19,
+ "colors": [
+  "330911",
+  "352605",
+  "413008",
+  "543a19",
+  "60471e",
+  "734f34",
+  "815f37",
+  "a37952",
+  "c6936f",
+  "dfa184",
+  "ebae8e",
+  "d29597",
+  "c1846f",
+  "b37c73",
+  "a3695a",
+  "936552",
+  "864f47",
+  "6a3734",
+  "4e2022"
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "id": "P73",
+ "slug": "brass_vigil",
+ "name": "Brass Vigil",
+ "class": "mono_accent",
+ "scheme": "brass 78-90 field; cold indigo 258-272 accent",
+ "mood": "Lamplit brass and old paper, with one cold blue window behind it.",
+ "count": 19,
+ "colors": [
+  "060300",
+  "0f0b04",
+  "312c23",
+  "585248",
+  "827c71",
+  "6d8ebe",
+  "aea89c",
+  "acc5f0",
+  "ddd7ca",
+  "feeab6",
+  "f2cb68",
+  "dead23",
+  "bf941c",
+  "a17b16",
+  "84630f",
+  "684c09",
+  "4d3705",
+  "332302",
+  "1b1000"
+ ]
+}

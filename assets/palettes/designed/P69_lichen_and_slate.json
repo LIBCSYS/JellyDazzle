@@ -1,0 +1,29 @@
+{
+ "id": "P69",
+ "slug": "lichen_and_slate",
+ "name": "Lichen & Slate",
+ "class": "earth",
+ "scheme": "lichen green 135 and slate violet 265, two muted lobes",
+ "mood": "A north wall in wet woodland: lichen on the stone, slate underneath, and not a warm colour anywhere.",
+ "count": 18,
+ "colors": [
+  "071601",
+  "13260e",
+  "102e30",
+  "1b3b3e",
+  "223821",
+  "314934",
+  "25494d",
+  "31575d",
+  "415c48",
+  "3c656d",
+  "526f5c",
+  "648371",
+  "686583",
+  "575775",
+  "464967",
+  "363c5a",
+  "262f4c",
+  "17233f"
+ ]
+}

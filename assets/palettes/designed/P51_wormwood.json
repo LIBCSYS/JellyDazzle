@@ -1,0 +1,32 @@
+{
+ "id": "P51",
+ "slug": "wormwood",
+ "name": "Wormwood",
+ "class": "mono_accent",
+ "scheme": "wormwood olive 99-111 field; magenta glint at 315",
+ "mood": "A distillery cellar in green half-light \u2014 everything olive, and one magenta reflection off glass somewhere near the ceiling.",
+ "count": 21,
+ "colors": [
+  "000000",
+  "020200",
+  "040300",
+  "110e00",
+  "211d01",
+  "322d03",
+  "433e05",
+  "565109",
+  "68640d",
+  "7c7712",
+  "8f8c17",
+  "a2a11c",
+  "b4b651",
+  "c6ca81",
+  "b2b2a5",
+  "b787c3",
+  "9a6aaf",
+  "89887c",
+  "616155",
+  "3c3c31",
+  "1b1a10"
+ ]
+}

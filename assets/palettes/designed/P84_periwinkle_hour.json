@@ -1,0 +1,31 @@
+{
+ "id": "P84",
+ "slug": "periwinkle_hour",
+ "name": "Periwinkle Hour",
+ "class": "pastel_wash",
+ "scheme": "periwinkle and cornflower pastels, all L 0.76-0.93",
+ "mood": "Six in the morning through a net curtain \u2014 periwinkle, cornflower and the faintest grey-blue.",
+ "count": 20,
+ "colors": [
+  "c2b8d5",
+  "c6b8d2",
+  "cabbd1",
+  "cebed4",
+  "d2c3da",
+  "d6c8e1",
+  "d8cdeb",
+  "d8d3f5",
+  "d5d8fb",
+  "d2ddfc",
+  "cedffc",
+  "c8e0fc",
+  "c1defb",
+  "b9dbfb",
+  "b2d7fb",
+  "aed1f9",
+  "b1caf3",
+  "b5c3eb",
+  "babde3",
+  "beb9db"
+ ]
+}

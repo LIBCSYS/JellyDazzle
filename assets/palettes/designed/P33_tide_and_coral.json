@@ -1,0 +1,29 @@
+{
+ "id": "P33",
+ "slug": "tide_and_coral",
+ "name": "Tide & Coral",
+ "class": "duotone",
+ "scheme": "sea-teal 196-204 vs coral 26-34",
+ "mood": "Two inks on wet paper: a cold sea-teal and a hot coral, with nothing between them but the paper.",
+ "count": 18,
+ "colors": [
+  "000101",
+  "040000",
+  "220400",
+  "4b1102",
+  "7a1f06",
+  "ad2d0d",
+  "e33b18",
+  "fb7259",
+  "fcae9f",
+  "fee0db",
+  "a3f9fe",
+  "2ddee5",
+  "23b8bc",
+  "1a9395",
+  "117071",
+  "094e4e",
+  "032f2f",
+  "001312"
+ ]
+}

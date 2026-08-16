@@ -1,0 +1,30 @@
+{
+ "id": "P90",
+ "slug": "mushroom_and_mauve",
+ "name": "Mushroom & Mauve",
+ "class": "earth",
+ "scheme": "mushroom -> mauve -> dusty rose, all low chroma",
+ "mood": "A forager's basket in flat light: cap-brown, gill-grey, and the mauve that bruised mushrooms go.",
+ "count": 19,
+ "colors": [
+  "2e193c",
+  "4b262c",
+  "592f36",
+  "623a48",
+  "744550",
+  "795066",
+  "8f5c6d",
+  "8f6786",
+  "ab758c",
+  "b685ad",
+  "c78ead",
+  "d49dc5",
+  "e3a9cf",
+  "b79bc9",
+  "a480a7",
+  "986d96",
+  "7b577f",
+  "604168",
+  "462d52"
+ ]
+}

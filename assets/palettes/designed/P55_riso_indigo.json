@@ -1,0 +1,30 @@
+{
+ "id": "P55",
+ "slug": "riso_indigo",
+ "name": "Riso Indigo",
+ "class": "duotone",
+ "scheme": "lime-olive 105-115 vs indigo 270-280, on a LIGHT ground",
+ "mood": "A two-colour risograph run: lime and indigo laid over bright stock, with the paper showing through everywhere they miss.",
+ "count": 19,
+ "colors": [
+  "232001",
+  "333003",
+  "434106",
+  "545309",
+  "66660e",
+  "777912",
+  "898d17",
+  "9ba21c",
+  "acb556",
+  "bfc889",
+  "f1f5ff",
+  "d2ddfd",
+  "b4c4fc",
+  "98aafb",
+  "7f8ffa",
+  "6b76e9",
+  "5c62c6",
+  "4d519f",
+  "3f4177"
+ ]
+}

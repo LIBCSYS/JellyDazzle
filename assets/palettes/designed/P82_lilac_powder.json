@@ -1,0 +1,31 @@
+{
+ "id": "P82",
+ "slug": "lilac_powder",
+ "name": "Lilac Powder",
+ "class": "pastel_wash",
+ "scheme": "lilac and orchid pastels, all L 0.76-0.93",
+ "mood": "Powdered sugar over something purple. Lilac, orchid and the palest mauve, none of it louder than a whisper.",
+ "count": 20,
+ "colors": [
+  "cfaeb1",
+  "cfb0b0",
+  "d1b4b2",
+  "d5bab7",
+  "dcc0bd",
+  "e5c6c5",
+  "eecbcf",
+  "f6d0da",
+  "fbd4e5",
+  "fcd7ef",
+  "fcd7f8",
+  "f7d6fc",
+  "f1d4fc",
+  "eccefa",
+  "e6c7f2",
+  "e1c0e6",
+  "ddb9d9",
+  "d9b3cc",
+  "d5afc0",
+  "d2adb7"
+ ]
+}

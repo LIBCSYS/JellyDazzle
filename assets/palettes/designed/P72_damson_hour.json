@@ -1,0 +1,30 @@
+{
+ "id": "P72",
+ "slug": "damson_hour",
+ "name": "Damson Hour",
+ "class": "mono_accent",
+ "scheme": "damson plum 330-342 field; old gold 76-88 accent",
+ "mood": "Plums in a dark bowl, and one brass lamp behind them. Almost the whole frame is the fruit.",
+ "count": 19,
+ "colors": [
+  "080007",
+  "0e070c",
+  "30272e",
+  "574d54",
+  "81767e",
+  "b98839",
+  "aea2aa",
+  "ebc486",
+  "dcd0d9",
+  "feddf1",
+  "fdb1e3",
+  "f97fd7",
+  "e35bc3",
+  "c935ad",
+  "aa1493",
+  "840d74",
+  "610756",
+  "40033a",
+  "21011e"
+ ]
+}

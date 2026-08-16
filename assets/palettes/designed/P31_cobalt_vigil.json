@@ -1,0 +1,30 @@
+{
+ "id": "P31",
+ "slug": "cobalt_vigil",
+ "name": "Cobalt Vigil",
+ "class": "mono_accent",
+ "scheme": "blue 257-267 field; amber 70-78 accent",
+ "mood": "A night watch by lamplight \u2014 one enormous blue room, and two small warm lights someone left burning at the far end.",
+ "count": 19,
+ "colors": [
+  "00000a",
+  "02040a",
+  "1d222b",
+  "414650",
+  "686e78",
+  "a17000",
+  "e3a400",
+  "9298a3",
+  "bec4d0",
+  "c7d7fd",
+  "a0bcfc",
+  "78a0fb",
+  "4e83f9",
+  "2564f0",
+  "094ccc",
+  "053c98",
+  "032a6a",
+  "011941",
+  "00081f"
+ ]
+}

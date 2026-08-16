@@ -1,0 +1,27 @@
+{
+ "id": "P87",
+ "slug": "hazard_tape",
+ "name": "Hazard Tape",
+ "class": "stark",
+ "scheme": "black / white / hazard lime",
+ "mood": "Black, white, and one lime slash across both. Signage, not painting.",
+ "count": 16,
+ "colors": [
+  "000000",
+  "010101",
+  "040404",
+  "080808",
+  "0d0d0d",
+  "161616",
+  "d1d1d1",
+  "e4e4e4",
+  "e9e9e9",
+  "eeeeee",
+  "f2f2f2",
+  "f7f7f7",
+  "fcfcfc",
+  "46ad00",
+  "0e8d00",
+  "1a6400"
+ ]
+}
