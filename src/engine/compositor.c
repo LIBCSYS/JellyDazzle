@@ -1509,6 +1509,21 @@ static int try_spawn(int slot, int frame)
     uint32_t hr = mix32(r ^ 0xB0B0B0B0u);
     int hold = HOLD_LO[sidx] + (int)(hr % (uint32_t)(HOLD_HI[sidx] - HOLD_LO[sidx] + 1));
     if (sidx) hold = (int)(((uint32_t)hold * g_tempo) >> 8);   /* overlays follow the ground's tempo */
+    /* A STILL PATTERN DOES NOT GET A LONG TURN (2.7.4).  Reported: an image
+     * 'lasted way too long — no morphing, moving, nothing'. Tenancy length was
+     * the same whether a routine was churning or completely static, and 14 of
+     * the routines measure at essentially zero movement. Thirty seconds of a
+     * genuinely still image is a screensaver that looks broken, while thirty
+     * seconds of a flowing one is exactly right. So the turn is scaled by what
+     * the routine actually does: a frozen one gets ~45% of the time, a busy
+     * one keeps the full table value. */
+    if (g_st[v].probed) {
+        uint32_t dq = g_st[v].delta_q8;              /* 256 == 1.0 per frame */
+        if (dq < 256) {
+            uint32_t k = 115 + (dq * 141) / 256;     /* 115..256 of 256 */
+            hold = (int)(((uint32_t)hold * k) >> 8);
+        }
+    }
     if (v >= JD_NASM) {
         /* envelope jitter (review 01 F9 / 05): 0.6x..1.6x per spawn, and one
          * overlay in 16 drifts in over twice the time.  asm modes keep the
