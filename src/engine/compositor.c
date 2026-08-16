@@ -250,7 +250,8 @@ static uint32_t g_gain = 256;              /* dead-air lift, Q8            */
 static uint32_t g_prot = 0;       /* audio palette rotation, 0..PAL_N-1 */
 void jd_audio_meter_draw(uint32_t *fb, int w, int h);   /* AUDIO: HUD, src/audio/listen.c */
 void jd_about_draw(uint32_t *fb, int w, int h);         /* ABOUT card (key A), src/audio/listen.c */
-void jd_status_draw(uint32_t *fb, int w, int h, int pct);  /* first-run notice */
+void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs);  /* first-run notice */
+extern int au_skip;                                     /* SPACE dismissed it */
 static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
@@ -537,6 +538,7 @@ static int probe_step(double budget_ms)
                 int rot = (int)(g_run % (uint32_t)(np > 0 ? np : 1));
                 rt = g_probe_i < np ? JD_NASM + (g_probe_i + rot) % np : g_probe_i - np;
                 g_probe_i++;
+                if (g_st[rt].probed) continue;   /* measured in an earlier run */
                 if (routine_live(rt)) {
                     if (g_pdefer_n < JD_MAXR) g_pdefer[g_pdefer_n++] = (uint16_t)rt;
                     continue;
@@ -562,6 +564,19 @@ static int probe_step(double budget_ms)
         else if (now_ms() - t0 >= budget_ms) break;
     }
     g_probe_ms += now_ms() - t0;
+    /* CHECKPOINT (2.7.1).  Measuring 603 patterns takes ~28 s, and the cache
+     * used to be written ONLY when the sweep completed. A screensaver is
+     * killed, not closed — quit at 20 s and every bit of that work was thrown
+     * away, so it started from scratch on the next launch. Reported exactly
+     * that. Now it saves every few seconds, and the loader accepts a partial
+     * file, so progress accumulates across launches until it is done once and
+     * for all. */
+    {
+        static double t_save = 0.0;
+        double nowm = now_ms();
+        if (t_save == 0.0) t_save = nowm;
+        if (nowm - t_save > 2500.0) { t_save = nowm; probe_cache_save(); }
+    }
     if (g_probe_i < g_nr || pr_rt >= 0 || g_pdefer_n) return 0;
     free(g_pa); free(g_pb); g_pa = g_pb = NULL;
     g_probe_done = 1;
@@ -691,8 +706,12 @@ static int probe_cache_load(void)
         }
     }
     fclose(f);
-    TR("PROBE cache %s (%s)\n", ok ? "hit" : "miss", p);
-    return ok;
+    int done = 0;
+    if (ok) for (int i = 0; i < g_nr; i++) if (g_st[i].probed) done++;
+    TR("PROBE cache %s (%d/%d already measured)\n",
+       ok ? "hit" : "miss", done, g_nr);
+    /* Only claim the sweep is finished if it really is. A partial file resumes. */
+    return ok && done >= g_nr;
 }
 
 static void probe_cache_save(void)
@@ -2348,8 +2367,16 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         }
     }
 
-    if (!g_probe_done && g_nr > 0)
-        jd_status_draw(fb, w, h, (int)((long)g_probe_i * 100 / g_nr));
+    /* First-run card: progress, a count-up clock, and a way out.  Dismissing
+     * it costs NOTHING — measuring already happens in the spare milliseconds
+     * between frames, so it simply carries on quietly and the picture keeps
+     * improving as routines are sorted into their layers. */
+    if (!g_probe_done && g_nr > 0 && !au_skip) {
+        static double t_first = 0.0;
+        if (t_first == 0.0) t_first = now_ms();
+        jd_status_draw(fb, w, h, (int)((long)g_probe_i * 100 / g_nr),
+                       (int)((now_ms() - t_first) / 1000.0));
+    }
 
     /* ---- health: frame time and composite motion ---- */
     motion_probe(fb, npix);
