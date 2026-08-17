@@ -603,6 +603,13 @@ extern void pattern_600(uint32_t*, int, int, int, int, uint32_t, const uint32_t*
 extern void pattern_601(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_602(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_603(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_604(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_605(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_606(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_607(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_608(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_609(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_610(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 const jd_pattern_fn jd_patterns[] = {
     pattern_001,
     pattern_002,
@@ -1207,6 +1214,13 @@ const jd_pattern_fn jd_patterns[] = {
     pattern_601,
     pattern_602,
     pattern_603,
+    pattern_604,
+    pattern_605,
+    pattern_606,
+    pattern_607,
+    pattern_608,
+    pattern_609,
+    pattern_610,
 };
 const char *const jd_pattern_names[] = {
     "001 kaleido rose",
@@ -1812,6 +1826,13 @@ const char *const jd_pattern_names[] = {
     "601 glyph glints",
     "602 string envelope",
     "603 emblem ghost",
+    "604 mandel deep",
+    "605 julia morph",
+    "606 burning ship",
+    "607 newton basins",
+    "608 lyapunov",
+    "609 buddhabrot",
+    "610 flame ifs",
 };
 const unsigned char jd_pattern_family[] = {
     3,
@@ -1833,7 +1854,7 @@ const unsigned char jd_pattern_family[] = {
     0,
     3,
     4,
-    0,
+    8,
     4,
     0,
     4,
@@ -1936,7 +1957,7 @@ const unsigned char jd_pattern_family[] = {
     1,
     0,
     4,
-    0,
+    8,
     1,
     5,
     0,
@@ -1953,13 +1974,13 @@ const unsigned char jd_pattern_family[] = {
     7,
     0,
     0,
-    0,
-    0,
-    4,
-    4,
+    8,
     0,
     4,
-    0,
+    4,
+    8,
+    4,
+    8,
     4,
     1,
     3,
@@ -1969,7 +1990,7 @@ const unsigned char jd_pattern_family[] = {
     1,
     0,
     1,
-    0,
+    8,
     1,
     0,
     4,
@@ -2276,7 +2297,7 @@ const unsigned char jd_pattern_family[] = {
     4,
     3,
     0,
-    4,
+    8,
     0,
     0,
     0,
@@ -2417,5 +2438,12 @@ const unsigned char jd_pattern_family[] = {
     5,
     1,
     0,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
 };
-const int jd_pattern_count = 603;
+const int jd_pattern_count = 610;

@@ -34,7 +34,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>JellyDazzle</string>
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
-  <key>CFBundleIdentifier</key><string>nyc.jelia.jd${VER}</string>
+  <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
   <key>CFBundleVersion</key><string>${VER}</string>
   <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundleIconFile</key><string>JellyDazzle</string>
@@ -48,7 +48,12 @@ PLIST
 # the bundle on unzip and break the seal ("a sealed resource is missing")
 xattr -cr "$APP"
 # sign inside-out (--deep is deprecated and seals unreliably)
-codesign --force -s - "$APP/Contents/Frameworks/libSDL3.dylib"
+# SDL3 is only present when the SDL2 we linked is Homebrew's sdl2-compat shim.
+# With the vendored real SDL2 there is nothing to sign here, and signing a file
+# that does not exist aborted the whole script under `set -e`.
+if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
+    codesign --force -s - "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 codesign --force -s - "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
 codesign --force -s - "$APP/Contents/MacOS/JellyDazzle"
 codesign --force -s - "$APP"
