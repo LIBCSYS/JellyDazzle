@@ -97,6 +97,8 @@ static float    au_live_thr = 0.001f;  /* absolute "real signal" threshold  */
 static int      au_meter;              /* HUD on/off                        */
 static int      au_meter_key_was;
 static int      au_about;              /* ABOUT card on/off                 */
+int             au_skip;               /* SPACE: dismiss the first-run card  */
+static int      au_skip_key_was;
 static int      au_about_key_was;
 static uint16_t au_peak_hold[4];       /* slow-falling peak ticks per bar   */
 static int      au_stale;              /* ticks with no new callbacks       */
@@ -329,6 +331,9 @@ void jd_audio_tick(void)
         int a = ks ? ks[SDL_SCANCODE_A] : 0;      /* A toggles the about card */
         if (a && !au_about_key_was) au_about ^= 1;
         au_about_key_was = a;
+        int k = ks ? (ks[SDL_SCANCODE_SPACE] || ks[SDL_SCANCODE_RETURN]) : 0;
+        if (k && !au_skip_key_was) au_skip = 1;   /* dismiss, never un-dismiss */
+        au_skip_key_was = k;
     }
 
     if (!au_on) { au_decay_all(); return; }
@@ -710,4 +715,45 @@ void jd_about_draw(uint32_t *fb, int w, int h)
             au_text(fb, w, h, x0 + pad, ly + (i + 1) * lh, s, 0xFFC8D4DEu, row);
         }
     }
+}
+
+/* ---- first-run status --------------------------------------------------
+ * The engine measures every routine once on a new install — with 603 patterns
+ * that is roughly half a minute. Without a word on screen it reads as "the
+ * app is broken", so say what is happening and how far along it is. Drawn
+ * bottom-left, small, and it disappears the moment measuring finishes. */
+void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs)
+{
+    if (!fb || w < 240 || h < 180) return;
+    if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+    int s = h / 200; if (s < 2) s = 2; if (s > 9) s = 9;   /* big: this matters */
+    static const char *L1 = "FIRST RUN";
+    static const char *L2 = "BUILDING THE PATTERN DATABASE";
+    static const char *L3 = "THIS HAPPENS ONCE";
+    char L4[64], L5[64];
+    snprintf(L4, sizeof L4, "%d%%   %d:%02d ELAPSED", pct, secs / 60, secs % 60);
+    snprintf(L5, sizeof L5, "PRESS SPACE TO CONTINUE ANYWAY");
+    int w1 = (int)strlen(L1) * 4 * s, w2 = (int)strlen(L2) * 4 * s;
+    int w3 = (int)strlen(L3) * 4 * s, w4 = (int)strlen(L4) * 4 * s;
+    int w5 = (int)strlen(L5) * 4 * s;
+    int tw = w2; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
+    int pad = 10 * s, lh = 9 * s;
+    int panel_w = tw + 2 * pad, panel_h = pad + lh * 5 + 8 * s + pad;
+    if (panel_w > w) { s = s > 2 ? s - 1 : 2; }            /* shrink once if tight */
+    int x0 = (w - panel_w) / 2, y0 = (h - panel_h) / 2;
+    if (x0 < 0) x0 = 0;
+    au_dim(fb, w, h, x0, y0, panel_w, panel_h);
+    au_dim(fb, w, h, x0, y0, panel_w, panel_h);            /* twice: readable card */
+    au_rect(fb, w, h, x0, y0, panel_w, s > 2 ? s / 2 : 1, 0xFF3A4652u);
+    au_rect(fb, w, h, x0, y0 + panel_h - (s > 2 ? s / 2 : 1), panel_w,
+            s > 2 ? s / 2 : 1, 0xFF3A4652u);
+    au_text(fb, w, h, x0 + (panel_w - w1) / 2, y0 + pad,            s, 0xFFE9B65Au, L1);
+    au_text(fb, w, h, x0 + (panel_w - w2) / 2, y0 + pad + lh,       s, 0xFFE8EEF4u, L2);
+    au_text(fb, w, h, x0 + (panel_w - w3) / 2, y0 + pad + lh * 2,   s, 0xFF8FA2B4u, L3);
+    au_text(fb, w, h, x0 + (panel_w - w4) / 2, y0 + pad + lh * 3,   s, 0xFF22D3EEu, L4);
+    au_text(fb, w, h, x0 + (panel_w - w5) / 2, y0 + pad + lh * 4,   s, 0xFF6E7F90u, L5);
+    /* progress bar, full width of the card */
+    int bx = x0 + pad, by = y0 + pad + lh * 5 + 2 * s, bw = panel_w - 2 * pad;
+    au_rect(fb, w, h, bx, by, bw, 2 * s, 0xFF243040u);
+    au_rect(fb, w, h, bx, by, bw * pct / 100, 2 * s, 0xFF22D3EEu);
 }

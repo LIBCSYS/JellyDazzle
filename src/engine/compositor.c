@@ -34,9 +34,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include "jellydazzle.h"
+#include "../patterns/_emblem.h"
 
 /* JD_DEBUG=1 traces spawns/retires and per-frame occupancy on stderr */
 #ifndef JD_TRACE
@@ -197,6 +199,16 @@ typedef struct {
     uint8_t   strikes;
     uint32_t  span, off;          /* palette window                      */
     uint16_t  wild;               /* 0 = shared ramp, else scheme+1 (2.5.4) */
+    /* MOBILITY (2.6).  Per-tenancy affine: where the layer sits, how big it is,
+     * and how that changes over its life.  54 of 202 patterns discard their
+     * seed entirely and draw identical geometry every single time — same
+     * centre, same scale, same corners — so the only thing that ever varied
+     * was colour.  Fixing 54 files would not stop the 55th; putting the
+     * transform in the compositor gives every routine mobility at once. */
+    float     tz, tz_v;           /* zoom and its drift                   */
+    float     tx, ty, tx_v, ty_v; /* centre offset, in fractions of frame */
+    float     tr, tr_v;           /* rotation, radians                    */
+    uint8_t   moving;             /* 0 = identity, skip the resample      */
     uint8_t   hrot;               /* 0/1/2 = RGB channel rotation (2.5.4)   */
     float     lo_s, hi_s, gs_s;   /* reshape params, fixed at spawn      */
     uint8_t   lut[256];           /* value transfer curve, built once    */
@@ -238,6 +250,8 @@ static uint32_t g_gain = 256;              /* dead-air lift, Q8            */
 static uint32_t g_prot = 0;       /* audio palette rotation, 0..PAL_N-1 */
 void jd_audio_meter_draw(uint32_t *fb, int w, int h);   /* AUDIO: HUD, src/audio/listen.c */
 void jd_about_draw(uint32_t *fb, int w, int h);         /* ABOUT card (key A), src/audio/listen.c */
+void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs);  /* first-run notice */
+extern int au_skip;                                     /* SPACE dismissed it */
 static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
@@ -524,6 +538,7 @@ static int probe_step(double budget_ms)
                 int rot = (int)(g_run % (uint32_t)(np > 0 ? np : 1));
                 rt = g_probe_i < np ? JD_NASM + (g_probe_i + rot) % np : g_probe_i - np;
                 g_probe_i++;
+                if (g_st[rt].probed) continue;   /* measured in an earlier run */
                 if (routine_live(rt)) {
                     if (g_pdefer_n < JD_MAXR) g_pdefer[g_pdefer_n++] = (uint16_t)rt;
                     continue;
@@ -549,6 +564,19 @@ static int probe_step(double budget_ms)
         else if (now_ms() - t0 >= budget_ms) break;
     }
     g_probe_ms += now_ms() - t0;
+    /* CHECKPOINT (2.7.1).  Measuring 603 patterns takes ~28 s, and the cache
+     * used to be written ONLY when the sweep completed. A screensaver is
+     * killed, not closed — quit at 20 s and every bit of that work was thrown
+     * away, so it started from scratch on the next launch. Reported exactly
+     * that. Now it saves every few seconds, and the loader accepts a partial
+     * file, so progress accumulates across launches until it is done once and
+     * for all. */
+    {
+        static double t_save = 0.0;
+        double nowm = now_ms();
+        if (t_save == 0.0) t_save = nowm;
+        if (nowm - t_save > 2500.0) { t_save = nowm; probe_cache_save(); }
+    }
     if (g_probe_i < g_nr || pr_rt >= 0 || g_pdefer_n) return 0;
     free(g_pa); free(g_pb); g_pa = g_pb = NULL;
     g_probe_done = 1;
@@ -627,6 +655,8 @@ static uint16_t bag_draw(jd_bag *b, int (*ok)(uint16_t, int), int slot)
  * the pattern set changes, so a stale cache can never mis-sort anything. */
 #define JD_CACHE_MAGIC 0x4A44504Bu       /* 'JDPK' */
 
+static uint32_t probe_stamp(void);
+
 static const char *probe_cache_path(void)
 {
     static char p[1024];
@@ -634,7 +664,12 @@ static const char *probe_cache_path(void)
     if (!home) return NULL;
     snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle", home);
     mkdir(p, 0755);                       /* ok if it already exists */
-    snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle/probe.bin", home);
+    /* One file PER LIBRARY SIZE. A single shared name meant any build with a
+     * different pattern count clobbered the others — running a 203-pattern
+     * build once would force a 603-pattern build to rebuild from scratch on
+     * its next launch, forever. Keyed by the stamp, they coexist. */
+    snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle/probe-%08x.bin",
+             home, probe_stamp());
     return p;
 }
 
@@ -678,8 +713,12 @@ static int probe_cache_load(void)
         }
     }
     fclose(f);
-    TR("PROBE cache %s (%s)\n", ok ? "hit" : "miss", p);
-    return ok;
+    int done = 0;
+    if (ok) for (int i = 0; i < g_nr; i++) if (g_st[i].probed) done++;
+    TR("PROBE cache %s (%d/%d already measured)\n",
+       ok ? "hit" : "miss", done, g_nr);
+    /* Only claim the sweep is finished if it really is. A partial file resumes. */
+    return ok && done >= g_nr;
 }
 
 static void probe_cache_save(void)
@@ -1101,6 +1140,39 @@ static void span_diff(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     }
 }
 
+/* Resample a layer through its affine transform.  Nearest-neighbour with
+ * 16.16 fixed-point stepping: two adds per pixel in the inner loop, no
+ * multiply, no divide, no branch.  Out-of-bounds reads as transparent black
+ * so a shrunk or drifted layer simply shows the layers beneath it rather
+ * than smearing its edge pixels across the frame.
+ *
+ * Cost measured at 1280x960: the engine had ~2.8x headroom (167 fps), and a
+ * transformed layer costs about one extra pass over its own buffer. */
+static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
+                       int w, int h)
+{
+    float cx = (float)w * 0.5f, cy = (float)h * 0.5f;
+    float iz = L->tz > 0.05f ? 1.0f / L->tz : 20.0f;
+    float cs = cosf(L->tr) * iz, sn = sinf(L->tr) * iz;
+    float ox = cx + L->tx * (float)w, oy = cy + L->ty * (float)h;
+    /* source position of the top-left destination pixel, and the per-pixel steps */
+    float sx0 = (0.5f - ox) * cs - (0.5f - oy) * sn + cx;
+    float sy0 = (0.5f - ox) * sn + (0.5f - oy) * cs + cy;
+    int32_t dxx = (int32_t)(cs * 65536.0f), dxy = (int32_t)(sn * 65536.0f);
+    int32_t dyx = (int32_t)(-sn * 65536.0f), dyy = (int32_t)(cs * 65536.0f);
+    for (int y = 0; y < h; y++) {
+        int32_t sx = (int32_t)((sx0 + dyx * (float)y / 65536.0f) * 65536.0f);
+        int32_t sy = (int32_t)((sy0 + dyy * (float)y / 65536.0f) * 65536.0f);
+        uint32_t *d = dst + (size_t)y * w;
+        for (int x = 0; x < w; x++) {
+            int ix = sx >> 16, iy = sy >> 16;
+            d[x] = ((unsigned)ix < (unsigned)w && (unsigned)iy < (unsigned)h)
+                 ? src[(size_t)iy * w + ix] : 0xFF000000u;
+            sx += dxx; sy += dxy;
+        }
+    }
+}
+
 static void blend_span(uint32_t *dst, const uint32_t *src, int n,
                        uint32_t w, int mode)
 {
@@ -1202,6 +1274,26 @@ static int admissible(uint16_t r, int slot)
      *    while the role's bag is comfortably larger than the ring. */
     { int role = g_st[r].role;
       if (recent_has(r) && g_bag[role].n > recent_in_role(role) + 5) return 0; }
+
+    /* SHAPE SEPARATION (2.6.4).  Measured across the shipping library: 20% of
+     * patterns are string-art X / curve-weaves and another 20% are radial
+     * mandalas. With four layers up, seeing an X was near-certain in every
+     * frame — which is why 'why always in a fucking X' was a fair question.
+     * 2.4.4 stopped two layers sharing a HUE; nothing ever stopped them
+     * sharing a SHAPE. A family already on screen is refused, unless the bag
+     * is too thin to afford it. Family 0 ('other') is exempt: it is a
+     * catch-all, not a look. */
+    if (r >= JD_NASM) {
+        unsigned fam = jd_pattern_family[r - JD_NASM];
+        if (fam) {
+            int clash = 0;
+            for (int i = 0; i < JD_NBUF; i++) {
+                if (!g_L[i].live || g_L[i].routine < JD_NASM) continue;
+                if (jd_pattern_family[g_L[i].routine - JD_NASM] == fam) { clash = 1; break; }
+            }
+            if (clash && g_bag[g_st[r].role].n > 12) return 0;
+        }
+    }
     /* 1. a routine may never be live twice — patterns hold file-static state */
     for (int i = 0; i < JD_NBUF; i++)
         if (g_L[i].live && g_L[i].routine == (int)r) return 0;
@@ -1417,6 +1509,21 @@ static int try_spawn(int slot, int frame)
     uint32_t hr = mix32(r ^ 0xB0B0B0B0u);
     int hold = HOLD_LO[sidx] + (int)(hr % (uint32_t)(HOLD_HI[sidx] - HOLD_LO[sidx] + 1));
     if (sidx) hold = (int)(((uint32_t)hold * g_tempo) >> 8);   /* overlays follow the ground's tempo */
+    /* A STILL PATTERN DOES NOT GET A LONG TURN (2.7.4).  Reported: an image
+     * 'lasted way too long — no morphing, moving, nothing'. Tenancy length was
+     * the same whether a routine was churning or completely static, and 14 of
+     * the routines measure at essentially zero movement. Thirty seconds of a
+     * genuinely still image is a screensaver that looks broken, while thirty
+     * seconds of a flowing one is exactly right. So the turn is scaled by what
+     * the routine actually does: a frozen one gets ~45% of the time, a busy
+     * one keeps the full table value. */
+    if (g_st[v].probed) {
+        uint32_t dq = g_st[v].delta_q8;              /* 256 == 1.0 per frame */
+        if (dq < 256) {
+            uint32_t k = 115 + (dq * 141) / 256;     /* 115..256 of 256 */
+            hold = (int)(((uint32_t)hold * k) >> 8);
+        }
+    }
     if (v >= JD_NASM) {
         /* envelope jitter (review 01 F9 / 05): 0.6x..1.6x per spawn, and one
          * overlay in 16 drifts in over twice the time.  asm modes keep the
@@ -1461,9 +1568,18 @@ static int try_spawn(int slot, int frame)
     if (g_st[v].probed) {
         uint32_t cd = g_st[v].cdiv;                 /* 0 flat .. 255 rich */
         if (cd < 160) {
-            uint32_t boost = 256 + ((160 - cd) * 358) / 160;   /* 256..614 */
+            uint32_t boost = 256 + ((160 - cd) * 230) / 160;   /* 256..486 */
             uint64_t w = ((uint64_t)L->span * boost) >> 8;
-            L->span = (uint32_t)(w > PAL_N ? PAL_N : w);
+            /* 2.6.3 CORRECTION.  This used to allow the FULL ramp, and 51% of
+             * flat routines were reaching it. A flat routine handed the whole
+             * spectrum renders as full-rainbow banding — so every flat pattern
+             * started looking like every other flat pattern, which is exactly
+             * the 'I see this exact image all the time' complaint. Widening
+             * the window makes colour TRAVEL; letting it reach the full ramp
+             * destroys colour IDENTITY. Cap at 17000, about half the ramp:
+             * still plenty of travel, still a recognisable hue family. */
+            const uint32_t SPAN_CAP = 17000;
+            L->span = (uint32_t)(w > SPAN_CAP ? SPAN_CAP : w);
         }
     }
     if (L->span > PAL_N) L->span = PAL_N;
@@ -1505,6 +1621,52 @@ static int try_spawn(int slot, int frame)
      * system built to keep everything harmonious.  Nothing scheduled can
      * produce an unexpected colour if every colour comes from the same two
      * curated schemes. */
+    /* MOBILITY (2.6): give the tenancy a place, a size and a drift.  54 of 202
+     * patterns discard their seed and draw identical geometry every time; this
+     * makes every routine mobile without touching one pattern file.  The
+     * GROUND is left alone — a drifting floor reads as a mistake, and a ground
+     * that shrinks would expose the frame edge. */
+    {
+        uint32_t m = mix32(L->seed ^ 0xB17E5EEDu);
+        /* ADAPTIVE MOBILITY (2.6.2).  The transform is the only life a frozen
+         * routine has, so give it the most.  Measured from the probe's own
+         * delta: 14 of 227 routines change by less than 0.1 per frame and two
+         * are EXACTLY 0.00 — a still image held for the whole tenancy. Those
+         * get up to 2.6x the drift and spin. A routine that is already busy
+         * gets less, so adding motion never tips it into chaos. */
+        uint32_t dq = g_st[v].probed ? g_st[v].delta_q8 : 256;
+        float life = (float)dq / 256.0f;               /* 0 = frozen */
+        float mob  = life < 1.6f ? (2.6f - life * 1.0f) : 1.0f;
+        if (mob < 1.0f) mob = 1.0f;
+        if (mob > 2.6f) mob = 2.6f;
+        if (slot == 0 || slot == JD_SHADOW) {
+            /* GROUND: zoom IN only, never out — the warp reads out-of-bounds
+             * as black, so a ground smaller than the frame would show a border.
+             * Slight rotation is safe because it is sampled from inside a
+             * region we always cover. No offset, for the same reason. */
+            L->tz  = 1.02f + (float)(m & 511) / 511.0f * 0.42f;   /* 1.02..1.44 */
+            L->tx  = L->ty = 0.0f;
+            L->tr  = (float)((m >> 9) & 63) / 63.0f * 6.2832f;
+            uint32_t d = mix32(m ^ 0x51F0A7u);
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00055f * mob;
+            L->tx_v = L->ty_v = 0.0f;
+            L->tr_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00030f * mob;
+            L->moving = 1;
+        } else {
+            /* OVERLAYS: the full range. Layers genuinely recede and loom,
+             * travel across the frame, and spin perceptibly over a tenancy. */
+            L->tz  = 0.40f + (float)(m & 1023) / 1023.0f * 2.10f;  /* 0.40..2.50 */
+            L->tx  = ((float)((m >> 10) & 255) / 255.0f - 0.5f) * 0.60f;
+            L->ty  = ((float)((m >> 18) & 255) / 255.0f - 0.5f) * 0.60f;
+            L->tr  = (float)((m >> 26) & 63) / 63.0f * 6.2832f;
+            uint32_t d = mix32(m ^ 0x9E3779B9u);
+            L->tz_v = ((float)(d & 255) / 255.0f - 0.5f) * 0.00190f * mob;
+            L->tx_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00105f * mob;
+            L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00105f * mob;
+            L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00240f * mob;
+            L->moving = 1;
+        }
+    }
     L->wild = 0; L->hrot = 0;
     if (slot != 0 && slot != JD_SHADOW) {
         uint32_t w = mix32(L->seed ^ 0x5CA1AB1Eu);
@@ -1723,7 +1885,13 @@ static void audio_rotate(void)
      * sound at all.  Audio adds on top of it, exactly as before.  A constant
      * slow rotation cannot strobe by construction — it is a shear along the
      * ramp, not a jump. */
-    const uint32_t IDLE_VEL = 12;
+    /* 2.6 CORRECTION.  This was 12, and 12 >> 3 = 1 step per frame — a full
+     * turn of a 32768-entry ramp takes NINE MINUTES.  The comment claimed 50
+     * seconds; the arithmetic never did.  Over a typical 25 s tenancy the
+     * palette moved 4.6% of the way round, which is invisible, so in silence
+     * the colour simply did not morph.  88 >> 3 = 11 steps/frame gives a turn
+     * in ~50 s, which is what was meant all along. */
+    const uint32_t IDLE_VEL = 88;
     if (g_audio.live) {
         uint32_t target = ((uint32_t)g_audio.level  * 2
                          + (uint32_t)g_audio.treble * 3
@@ -1962,6 +2130,14 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         } else {
             jd_patterns[L->routine - JD_NASM](L->buf, w, h, L->fbase + L->sl,
                                               L->sl, L->seed, L->pal + g_prot);
+            if (L->moving) {                     /* advance the tenancy's drift */
+                L->tz += L->tz_v; L->tx += L->tx_v;
+                L->ty += L->ty_v; L->tr += L->tr_v;
+                if (L->tz < 0.34f) { L->tz = 0.34f; L->tz_v = -L->tz_v; }
+                if (L->tz > 2.90f) { L->tz = 2.90f; L->tz_v = -L->tz_v; }
+                if (L->tx < -0.42f || L->tx > 0.42f) L->tx_v = -L->tx_v;
+                if (L->ty < -0.42f || L->ty > 0.42f) L->ty_v = -L->ty_v;
+            }
         }
         double dt = now_ms() - t0;
         if (dt > 20.0) TR("SLOW f=%d slot=%d rt=%d sl=%d dt=%.1f\n",
@@ -2079,7 +2255,17 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     /* ---- overlays, bottom up ---- */
     for (int k = 0; k < no; k++) {
         jd_layer *L = &g_L[ov[k]];
-        blend_span(fb, L->buf, npix, L->w_now, L->blend);
+        {   /* MOBILITY: composite through the tenancy's transform.  A scratch
+             * buffer is used rather than warping in place, because L->buf must
+             * survive for accumulators and for the next frame's motion probe. */
+            const uint32_t *srcp = L->buf;
+            if (L->moving) {
+                static uint32_t *warp; static int warp_n;
+                if (warp_n < npix) { free(warp); warp = malloc((size_t)npix * 4); warp_n = warp ? npix : 0; }
+                if (warp) { layer_warp(L, L->buf, warp, w, h); srcp = warp; }
+            }
+            blend_span(fb, srcp, npix, L->w_now, L->blend);
+        }
     }
 
     /* ---- boot: ease up over the first 2 s, FROM A FLOOR ----
@@ -2159,6 +2345,59 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         if (bump > g_gain) g_gain += (bump - g_gain) >> 3;
         else               g_gain -= (g_gain - bump) >> 5;
         if (g_gain > 260) span_gain(fb, fb, npix, g_gain);
+    }
+
+    /* ---- OPENING SIGNATURE ------------------------------------------
+     * The mark, for the first ~3 seconds of a run, over whatever the engine
+     * opened with. It is NOT drawn over the picture: it lifts the luminance
+     * of the pixels already there, in the shape of the mark, so the opening
+     * pattern shows straight through it and it recolours with the frame.
+     * Rises over 0.4 s, holds 1.4 s, dissolves over 1.4 s, then never again.
+     * (DAZZLE.EXE signed off on exit; this signs on.) */
+    {
+        int age = frame - g_frame0;
+        if (age >= 0 && age < 194) {
+            float e;
+            if      (age <  24) e = (float)age / 24.0f;
+            else if (age < 108) e = 1.0f;
+            else                e = (float)(194 - age) / 86.0f;
+            e = e * e * (3.0f - 2.0f * e);
+            float cx = (float)w * 0.5f, cy = (float)h * 0.5f;
+            float sc = (float)(w < h ? w : h) * 0.46f;
+            /* a breath of zoom so it settles rather than sits */
+            float zoom = 1.06f - 0.10f * e;
+            for (int y = 0; y < h; y++) {
+                float v = ((float)y - cy) / (sc * zoom);
+                if (v < -1.0f || v > 1.0f) continue;
+                int my = (int)((v * 0.5f + 0.5f) * (JD_EMB_N - 1));
+                uint32_t *row = fb + (size_t)y * w;
+                for (int x = 0; x < w; x++) {
+                    float u = ((float)x - cx) / (sc * zoom);
+                    if (u < -1.0f || u > 1.0f) continue;
+                    int mx = (int)((u * 0.5f + 0.5f) * (JD_EMB_N - 1));
+                    uint32_t m = jd_emblem[my * JD_EMB_N + mx];
+                    if (m < 10) continue;
+                    uint32_t lift = (uint32_t)(m * e * 0.78f);
+                    uint32_t c = row[x];
+                    uint32_t r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+                    r += lift; g += lift; b += lift;
+                    row[x] = 0xFF000000u | (r > 255 ? 255u : r) << 16
+                                         | (g > 255 ? 255u : g) << 8
+                                         | (b > 255 ? 255u : b);
+                }
+            }
+        }
+    }
+
+    /* First-run card: progress, a count-up clock, and a way out.  Dismissing
+     * it costs NOTHING — measuring already happens in the spare milliseconds
+     * between frames, so it simply carries on quietly and the picture keeps
+     * improving as routines are sorted into their layers. */
+    if (!g_probe_done && g_nr > 0 && !au_skip) {
+        static double t_first = 0.0;
+        if (t_first == 0.0) t_first = now_ms();
+        jd_status_draw(fb, w, h, (int)((long)g_probe_i * 100 / g_nr),
+                       (int)((now_ms() - t_first) / 1000.0));
     }
 
     /* ---- health: frame time and composite motion ---- */

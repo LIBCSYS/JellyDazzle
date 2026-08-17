@@ -76,10 +76,10 @@ header{padding-top:34px!important}
   <div class="tag">A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A
   assembly for Apple Silicon &mdash; and beyond. It listens to whatever your Mac is
   playing and paints to it: never the same pattern, never the same colours.</div>
-  <div class="ver">version 2.4.4 &middot; macOS &middot; Apple Silicon &middot; MIT</div>
+  <div class="ver">version 2.8.0 &middot; macOS &middot; Apple Silicon &middot; MIT</div>
   <div class="cta">
     <a class="btn p" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download for macOS</a>
-    <a class="btn s" href="/library/">Browse all 625 routines</a>
+    <a class="btn s" href="/library/">Browse all 634 routines</a>
     <a class="btn" href="https://github.com/LIBCSYS/JellyDazzle">Source on GitHub</a>
   </div>
 </header>
@@ -111,7 +111,7 @@ header{padding-top:34px!important}
     </div>
     <div>
       <div class="stat">24</div><div>ARMv9.2-A assembly engine modes</div>
-      <div class="stat" style="margin-top:18px">201</div><div>C pattern plug-ins in the shipping build</div>
+      <div class="stat" style="margin-top:18px">610</div><div>C pattern plug-ins in the shipping build</div>
       <div class="stat" style="margin-top:18px">180</div><div>palette schemes, interpolated in OKLab</div>
     </div>
   </div>
@@ -120,6 +120,61 @@ header{padding-top:34px!important}
 <section>
   <h2>What's new</h2>
   <ul>
+    <li><b>2.8.0 &mdash; fractals.</b> Seven new routines, each a different visual
+    language: <b>604 Mandel Deep</b>, <b>605 Julia Morph</b> &mdash; a Julia set that
+    genuinely <i>changes shape while you watch</i>, its constant walking through ten
+    curated values while the plane is re-swept fourteen scanlines a frame, forever &mdash;
+    <b>606 Burning Ship</b>, <b>607 Newton Basins</b>, <b>608 Lyapunov</b>,
+    <b>609 Buddhabrot</b>, which exposes over about a minute like a photographic plate
+    rather than arriving finished, and <b>610 Flame IFS</b>, whose attractor is drawn
+    from the seed so every instance is one that has probably never been rendered before.
+    None of them paint anything black: interiors are coloured by orbit trap and exteriors
+    by trap-folded escape, so the whole frame is live colour. They share a shape family,
+    so two never run at once.</li>
+
+    <li><b>2.7 &mdash; the whole library.</b> All 400 held candidate patterns promoted
+    into the shipping build &mdash; no work discarded &mdash; taking it from 201 plug-ins
+    to 610. Shape repetition fixed: two routines of the same family can no longer share
+    the screen. The startup database is genuinely built once, with a count-up clock and a
+    cancel. The macOS floor dropped from 26 to 11, so the download runs on hardware older
+    than the machine that built it.</li>
+
+    <li><b>2.6 &mdash; the mark, and movement.</b> Adaptive mobility: the engine measures
+    how much each routine moves on its own and gives the stillest ones the most transform,
+    so nothing sits static.</li>
+
+    <li><b>2.5.4 &mdash; surprise.</b> Every layer used to take a window into <i>one
+    shared palette ramp</i>, blended from just two curated schemes &mdash; so every colour
+    on screen came from the same two palettes, and the engine was architecturally
+    incapable of clashing or of opposites. About <b>30% of overlay layers now break
+    out</b>, taking a scheme of their own and optionally rotating hue 120&deg; or
+    240&deg; (luma-preserving, so nothing dims). The result is pairings the curated
+    schemes would never produce: red on blue, magenta on green. The ground stays
+    coherent on purpose. <b>The palettes are a guide now, not a law.</b></li>
+
+    <li><b>2.5.3 &mdash; advanced colour management.</b> Rotation moves a pattern through
+    its <i>own</i> window of the ramp, so a narrow span means little hue travels. The
+    startup probe now measures colour diversity and gives flat, graphic routines up to
+    <b>2.4&times; the span</b>. Only 9% of the library is flat &mdash; and those are
+    exactly the ones that looked static. They don't change colour <i>less</i>; a flat
+    region just becomes a different flat colour, and nothing sweeps. Morph needs
+    gradients.</li>
+
+    <li><b>2.5.2 &mdash; even spread, breathing silence.</b> The memory ring covers every
+    spawn now, budgeted per role: routines repeating 4+ times across eight runs fell from
+    15 to 7. And silence gets its own rhythm from three clocks that never line up, instead
+    of going flat when the music stops.</li>
+    <li><b>2.5.1 &mdash; the Dazzle method.</b> <b>602 String Envelope</b> is the first
+    pattern that works the way the original did: it draws a composition <i>once</i> into a
+    plane of palette indices, then animates for its whole turn by moving the palette
+    underneath. <b>The geometry never moves. Only the colour travels.</b> That is how
+    DAZZLE.EXE got such rich motion out of an 8088, and video of it running shows eight of
+    twelve sampled frames holding identical geometry with only the colour sweeping
+    (<a href="/tribute/">the story</a>). The content is the original's workhorse primitive,
+    line-sweep string art &mdash; every line straight, the envelope they trace curved.
+    Per-frame cost: one table lookup per pixel.<br>
+    Press <b>A</b> and the app now <b>names every layer on screen</b>, so you can tell
+    exactly what you are looking at.</li>
     <li><b>2.4.4 &mdash; layers always read apart.</b> A layer's palette window used
     to be picked at random with no regard for what was already on screen, so an
     overlay could land on the same hue family as the ground and vanish. Measured

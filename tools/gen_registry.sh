@@ -19,6 +19,33 @@ files=$(ls [0-9][0-9][0-9]_*.c [0-9][0-9][0-9].c 2>/dev/null | sort)
     echo "    \"${f:0:3} ${nm}\","
   done
   echo '};'
+  # SHAPE FAMILY per pattern. Measured across the shipping library, 20% of
+  # patterns are string-art X/curve-weaves and another 20% are radial mandalas
+  # — so with four layers up, seeing an X was close to certain every frame.
+  # The compositor uses this to keep two layers of the SAME SHAPE off screen
+  # together, exactly as it already does for hue.
+  #   0 other  1 X/string  2 grid/panel  3 radial  4 field/flow
+  #   5 particle  6 lightning  7 tunnel/depth  8 fractal
+  # Fractals are their own family for two reasons: they share a look (escape
+  # structure and filigree), and several cost 3-4 ms a frame, so two of them up
+  # together would be both repetitive and expensive.
+  echo 'const unsigned char jd_pattern_family[] = {'
+  for f in $files; do
+    nm=$(echo "${f:4}" | tr 'A-Z' 'a-z')
+    fam=0
+    case "$nm" in
+      *mandel*|*julia*|*burning_ship*|*newton*|*lyapunov*|*buddhabrot*|*flame*|*fractal*|*apollon*|*kleinian*) fam=8;;
+      *lissa*|*string*|*harmonograph*|*spiro*|*curve*|*weave*|*braid*|*plait*|*cord*|*thread*|*loom*|*web*|*envelope*|*cardioid*|*epicycle*|*pendulum*|*maurer*|*guilloche*|*knot*|*hopf*|*villarceau*|*steiner*|*doyle*|*loxodrome*) fam=1;;
+      *quilt*|*tile*|*truchet*|*mosaic*|*greek*|*panel*|*lattice*|*tartan*|*checker*|*grid*|*patch*|*cloth*|*pentagrid*|*craquelure*|*facet*) fam=2;;
+      *mandala*|*rosette*|*kaleido*|*fold*|*pinwheel*|*spiral*|*fan*|*burst*|*star*|*flower*|*bloom*|*petal*|*rose*|*octa*|*hex*|*spoke*|*wedge*|*iris*|*aperture*) fam=3;;
+      *plasma*|*silk*|*flow*|*current*|*aurora*|*curtain*|*smoke*|*ink*|*veil*|*marbl*|*caustic*|*ripple*|*wave*|*moire*|*interf*|*noise*|*drift*|*swirl*|*vortex*) fam=4;;
+      *spark*|*rain*|*snow*|*ember*|*firefly*|*pollen*|*dust*|*mote*|*glint*|*swarm*|*plankton*|*comet*|*seed*|*twinkle*|*lantern*|*starfield*|*meteor*|*firework*) fam=5;;
+      *lightning*|*bolt*|*tesla*|*elmo*|*filament*) fam=6;;
+      *tunnel*|*corridor*|*wormhole*|*pillar*|*hall*|*warp*|*droste*|*tesseract*|*relief*) fam=7;;
+    esac
+    echo "    $fam,"
+  done
+  echo '};'
   echo "const int jd_pattern_count = $(echo "$files" | wc -w | tr -d ' ');"
 } > _registry.c
 echo "registry: $(echo "$files" | wc -w | tr -d ' ') patterns"

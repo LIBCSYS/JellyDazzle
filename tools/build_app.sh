@@ -14,10 +14,18 @@ cp jellydazzle "$APP/Contents/MacOS/JellyDazzle"
 # sdl2-compat shim + the SDL3 it dlopens as @loader_path/libSDL3.dylib
 SHIM=$(otool -L jellydazzle | awk '/libSDL2/{print $1}')
 cp "$SHIM" "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
-cp /opt/homebrew/opt/sdl3/lib/libSDL3.0.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+# Homebrew ships sdl2-compat, a shim that dlopens SDL3 — bundling SDL3 was only
+# ever to satisfy that. With a real SDL2 (vendor/sdl2, built against MACMIN)
+# there is nothing to load, and the Homebrew SDL3 would drag the whole bundle
+# back up to whatever macOS this machine runs.
+if otool -L "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib" | grep -q SDL3; then
+    cp /opt/homebrew/opt/sdl3/lib/libSDL3.0.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 install_name_tool -change "$SHIM" @executable_path/../Frameworks/libSDL2-2.0.0.dylib \
     "$APP/Contents/MacOS/JellyDazzle"
-install_name_tool -id @loader_path/libSDL3.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
+    install_name_tool -id @loader_path/libSDL3.dylib "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 chmod u+w "$APP/Contents/Frameworks/"*.dylib      # Homebrew ships them read-only
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -26,7 +34,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>JellyDazzle</string>
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
-  <key>CFBundleIdentifier</key><string>nyc.jelia.jd${VER}</string>
+  <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
   <key>CFBundleVersion</key><string>${VER}</string>
   <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundleIconFile</key><string>JellyDazzle</string>
@@ -40,7 +48,12 @@ PLIST
 # the bundle on unzip and break the seal ("a sealed resource is missing")
 xattr -cr "$APP"
 # sign inside-out (--deep is deprecated and seals unreliably)
-codesign --force -s - "$APP/Contents/Frameworks/libSDL3.dylib"
+# SDL3 is only present when the SDL2 we linked is Homebrew's sdl2-compat shim.
+# With the vendored real SDL2 there is nothing to sign here, and signing a file
+# that does not exist aborted the whole script under `set -e`.
+if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
+    codesign --force -s - "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 codesign --force -s - "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
 codesign --force -s - "$APP/Contents/MacOS/JellyDazzle"
 codesign --force -s - "$APP"

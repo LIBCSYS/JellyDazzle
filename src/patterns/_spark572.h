@@ -226,6 +226,21 @@ static void sk_spawn_spoke(gk *g, sk_stream *s, float ang, float r0,
     sk_spawn(s, cx + ux * r0, cy + uy * r0, ux, uy, cs, gs, spd, len, maxc, hue, amp, r);
 }
 
+/* Advance the stream's own rng.
+ *
+ * This used to call gk_ru(&s->rs), which compiled with a warning and was a
+ * genuine out-of-bounds access: gk_ru takes a `gk *` and reads g->rs, but
+ * gk::rs sits about thirty bytes into that struct, so passing the address of
+ * a bare uint32_t made it read and write past the end of the stream. The
+ * arithmetic is four lines; it does not need to borrow another kit's helper. */
+static inline uint32_t sk_ru(uint32_t *st)
+{
+    uint32_t x = *st;
+    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    *st = x ? x : 0x9E3779B9u;
+    return *st;
+}
+
 /* advance one frame.  returns 0 once the stream has run its course. */
 static int sk_step(sk_stream *s)
 {
@@ -234,7 +249,7 @@ static int sk_step(sk_stream *s)
     s->age += 1.0f;
     s->hue += s->hdrift;
     int c = (int)s->pos;
-    if (c != s->lastc) { s->lastc = c; gk_ru(&s->rs); }
+    if (c != s->lastc) { s->lastc = c; sk_ru(&s->rs); }
     if (s->pos - (float)s->len > (float)s->maxc) { s->alive = 0; return 0; }
     return 1;
 }
