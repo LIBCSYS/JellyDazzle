@@ -3,6 +3,10 @@
 set -e
 cd "$(dirname "$0")/.."
 VER=$(cat VERSION)
+# Read MACMIN from the Makefile rather than repeating it. These two disagreeing
+# is exactly how a build ships claiming macOS 11 while refusing to launch on it.
+MACMIN=$(awk -F= '/^MACMIN/{gsub(/ /,"",$2); print $2}' Makefile)
+MACMIN=${MACMIN:-11.0}
 APP=dist/JellyDazzle.app
 make
 rm -rf "$APP"
@@ -39,6 +43,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundleIconFile</key><string>JellyDazzle</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <!-- Required by the App Store; also what Finder/Launchpad categorise by. -->
+  <key>LSApplicationCategoryType</key><string>public.app-category.entertainment</string>
+  <!-- Must match the compiler's -mmacosx-version-min. Without it macOS infers
+       the SDK version and the app refuses to launch on older systems. -->
+  <key>LSMinimumSystemVersion</key><string>${MACMIN}</string>
+  <key>NSHumanReadableCopyright</key><string>Copyright © 2026 John Elia / LIBCSYSTEMS LLC. MIT licensed.</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAudioCaptureUsageDescription</key><string>JellyDazzle listens to what the Mac is playing (Spotify, any app) so the kaleidoscope can move with the music. Audio is analysed in memory only — never recorded, stored, or sent anywhere.</string>
   <key>NSMicrophoneUsageDescription</key><string>JellyDazzle listens to whatever it can hear so the kaleidoscope can move with the music. Audio is analysed in memory only — never recorded, stored, or sent anywhere.</string>

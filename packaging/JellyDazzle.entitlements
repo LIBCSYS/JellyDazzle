@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Mandatory for the Mac App Store. Without it the upload is rejected. -->
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+
+  <!-- JellyDazzle reacts to what the Mac is playing, so it needs audio input.
+       This is the entitlement behind the NSMicrophoneUsageDescription /
+       NSAudioCaptureUsageDescription strings already in Info.plist. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+
+  <!-- Deliberately NOT requested, and each omission is a question Apple will
+       not have to ask:
+         com.apple.security.network.client / .server  - the app never talks to
+             the network. Claiming it invites "why?" at review.
+         com.apple.security.files.user-selected.*     - it opens no documents.
+         com.apple.security.device.camera             - no camera use.
+       Ask for nothing you cannot justify in one sentence. -->
+</dict>
+</plist>
