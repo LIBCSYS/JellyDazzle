@@ -1,36 +1,101 @@
-# JellyDazzle v2.4 — Audio
+# JellyDazzle
 
-Clean-room reorganisation of JellyDazzle 2.3 (LIBCSYS/JellyDazzle) with a
-proper layout, verified system-audio capture, and a rebuilt startup path.
+**An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever your Mac is
+playing and paints to it — never the same pattern, never the same colours.
 
-What the built app actually contains: **24 ARMv9.2-A assembly engine
-modes + 201 C pattern plug-ins**. A further 400 candidate patterns live in
-`src/patterns_hold/` — they are NOT compiled into the binary. They are kept in
-the tree deliberately (no work is discarded) and are being reviewed a family at
-a time before promotion into `src/patterns/`. 30 of them do not currently
-compile: they were written against a `_spark572.h` sprite kit that has not been
-written yet, and are marked as such in the catalogue.
+An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
+under a library of 610 C pattern plug-ins.
 
-Changes over 2.3:
-  * system-output audio capture via a Core Audio process tap (not just the mic)
-  * strobe eliminated — layer palette windows are cyclic, so audio-driven
-    palette rotation can no longer drag a pattern across a discontinuity
-  * fullscreen no longer restarts the engine (resize keeps probe stats + bags)
-  * probe results are cached to ~/Library/Application Support/JellyDazzle, so
-    every launch starts with the whole library sorted into layers instead of
-    spending its first ~6.5 s drawing from a near-empty pool
+**Version 2.8.0** · macOS 11+ · Apple Silicon · MIT
+· [dazzle.jelia.nyc](https://dazzle.jelia.nyc/)
+· [browse every routine](https://dazzle.jelia.nyc/library/)
 
-    src/engine/    compositor.c   scheduler + layer compositor (was bridge.c)
-                   routines_asm.s 24 ARM64 assembly routines (was draw.s)
-                   jellydazzle.h  the plug-in contract
-    src/audio/     listen.c       microphone -> bass/mid/treble/beat
-    src/app/       main.c         SDL window, native-resolution render loop
-    src/patterns/  NNN_name.c     pattern plug-ins, named by what they draw
-    assets/        palette.bin, sintab.bin, palettes/ (sources)
-    tools/         gen_palettes.py, gen_registry.sh, build_app.sh, release_app.sh
-    docs/          HOW_TO_OPEN.md
+---
 
-Build: `make` · run: `make run` · app bundle: `make app`
+## What the built app contains
 
-Engine port verified byte-identical to 2.3.0 at the time of the port (frame
-hashes at 3 sample points); the changes listed above came after.
+| | |
+|---|---|
+| **24** | ARMv9.2-A assembly engine modes |
+| **610** | C pattern plug-ins |
+| **634** | routines total |
+| **180** | palette schemes, interpolated in OKLab |
+
+Every routine in the tree is compiled into the shipping binary. Nothing is held back.
+
+The engine draws once and then moves the palette, the way the original did. Patterns are
+scheduled into layers by how much they move on their own, so the stillest ones get the most
+transform and nothing sits static. Two routines from the same shape family never share the
+screen.
+
+## Audio
+
+On macOS 14.2+ JellyDazzle taps the **system audio output**, so it moves with whatever is
+already playing — Spotify, a browser, anything. On earlier versions it falls back to the
+microphone, which is why macOS asks for permission on first launch.
+
+Audio is turned into numbers and thrown away. It is analysed in memory to drive the current
+frame and then discarded — never recorded, never stored, never transmitted. The app has no
+network capability at all. Without permission the visuals simply run on internal clocks.
+See the [privacy policy](https://dazzle.jelia.nyc/privacy/).
+
+## Build it
+
+```sh
+git clone https://github.com/LIBCSYS/JellyDazzle.git
+cd JellyDazzle
+make          # build ./jellydazzle
+make run      # build and launch
+make app      # self-contained JellyDazzle.app
+```
+
+Needs only the Xcode command line tools (`xcode-select --install`).
+
+**SDL2 ships in this repository**, built against the minimum supported macOS. That is
+deliberate: a Homebrew SDL is compiled for whichever macOS the build machine happens to run
+and silently pins the finished app to it — which is exactly what once made a public download
+refuse to launch on anything but the newest system.
+
+⚠️ **First launch can take 30–60 seconds** while it measures the library and probes audio
+devices. It is working, not hung. The measurements are cached, so every later launch is
+immediate.
+
+## Installing a downloaded build
+
+Current downloads are ad-hoc signed, so macOS warns that it cannot verify the app. Nothing
+is wrong with it — it has not been through Apple's signing and notarisation yet. Apple
+Developer enrolment under **LIBCSYSTEMS LLC** is in progress and the next release will be
+signed and notarised, opening with no warning. Until then: right-click the app → **Open** →
+**Open**.
+
+## Layout
+
+```
+src/engine/    compositor.c    scheduler + layer compositor
+               routines_asm.s  24 ARM64 assembly routines
+               jellydazzle.h   the plug-in contract
+src/audio/     listen.c        bass / mid / treble / beat
+               systap.m        Core Audio system-output tap
+src/app/       main.c          SDL window, native-resolution render loop
+src/patterns/  NNN_name.c      pattern plug-ins, named by what they draw
+assets/        palette.bin, sintab.bin, palettes/ (sources)
+packaging/     JellyDazzle.entitlements (App Store sandbox)
+tools/         gen_palettes.py, gen_registry.sh, build_app.sh,
+               release_app.sh, build_appstore.sh
+```
+
+## In tribute
+
+JellyDazzle exists because of **DAZZLE.EXE**, written by **James R. Shiflett** of Houston,
+Texas — at night, "a sort of therapy," as he called it. MicroTronics released it as shareware
+in 1990. This is an homage, not affiliated with the original.
+[The full story](https://dazzle.jelia.nyc/tribute/).
+
+## Support
+
+Questions, bugs, or anything else: **support@libcsys.com** ·
+[support page](https://dazzle.jelia.nyc/support/)
+
+---
+
+MIT licensed. Built by John Elia / LIBCSYSTEMS LLC.
