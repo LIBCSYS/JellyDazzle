@@ -6,7 +6,7 @@ playing and paints to it — never the same pattern, never the same colours.
 An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
 under a library of 610 C pattern plug-ins.
 
-**Version 2.8.0** · macOS 11+ · Apple Silicon · MIT
+**Version 3.0.0** · macOS 11+ · Apple Silicon · MIT
 · [dazzle.jelia.nyc](https://dazzle.jelia.nyc/)
 · [browse every routine](https://dazzle.jelia.nyc/library/)
 
@@ -27,6 +27,27 @@ The engine draws once and then moves the palette, the way the original did. Patt
 scheduled into layers by how much they move on their own, so the stillest ones get the most
 transform and nothing sits static. Two routines from the same shape family never share the
 screen.
+
+## Controls
+
+| key | |
+|---|---|
+| **C** | **new colours.** The whole palette cycles to a different scheme — not the next one, the one furthest from what is on screen. |
+| **S** | **new shapes.** Every routine currently drawing is retired and the stack fills again from the library. Colour is left alone. |
+| **A** | about card — version, links, what is playing right now |
+| **M** | audio meter |
+| **F** | full screen |
+| **ESC** | quit |
+
+**C** and **S** are the 3.0 feature and they split the show in two: one key changes what
+it looks like, the other changes what it is doing. Either can be pressed at any time.
+
+Neither of them cuts. The engine has one law — nothing strobes — and a key press is not an
+exemption from it: **C** crossfades to the new palette over two thirds of a second, and
+**S** fades the old routines out under the same envelope that retires them normally. The
+release gate measures this (`gate keys`): across seven starting seeds the worst
+single-frame change after either press stayed inside the range the show already produces
+on its own, and the whole cast turned over.
 
 ## Audio
 

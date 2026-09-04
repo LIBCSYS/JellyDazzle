@@ -61,6 +61,18 @@ static int g_dbg = 0;                      /* 1 = events, 2 = every frame */
 #endif
 
 uint32_t g_mode = 0;                       /* read by draw.s mode select */
+/* THE C KEY (3.0).  The palette walk is a pure function of the frame counter,
+ * so the cheapest honest way to move it is to move the clock it reads: every
+ * scheme, bag, epoch and crossfade downstream then behaves exactly as it
+ * always did, just further along.  This offset is added to `frame` before the
+ * leg AND the leg-phase are taken, which is what lets a jump land on the HEAD
+ * of a leg and therefore show the scheme it picked outright, instead of some
+ * point half-way into that scheme's own successor.
+ * draw.s reads it too, at the two places it takes a colour leg — without that
+ * the 24 asm grounds would sit the jump out and only the overlays would
+ * change, which is the half-feature a viewer reads as "it barely did
+ * anything". */
+uint32_t g_pal_bias = 0;                   /* read by draw.s colour leg     */
 extern void draw_frame(uint32_t*, int, int, int);
 extern const uint32_t jd_palette[];        /* JD_NS*32768 ARGB, in draw.s */
 extern const jd_pattern_fn jd_patterns[];  /* registry.c, indexed 0..N-1 */
@@ -235,6 +247,9 @@ static uint8_t   g_pbag[2][256];
 static uint32_t  g_pepoch[2] = { 0xFFFFFFFFu, 0xFFFFFFFFu };
 static float     g_pfeat[256][14];         /* hue12 + sat + val           */
 static float     g_pthresh = 0.0f;
+static uint32_t  g_pal_from[PAL_N];        /* the ramp a C-jump is leaving */
+static int       g_cfade = 0;              /* frames left in that crossfade */
+#define JD_CJUMP 40                        /* 2/3 s: a cut without a strobe */
 
 /* ---------------- engine state ---------------- */
 static int    g_w = 0, g_h = 0;
@@ -252,6 +267,12 @@ void jd_audio_meter_draw(uint32_t *fb, int w, int h);   /* AUDIO: HUD, src/audio
 void jd_about_draw(uint32_t *fb, int w, int h);         /* ABOUT card (key A), src/audio/listen.c */
 void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs);  /* first-run notice */
 extern int au_skip;                                     /* SPACE dismissed it */
+/* LIVE CONTROL (3.0).  Raised by the keyboard poll in listen.c, cleared here.
+ * The compositor is the only thing allowed to touch the palette walk or the
+ * layer stack, so the key sets a request and this file decides what it means
+ * and when it is safe to act on it. */
+extern int jd_req_palette;                              /* C: new colours     */
+extern int jd_req_shape;                                /* S: new shapes      */
 static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
@@ -877,15 +898,67 @@ static int scheme_at(uint32_t leg)
 
 static void layer_pal_build(int s);
 
+/* ---- THE C KEY: cycle the whole colour set ------------------------------
+ * Move the palette clock to a leg whose scheme is as far from the one on
+ * screen as the library allows, and crossfade there.
+ *
+ * "The next scheme" was the obvious implementation and it is the wrong one.
+ * The walk is ALREADY a shuffled, de-duplicated bag, so the next scheme is
+ * merely a different one — and a fair share of the time it is a near
+ * neighbour that reads as the same picture in a slightly other mood.  A
+ * viewer who presses a key expects the room to change.  So ask pal_dist —
+ * the same colour metric the automatic walk uses to keep lookalikes off
+ * consecutive legs — which of the coming legs is FURTHEST from the current
+ * scheme, and go to that one.  That is the whole difference between
+ * "another palette" and "completely different".  */
+static void palette_jump(int frame)
+{
+    if (g_ns < 2) return;
+    uint32_t pf  = (uint32_t)frame + g_pal_bias;
+    uint32_t leg = pf >> 10;
+    int cur = scheme_at(leg);
+    uint32_t best = 1; float bd = -1.0f;
+    for (uint32_t k = 1; k <= (uint32_t)g_ns; k++) {
+        float d = pal_dist(cur, scheme_at(leg + k));
+        if (d > bd) { bd = d; best = k; }
+    }
+    /* Keep the ramp we are standing on so the change can be a fade rather
+     * than a cut, then put the clock on the HEAD of the winning leg: phase
+     * zero, so what comes up is the chosen scheme itself. */
+    if (g_blend_key >= 0) { memcpy(g_pal_from, g_blend, sizeof g_pal_from);
+                            g_cfade = JD_CJUMP; }
+    g_pal_bias += ((leg + best) << 10) - pf;
+    /* Wildcard layers (2.5.4) index jd_palette directly, not the shared
+     * ramp, so they would sit the jump out holding their old colour while
+     * everything beneath them changed — the one thing on screen that did
+     * not answer the key.  Re-roll them, and their channel rotation with
+     * them. */
+    for (int s = 0; s < JD_NBUF; s++) {
+        if (!g_L[s].live || !g_L[s].wild) continue;
+        uint32_t w = mix32((uint32_t)frame ^ ((uint32_t)s << 13) ^ g_run ^ 0x0C010Eu);
+        g_L[s].wild = (uint16_t)(1 + (w >> 8) % (uint32_t)g_ns);
+        uint32_t hr = (w >> 20) % 100;
+        g_L[s].hrot = (uint8_t)(hr < 34 ? 1 : (hr < 58 ? 2 : 0));
+    }
+    TR("CJUMP f=%d %d -> %d (+%u legs, dist %.3f)\n",
+       frame, cur, scheme_at(leg + best), best, (double)bd);
+}
+
 static void palette_update(int frame)
 {
-    uint32_t leg = (uint32_t)frame >> 10;
+    /* consume the C request first: everything below reads the walk */
+    if (jd_req_palette) { jd_req_palette = 0; palette_jump(frame); }
+
+    uint32_t pf  = (uint32_t)frame + g_pal_bias;
+    uint32_t leg = pf >> 10;
     int A = scheme_at(leg), B = scheme_at(leg + 1);
-    uint32_t x = ((uint32_t)frame & (JD_LEG - 1)) << 6;      /* 0..65472 */
+    uint32_t x = (pf & (JD_LEG - 1)) << 6;                   /* 0..65472 */
     uint32_t t8 = ease_ss(x) >> 8;
     int key = (A << 17) | (B << 9) | (int)t8;
-    if (key == g_blend_key) return;
-    g_blend_key = key;
+    /* the cache short-circuit has to stand down during a jump: the target
+     * ramp is not moving, but the fade towards it is */
+    if (key == g_blend_key && !g_cfade) return;
+    g_blend_key = g_cfade ? -1 : key;
     const uint32_t *pa = jd_palette + (size_t)A * PAL_N;
     const uint32_t *pb = jd_palette + (size_t)B * PAL_N;
     uint32_t t = t8, it = 256 - t8;
@@ -894,6 +967,23 @@ static void palette_update(int frame)
         uint32_t rb = (((ca & 0xFF00FFu) * it + (cb & 0xFF00FFu) * t) >> 8) & 0xFF00FFu;
         uint32_t g  = (((ca & 0x00FF00u) * it + (cb & 0x00FF00u) * t) >> 8) & 0x00FF00u;
         g_blend[i] = 0xFF000000u | rb | g;
+    }
+    /* THE C KEY, second half: the ramp above is the DESTINATION.  Walk to it
+     * from the one that was on screen when the key was pressed.  Two thirds
+     * of a second reads as "it changed when I pressed it" while still being
+     * a fade — and the engine's one law is that nothing strobes. */
+    if (g_cfade) {
+        uint32_t u = ease_ss((uint32_t)(((uint64_t)(JD_CJUMP - g_cfade + 1) << 16)
+                                        / JD_CJUMP)) >> 8;
+        if (u > 256) u = 256;
+        uint32_t iu = 256 - u;
+        for (int i = 0; i < PAL_N; i++) {
+            uint32_t ca = g_pal_from[i], cb = g_blend[i];
+            uint32_t rb = (((ca & 0xFF00FFu) * iu + (cb & 0xFF00FFu) * u) >> 8) & 0xFF00FFu;
+            uint32_t gg = (((ca & 0x00FF00u) * iu + (cb & 0x00FF00u) * u) >> 8) & 0x00FF00u;
+            g_blend[i] = 0xFF000000u | rb | gg;
+        }
+        g_cfade--;
     }
     /* Every live layer follows the shared ramp on the SAME frame.  Staggering
      * the rebuilds (round-robin) was measurably worse: a layer that misses a
@@ -1707,8 +1797,79 @@ static uint32_t layer_w_q16(const jd_layer *L, int f)
     return (e * L->w_peak) >> 8;          /* Q16: peak is Q8, e is Q16 */
 }
 
+/* ---- THE S KEY: change every shape on screen ----------------------------
+ * The picture is a stack of tenancies — a ground plus up to three overlays,
+ * each running one routine.  "A complete shape change" is therefore: end
+ * every tenancy now and let the scheduler fill the stack again from the
+ * bags, which carry their own anti-repeat and will not hand back what just
+ * played.  Colour is untouched on purpose; that is the C key's job, and the
+ * two keys are only worth having if each does one thing.
+ *
+ * Everything here goes through the ordinary envelope.  Nothing is cut: a
+ * layer's t_out/t_end are pulled in and layer_w_q16 fades it exactly as it
+ * fades every other departure.  A hard cut of the whole frame is the worst
+ * break this engine can make, and a key press is not a licence for it.
+ *
+ * The ground is the one exception worth naming: it may never leave without
+ * a successor in place or the frame goes black, so it is not retired here
+ * at all.  Its t_out is pulled in — which is precisely the signal
+ * sched_tick already reads to START a successor, g_lead frames ahead.
+ *
+ * A handover already in flight is the case worth getting right, because it
+ * is running about a fifth of the time and the ground is the largest thing
+ * on screen.  The incoming ground cannot simply be dropped — that would
+ * strand the outgoing one with no successor, which is the one state that
+ * blanks the frame.  So it is allowed to finish arriving and given a SHORT
+ * tenancy instead: the change already under way completes, and another
+ * ground follows it a few seconds later.  Measured without this, two presses
+ * in five left the ground exactly as it was, which is not what "complete"
+ * means to anyone holding the keyboard. */
+#define JD_SKICK   36     /* 0.6 s to clear the stack                       */
+#define JD_SHOLD  200     /* 3.3 s: the tenancy a mid-arrival ground is cut
+                           * back to, so the next one follows it promptly   */
+#define JD_SBACK  360     /* 6 s window in which replacements come straight
+                           * back — long enough to cover a ground handover,
+                           * which gates overlay entry while it runs        */
+static int g_skick_until = 0;
+
+static void shape_kick(int frame)
+{
+    int handover = g_L[JD_SHADOW].live;
+    for (int s = 0; s < JD_NBUF; s++) {
+        jd_layer *L = &g_L[s];
+        if (!L->live) {                    /* idle slot: stop it resting */
+            if (g_rest[s] > frame) g_rest[s] = frame;
+            continue;
+        }
+        int sidx = (s == JD_SHADOW) ? 0 : s;
+        /* the arriving ground gets a short life, not an early exit */
+        int out = frame + ((s == JD_SHADOW && handover) ? JD_SHOLD : JD_SKICK);
+        /* never in front of the fade-IN.  With t_out below t_full,
+         * layer_w_q16 stays on the rising branch past the point it should
+         * have begun to fall and the layer pops when it crosses — the same
+         * trap the strobe guard sidesteps at the ground. */
+        if (out < L->t_full) out = L->t_full;
+        if (out < L->t_out) {
+            L->t_out = out;
+            L->t_end = out + FADE_OUT[sidx] / 2;
+        }
+    }
+    /* The rest a retiring overlay draws is 3-18 s.  That is right for a show
+     * that runs itself and wrong as an answer to a key press: the shapes
+     * would leave and the screen would hold a bare ground for a quarter of a
+     * minute.  Shorten it while this kick is being served, and drop the
+     * minimum gap between entries so the new stack is not rationed. */
+    g_skick_until = frame + JD_SBACK;
+    g_last_change = -100000;
+    TR("SKICK f=%d handover=%d\n", frame, handover);
+}
+
 static void sched_tick(int frame)
 {
+    /* consume the S request before the retire pass reads the timings it is
+     * about to change */
+    if (jd_req_shape) { jd_req_shape = 0; shape_kick(frame); }
+
     /* retire */
     for (int s = 0; s < JD_NBUF; s++) {
         jd_layer *L = &g_L[s];
@@ -1726,6 +1887,9 @@ static void sched_tick(int frame)
             uint32_t k = (rr >> 24) & 15u;
             if (k < 2)       rest = rest * 5 / 2;   /* 1 in 8: a real gap, the stack thins */
             else if (k == 2) rest = lo / 2;         /* 1 in 16: straight back — a double  */
+            /* 3.0: a layer the S key retired comes straight back, or the key
+             * would read as "clear the screen" rather than "change it" */
+            if (frame < g_skick_until) rest = 6 + (int)(rr % 40u);
             g_rest[s] = frame + rest;
         }
     }
@@ -2491,6 +2655,11 @@ const char *jd_routine_name(int rt)
       if (i >= 0 && i < jd_pattern_count) return jd_pattern_names[i]; }
     return "?";
 }
+
+/* The shared blended ramp, read-only, for the gate harness: asserting that
+ * the C key changed the COLOUR wants the palette itself, not an inference
+ * from pixels that were also going to move on their own. */
+const uint32_t *jd_blend_ramp(void) { return g_blend; }
 
 int jd_now_playing(jd_nowplaying *out, int max)
 {

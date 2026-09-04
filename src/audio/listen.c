@@ -100,6 +100,16 @@ static int      au_about;              /* ABOUT card on/off                 */
 int             au_skip;               /* SPACE: dismiss the first-run card  */
 static int      au_skip_key_was;
 static int      au_about_key_was;
+/* ---- 3.0 LIVE CONTROL --------------------------------------------------
+ * Two one-shot requests the viewer can make of the engine.  They are set
+ * here (the keyboard is already polled here, so main.c stays the INT 10h
+ * shim it was written to be) and CONSUMED by the compositor, which is the
+ * only place that may touch the palette walk or the layer stack.  Set-and-
+ * consume, not a toggle: holding the key down must not fire every frame. */
+int             jd_req_palette;        /* C: jump to a different colour set */
+int             jd_req_shape;          /* S: retire the stack, new shapes   */
+static int      au_pal_key_was;
+static int      au_shape_key_was;
 static uint16_t au_peak_hold[4];       /* slow-falling peak ticks per bar   */
 static int      au_stale;              /* ticks with no new callbacks       */
 static float    au_rms_now;
@@ -334,6 +344,16 @@ void jd_audio_tick(void)
         int k = ks ? (ks[SDL_SCANCODE_SPACE] || ks[SDL_SCANCODE_RETURN]) : 0;
         if (k && !au_skip_key_was) au_skip = 1;   /* dismiss, never un-dismiss */
         au_skip_key_was = k;
+        /* C: cycle the colour.  Edge-triggered — the request is raised once
+         * per press and the compositor clears it, so leaning on the key does
+         * not re-roll the palette sixty times a second. */
+        int c = ks ? ks[SDL_SCANCODE_C] : 0;
+        if (c && !au_pal_key_was) jd_req_palette = 1;
+        au_pal_key_was = c;
+        /* S: cycle the shapes.  Same contract. */
+        int sh = ks ? ks[SDL_SCANCODE_S] : 0;
+        if (sh && !au_shape_key_was) jd_req_shape = 1;
+        au_shape_key_was = sh;
     }
 
     if (!au_on) { au_decay_all(); return; }
@@ -670,6 +690,7 @@ void jd_about_draw(uint32_t *fb, int w, int h)
         "DAZZLE.JELIA.NYC/TRIBUTE",
         "GITHUB.COM/LIBCSYS/JELLYDAZZLE",
         "",
+        "C COLOUR       S SHAPE",
         "F FULLSCREEN   M METER",
         "A ABOUT        ESC QUIT",
         "",

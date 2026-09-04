@@ -8,6 +8,11 @@
  *   gate render  W H START END prefix f1 [f2 ...]
  *                                      run START..END, dump PPM at each fN
  *   gate run     W H START TOTAL       just run (JD_DEBUG=1 for the trace)
+ *   gate keys    W H START TOTAL      3.0: press C at 1/3 and S at 2/3 of the
+ *                                      run and report what each one changed,
+ *                                      plus the worst single-frame delta in
+ *                                      the second after the press (a key may
+ *                                      change the picture; it may not strobe)
  *   gate audio   W H N                 jd_audio_init + tick + frame N times,
  *                                      print g_audio every 30 frames, dump
  *                                      last frame to /tmp/gate_audio.ppm
@@ -102,6 +107,90 @@ int main(int argc, char **argv) {
             dsum += d;
         }
         printf("MAXDELTA %.2f@%d ge8=%d ge4=%d mean=%.2f\n", dmax, fmax, ge8, ge4, dsum / (total - 1));
+        return 0;
+    }
+    if (!strcmp(cmd, "keys")) {
+        /* Three questions, and the third is the one that matters:
+         *   1. did C actually change the colour?      (the ramp itself)
+         *   2. did S actually change the shapes?      (jd_now_playing)
+         *   3. did either of them strobe?             (single-frame delta)
+         * The engine's one law is that nothing strobes, and a key press is
+         * not a licence to break it — so the delta after a press is measured
+         * against the delta the same run produces on its own. */
+        int start = atoi(argv[4]), total = atoi(argv[5]);
+        /* how long to watch after a press.  Departures here are envelopes,
+         * not cuts — the ground alone takes about three seconds to hand over
+         * — so a short window measures the fade, not the outcome. */
+        #define KWIN 300
+        int f_c = total / 3, f_s = (total * 2) / 3;
+        uint32_t pal_before[8], pal_after[8];
+        jd_nowplaying np_before[8], np_after[8], np_late[8];
+        int nb = 0, na = 0, nl = 0;
+        double d_base = 0, d_c = 0, d_s = 0;      /* worst delta per window  */
+        int    n_base = 0;
+        jd_frame(fb, w, h, start);
+        for (int f = 1; f < total; f++) {
+            int gf = start + f;
+            /* sample the ramp and the cast just before each press */
+            if (f == f_c) {
+                const uint32_t *r = jd_blend_ramp();
+                for (int i = 0; i < 8; i++) pal_before[i] = r[i * 4096];
+                ppm("/tmp/jd_key_c_before.ppm", fb, w, h);
+                jd_req_palette = 1;
+            }
+            if (f == f_s) {
+                nb = jd_now_playing(np_before, 8);
+                ppm("/tmp/jd_key_s_before.ppm", fb, w, h);
+                jd_req_shape = 1;
+            }
+
+            memcpy(prev, fb, (size_t)n * 4);
+            jd_frame(fb, w, h, gf);
+            double d = delta_of(prev, fb, n);
+
+            /* windows: 60 frames after each press, everything else is the
+             * baseline this run makes on its own */
+            if      (f > f_c && f <= f_c + KWIN) { if (d > d_c) d_c = d; }
+            else if (f > f_s && f <= f_s + KWIN) { if (d > d_s) d_s = d; }
+            else { if (d > d_base) d_base = d; n_base++; }
+
+            if (f == f_c + 90) ppm("/tmp/jd_key_c_after.ppm", fb, w, h);
+            if (f == f_c + KWIN) {
+                const uint32_t *r = jd_blend_ramp();
+                for (int i = 0; i < 8; i++) pal_after[i] = r[i * 4096];
+            }
+            if (f == f_s + KWIN) { na = jd_now_playing(np_after, 8);
+                                   ppm("/tmp/jd_key_s_after.ppm", fb, w, h); }
+            if (f == f_s + KWIN*2) nl = jd_now_playing(np_late, 8);
+        }
+        /* 1. colour: mean per-channel distance across 8 taps of the ramp */
+        double pd = 0;
+        for (int i = 0; i < 8; i++) {
+            uint32_t a = pal_before[i], b = pal_after[i];
+            pd += abs((int)(a >> 16 & 255) - (int)(b >> 16 & 255))
+                + abs((int)(a >> 8  & 255) - (int)(b >> 8  & 255))
+                + abs((int)(a       & 255) - (int)(b       & 255));
+        }
+        pd /= 24.0;
+        printf("C  palette moved %.1f/255 per channel\n", pd);
+        /* 2. shapes: how much of the cast turned over */
+        int held = 0, held_l = 0;
+        for (int i = 0; i < na; i++)
+            for (int j = 0; j < nb; j++)
+                if (np_after[i].routine == np_before[j].routine) { held++; break; }
+        for (int i = 0; i < nl; i++)
+            for (int j = 0; j < nb; j++)
+                if (np_late[i].routine == np_before[j].routine) { held_l++; break; }
+        printf("S  cast %d -> %d, %d held over (at +%d: %d of %d held)\n",
+               nb, na, held, KWIN * 2, held_l, nl);
+        static const char *RL[] = { "GROUND", "FIELD", "FIGURE", "SPARK" };
+        for (int i = 0; i < nb; i++)
+            printf("   was %-6s %s\n", RL[np_before[i].role & 3], jd_routine_name(np_before[i].routine));
+        for (int i = 0; i < na; i++)
+            printf("   now %-6s %s\n", RL[np_after[i].role & 3], jd_routine_name(np_after[i].routine));
+        /* 3. strobe */
+        printf("DELTA baseline max %.2f (%d frames) | after C %.2f | after S %.2f\n",
+               d_base, n_base, d_c, d_s);
         return 0;
     }
     if (!strcmp(cmd, "battery")) {

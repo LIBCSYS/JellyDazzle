@@ -163,7 +163,16 @@ _draw_frame:
     adrp    x9, palette@PAGE
     add     x9, x9, palette@PAGEOFF
     mov     w13, #180                    // JD_SCHEMES: generated, see palette_count.h (scheme count)
-    lsr     w16, w3, #10                // color leg p
+    // 3.0 THE C KEY: take the colour leg from a BIASED frame, so the asm
+    // grounds jump with everything else.  _g_pal_bias is written by the
+    // compositor (palette_jump); without this the key changes only the
+    // overlays whenever an asm mode holds the ground.
+    // w10 is free here - the next instruction loads a constant into it.
+    adrp    x10, _g_pal_bias@PAGE
+    add     x10, x10, _g_pal_bias@PAGEOFF
+    ldr     w10, [x10]
+    add     w16, w3, w10
+    lsr     w16, w16, #10               // color leg p
     movz    w10, #0x79B1
     movk    w10, #0x9E37, lsl #16
     mul     w11, w16, w10
@@ -189,7 +198,15 @@ _draw_frame:
     add     x20, x9, x11                // + schemeA*131072
     lsl     w12, w12, #17
     add     x21, x9, x12
-    lsr     w10, w3, #10                // recompute pseg for partner pair
+    // 3.0: the same bias for the partner pair, or the two halves of the
+    // crossfade walk to different places on a C press and the yang side
+    // keeps the colour the key was meant to retire.
+    // w12 is free here - it is written by the udiv four lines down.
+    adrp    x12, _g_pal_bias@PAGE
+    add     x12, x12, _g_pal_bias@PAGEOFF
+    ldr     w12, [x12]
+    add     w10, w3, w12
+    lsr     w10, w10, #10               // recompute pseg for partner pair
     mov     w13, #6
     udiv    w12, w10, w13
     msub    w10, w12, w13, w10

@@ -44,3 +44,9 @@ extern const int jd_pattern_count;
 typedef struct { int routine; int role; int live; } jd_nowplaying;
 int jd_now_playing(jd_nowplaying *out, int max);   /* returns count filled */
 const char *jd_routine_name(int rt);
+const uint32_t *jd_blend_ramp(void);   /* shared ramp, read-only (gate) */
+
+/* LIVE CONTROL (3.0) — raised by the keyboard, consumed by the compositor.
+ * C asks for a different colour set, S for a different set of shapes. */
+extern int jd_req_palette;
+extern int jd_req_shape;
