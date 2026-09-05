@@ -11,6 +11,11 @@ under a library of 610 C pattern plug-ins.
 > your Mac: a record, a film, a livestream. On macOS 14.2+ it listens to the *system output*, so
 > it follows whatever app is making the sound. In silence it still runs, but on internal clocks —
 > and you are seeing maybe half of what it does.
+>
+> **Nothing to hand?** Play mine — *And I Need Ur Love* by
+> [The Rat's Asses](https://theratsasses.com/), featuring the guy who wrote this thing:
+> [Spotify](https://open.spotify.com/track/3wRjyj2LlYPMx3cziUhb9y) ·
+> [YouTube](https://www.youtube.com/watch?v=u5IyinH_3s4)
 
 > ### Signed by Apple — installs with no warnings
 > Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised by Apple**,
