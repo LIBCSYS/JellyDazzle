@@ -6,6 +6,12 @@ playing and paints to it — never the same pattern, never the same colours.
 An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
 under a library of 610 C pattern plug-ins.
 
+> ### 🔊 Play music first
+> **JellyDazzle is audio-reactive — put something on before you watch it.** Anything playing on
+> your Mac: a record, a film, a livestream. On macOS 14.2+ it listens to the *system output*, so
+> it follows whatever app is making the sound. In silence it still runs, but on internal clocks —
+> and you are seeing maybe half of what it does.
+
 > ### Signed by Apple — installs with no warnings
 > Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised by Apple**,
 > with the ticket stapled so it verifies offline. No "cannot verify" dialog, no right-click
