@@ -37,13 +37,34 @@ extern int  jd_about_is_on(void);
 - (void)jdAbout:(id)sender { (void)sender; jd_about_toggle(); }
 - (void)jdHelp:(id)sender  { (void)sender; jd_about_toggle(); }
 
+/* Both open in the user's default handler — Mail for the mailto:, browser for
+ * the site. openURL: returns NO if nothing is registered to handle the scheme,
+ * which we ignore: there is no useful recovery and no reason to interrupt the
+ * show over it. */
+- (void)jdEmail:(id)sender
+{
+    (void)sender;
+    [[NSWorkspace sharedWorkspace] openURL:
+        [NSURL URLWithString:@"mailto:jellydazzle@jelia.nyc?subject=JellyDazzle"]];
+}
+- (void)jdSite:(id)sender
+{
+    (void)sender;
+    [[NSWorkspace sharedWorkspace] openURL:
+        [NSURL URLWithString:@"https://dazzle.jelia.nyc"]];
+}
+
 /* An explicit target plus an implemented selector is what makes AppKit
  * auto-enable the item; a nil target walks the responder chain, finds nothing
  * that implements these, and greys the item out. The checkmark mirrors whether
  * the card is currently up. */
 - (BOOL)validateMenuItem:(NSMenuItem *)item
 {
-    [item setState:(jd_about_is_on() ? NSControlStateValueOn : NSControlStateValueOff)];
+    /* Only the two items that TOGGLE the card carry a checkmark. The website
+     * and email items just fire, so ticking them would be a lie about state. */
+    SEL a = [item action];
+    if (a == @selector(jdAbout:) || a == @selector(jdHelp:))
+        [item setState:(jd_about_is_on() ? NSControlStateValueOn : NSControlStateValueOff)];
     return YES;
 }
 @end
@@ -98,6 +119,20 @@ void jd_menu_install(void)
      * "Command-Question Mark" rather than naming the slash key. */
     [helpEntry setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
     [helpEntry setTarget:jd_menu_target];
+
+    /* Support and the site, below a separator. A Mac user looking for "how do I
+     * reach these people" checks the Help menu before they check a README. */
+    [helpMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *siteEntry = [helpMenu addItemWithTitle:@"JellyDazzle Website"
+                                                action:@selector(jdSite:)
+                                         keyEquivalent:@""];
+    [siteEntry setTarget:jd_menu_target];
+
+    NSMenuItem *mailEntry = [helpMenu addItemWithTitle:@"Email Support…"
+                                                action:@selector(jdEmail:)
+                                         keyEquivalent:@""];
+    [mailEntry setTarget:jd_menu_target];
 
     NSMenuItem *helpTop = [[NSMenuItem alloc] initWithTitle:@"Help"
                                                      action:NULL
