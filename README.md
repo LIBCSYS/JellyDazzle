@@ -13,9 +13,10 @@ under a library of 610 C pattern plug-ins.
 > and you are seeing maybe half of what it does.
 >
 > **Nothing to hand?** Play mine — *And I Need Ur Love* by
-> [The Rat's Asses](https://theratsasses.com/), featuring the guy who wrote this thing:
-> [Spotify](https://open.spotify.com/track/3wRjyj2LlYPMx3cziUhb9y) ·
-> [YouTube](https://www.youtube.com/watch?v=u5IyinH_3s4)
+> [The Rat's Asses](https://theratsasses.com/), featuring the guy who wrote this thing.
+> **[▶ Watch on YouTube](https://www.youtube.com/watch?v=u5IyinH_3s4)** — free, no account.
+> Also on [Spotify](https://open.spotify.com/track/3wRjyj2LlYPMx3cziUhb9y), though free
+> accounts only get a 30-second preview there.
 
 > ### Signed by Apple — installs with no warnings
 > Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised by Apple**,
