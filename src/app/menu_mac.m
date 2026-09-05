@@ -103,6 +103,14 @@ void jd_menu_install(void)
     [mainMenu addItem:helpTop];       /* appended => rightmost, after App/Window/View */
     [NSApp setHelpMenu:helpMenu];     /* pins it right and marks it as THE help menu */
 
-    [helpTop release];                /* mainMenu retains it */
-    [helpMenu release];               /* helpTop retains it  */
+    /* Both stay alive for the life of the process, deliberately.
+     *
+     * Releasing them looked correct by the ownership rules — mainMenu retains
+     * helpTop, helpTop retains helpMenu — but combined with setHelpMenu: it
+     * left AppKit holding a menu it did not own, and the app shut itself down
+     * a few seconds after launch with a clean exit 0. Bisected: dropping
+     * either setHelpMenu: or the releases fixes it; keeping both does not.
+     *
+     * A menu bar lives as long as the app does. There is nothing to reclaim,
+     * so we don't. Same reasoning as jd_menu_target above. */
 }}
