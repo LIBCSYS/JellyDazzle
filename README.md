@@ -6,7 +6,13 @@ playing and paints to it — never the same pattern, never the same colours.
 An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
 under a library of 610 C pattern plug-ins.
 
-**Version 3.0.0** · macOS 11+ · Apple Silicon · MIT
+> ### Signed by Apple — installs with no warnings
+> Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised by Apple**,
+> with the ticket stapled so it verifies offline. No "cannot verify" dialog, no right-click
+> trick — download it and open it.
+> **Mac App Store submission is in review.**
+
+**Version 3.0.2** · macOS 11+ · Apple Silicon · MIT
 · [dazzle.jelia.nyc](https://dazzle.jelia.nyc/)
 · [browse every routine](https://dazzle.jelia.nyc/library/)
 
@@ -129,10 +135,4 @@ Questions, bugs, or anything else: **support@libcsys.com** ·
 
 ---
 
-MIT licensed. Built by John Elia / LIBCSYSTEMS LLC.> ### ✅ Signed by Apple — installs with no warnings
-> The download is **code-signed as `Developer ID Application: LIBCSYSTEMS LLC`** and
-> **notarised by Apple**, with the ticket stapled so it verifies offline. No
-> "cannot verify" dialog, no right-click trick — download it and open it.
-> **Mac App Store submission is in review.**
-
-
+MIT licensed. Built by John Elia / LIBCSYSTEMS LLC.
