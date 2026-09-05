@@ -96,6 +96,19 @@ int jd_systap_open(jd_tap_push_fn push, int *rate_out, char *name, int namelen)
     return 0;
 #else
     if (st_running) return 1;
+    /* THE ONE VERSION GATE FOR THIS WHOLE FILE. Everything below — and every
+     * tap call in jd_systap_close — is Core Audio process-tap API introduced
+     * across macOS 12/13/14.2, and none of it is reachable unless this passes.
+     * We build with -mmacosx-version-min=11.0 so the app still LAUNCHES on
+     * older systems; it just reports "needs macOS 14.2+" and falls back to the
+     * microphone.
+     *
+     * ⚠ Because the gate is an early RETURN rather than an @available block
+     * wrapped around the calls, clang cannot see it and emits eight
+     * -Wunguarded-availability-new warnings for this file. They are expected.
+     * Do not "fix" them by lowering the checks to individual call sites — the
+     * invariant is simpler than that: st_running / st_tap / st_agg are all
+     * zero unless this line let us through. */
     if (@available(macOS 14.2, *)) {} else { snprintf(st_err, sizeof st_err, "needs macOS 14.2+"); return 0; }
     st_err[0] = 0;
     @autoreleasepool {
@@ -193,6 +206,13 @@ int jd_systap_open(jd_tap_push_fn push, int *rate_out, char *name, int namelen)
 void jd_systap_close(void)
 {
 #if JD_HAVE_TAP
+    /* st_running is only ever set by jd_systap_open() AFTER its
+     * @available(macOS 14.2) gate, so this early return is what makes the
+     * unguarded 14.2 calls below safe on an 11.0 deployment target. Each
+     * handle is also tested individually: open() tears down partially and
+     * zeroes what it destroyed, so a failed open can leave some set and some
+     * not. Order matters — stop the IOProc before destroying the device that
+     * owns it, and the aggregate before the tap it wraps. */
     if (!st_running) return;
     if (st_proc) { AudioDeviceStop(st_agg, st_proc); AudioDeviceDestroyIOProcID(st_agg, st_proc); }
     if (st_agg)  AudioHardwareDestroyAggregateDevice(st_agg);

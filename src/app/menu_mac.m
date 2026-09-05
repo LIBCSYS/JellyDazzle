@@ -70,11 +70,14 @@ void jd_menu_install(void)
         [about setTitle:@"About JellyDazzle"];
         [about setTarget:jd_menu_target];
         [about setAction:@selector(jdAbout:)];
-        /* ⚠ Deliberately NO key equivalent. listen.c polls SDL_SCANCODE_A with
-         * no modifier check, and AppKit fires a menu key equivalent AND still
-         * forwards the key to SDL — so Cmd-A would toggle the card twice and
-         * look like a no-op. Cmd-? is safe because nothing polls '/' with
-         * Command held (listen.c explicitly excludes it). */
+        /* ⚠ Deliberately NO key equivalent — but no longer for the original
+         * reason. AppKit fires a menu key equivalent AND still forwards the
+         * key to SDL, and listen.c used to poll bare A, so Cmd-A toggled the
+         * card twice and looked like a no-op. listen.c now ignores its entire
+         * key poll while Command is down, so that double-fire is gone. The
+         * item stays bare anyway: Cmd-A is Select All everywhere else on the
+         * Mac and an About card is not worth stealing it for. Cmd-? on the
+         * Help item is the sanctioned shortcut and passes the same gate. */
     }
 
     /* A non-bundled run (make run) titles these from the lowercase process
@@ -101,16 +104,31 @@ void jd_menu_install(void)
                                               keyEquivalent:@""];
     [helpTop setSubmenu:helpMenu];
     [mainMenu addItem:helpTop];       /* appended => rightmost, after App/Window/View */
-    [NSApp setHelpMenu:helpMenu];     /* pins it right and marks it as THE help menu */
-
-    /* Both stay alive for the life of the process, deliberately.
+    /* TWO DELIBERATE OMISSIONS, AND THEY ARE THE SAME BUG: we never call
+     * setHelpMenu:, and we never release helpTop or helpMenu.
      *
-     * Releasing them looked correct by the ownership rules — mainMenu retains
-     * helpTop, helpTop retains helpMenu — but combined with setHelpMenu: it
-     * left AppKit holding a menu it did not own, and the app shut itself down
-     * a few seconds after launch with a clean exit 0. Bisected: dropping
-     * either setHelpMenu: or the releases fixes it; keeping both does not.
+     * The releases look correct by the ownership rules — mainMenu retains
+     * helpTop, helpTop retains helpMenu — but with setHelpMenu: also in play
+     * the app shut ITSELF down about a minute after launch: WINDOWEVENT_CLOSE,
+     * then SDL_QUIT, clean exit 0, no crash report, reproducible every run.
+     * Bisected against a no-menu build side by side: dropping EITHER the
+     * setHelpMenu: call or the releases fixes it, keeping both does not. So
+     * this is an over-release — setHelpMenu: leaves AppKit holding a reference
+     * that our release then drops out from under it. Either half alone is a
+     * fix; we keep both out because neither costs us anything:
      *
-     * A menu bar lives as long as the app does. There is nothing to reclaim,
-     * so we don't. Same reasoning as jd_menu_target above. */
+     *   - The releases buy nothing. A menu bar lives as long as the app does,
+     *     so there is no memory to reclaim. Same reasoning as jd_menu_target.
+     *   - setHelpMenu: buys little. AppKit recognises a menu titled "Help" by
+     *     itself and adds the help search field to it.
+     *
+     * ⚠ What setHelpMenu: DID buy is position, and nothing replaces that.
+     * Help sits rightmost only because addItem: appends and no code runs after
+     * us — SDL builds App/Window/View inside SDL_Init, before jd_menu_install.
+     * A menu added later lands to the RIGHT of Help and breaks HIG order.
+     * Insert at an explicit index rather than appending if you add one.
+     *
+     * ⚠ AppKit's auto-recognition matches the LOCALISED title, so hardcoding
+     * @"Help" makes that behaviour English-only. This is the line to revisit
+     * if JellyDazzle is ever localised. */
 }}

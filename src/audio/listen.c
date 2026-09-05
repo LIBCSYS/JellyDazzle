@@ -132,6 +132,9 @@ static void au_push(const float *in, int n, int stride)
     au_w = w;
 }
 
+/* SDL's audio thread lands here. Does nothing but hand the samples to the
+ * ring — analysis happens on the main thread in jd_audio_tick, because this
+ * callback must never be the thing that misses a buffer. */
 static void au_sdl_cb(void *ud, Uint8 *stream, int len)
 {
     (void)ud;
@@ -168,6 +171,9 @@ static void au_fft(float *re, float *im, int n)
     }
 }
 
+/* Diagnostics to /tmp, opened and closed per line on purpose: this is the log
+ * you read AFTER the app was killed, and a held FILE* loses its tail. Silent
+ * no-op if the file will not open — logging must never take the app down. */
 static void au_log(const char *fmt, ...)
 {
     FILE *lf = fopen("/tmp/jd_audio_meter.log", "a");
@@ -253,6 +259,9 @@ static int au_open_mic(void)
     return 1;
 }
 
+/* Tear down whichever source is open. Dispatches on au_src rather than trying
+ * both, so a half-open state from a failed switch cannot close the wrong
+ * one. */
 static void au_close_src(void)
 {
     if (au_src == SRC_TAP) jd_systap_close();
@@ -261,6 +270,9 @@ static void au_close_src(void)
     au_stale = 0;
 }
 
+/* Open the source the user asked for, or in auto mode try the system tap and
+ * fall back to the mic. Tap first because it hears what the Mac is PLAYING;
+ * the mic hears the room, which is the honest fallback but not the intent. */
 static int au_open_any(void)
 {
     if (au_want_src == SRC_MIC) return au_open_mic();
@@ -268,6 +280,9 @@ static int au_open_any(void)
     return au_open_tap() || au_open_mic();
 }
 
+/* Bring audio up. Returns 0 when there is no usable input — which is a
+ * supported way to run, not a failure: the engine falls back to its internal
+ * clocks and the picture carries on. */
 int jd_audio_init(void)
 {
     if (au_on) return 1;
@@ -303,6 +318,9 @@ int jd_audio_init(void)
     return 1;
 }
 
+/* Idempotent, and called on the normal shutdown path from main(). The tap
+ * holds a Core Audio aggregate device that outlives a sloppy exit, so this
+ * running matters more than most cleanup. */
 void jd_audio_close(void)
 {
     if (au_on) { au_close_src(); au_on = 0; }
@@ -319,6 +337,10 @@ static uint16_t env(uint16_t cur, float target_f, int att_sh, int rel_sh)
     return (uint16_t)(cur - (d ? d : 1));       /* always reaches 0 in silence */
 }
 
+/* One frame of decay with no input — silence has to LOOK like silence.
+ * Geometric rather than a hard zero so losing the source reads as the music
+ * ending rather than as the visualiser breaking; beat falls faster (7/8)
+ * because a stuck beat light is the most obviously wrong thing on the HUD. */
 static void au_decay_all(void)
 {
     g_audio.level = (uint16_t)(g_audio.level * 15 / 16);
@@ -343,29 +365,50 @@ void jd_audio_tick(void)
      * event loop has already pumped this frame's keys. */
     {
         const Uint8 *ks = SDL_GetKeyboardState(NULL);
+        SDL_Keymod mod  = SDL_GetModState();
+        int shifted     = (mod & KMOD_SHIFT) != 0;
+
+        /* ⚠ COMMAND DOWN = THE MENU BAR OWNS THE KEYSTROKE. Read nothing.
+         *
+         * SDLApplication's sendEvent: runs the menu key equivalent AND still
+         * forwards the raw key to SDL, so every bare key polled below also
+         * fires on its Command chord. Not hypothetical: SDL's own menus bind
+         * Cmd-M to Minimize and Cmd-H to Hide, and this block polls bare M and
+         * bare H. Without this gate Cmd-M minimises the window AND flips the
+         * meter, and Cmd-H hides the app AND flips the About card behind your
+         * back - you unhide to find it in the opposite state.
+         *
+         * Cmd-? is the one Command chord that SHOULD toggle the card, and it
+         * still does: menu_mac.m owns that item and fires jdHelp: through the
+         * menu. One keystroke, one toggle, exactly once.
+         *
+         * Zeroing the state pointer beats testing each key individually - it
+         * also clears every edge-trigger latch below, so releasing Command
+         * re-arms them all instead of swallowing the next press. */
+        if (mod & KMOD_GUI) ks = NULL;
+
         int m = ks ? ks[SDL_SCANCODE_M] : 0;
         if (m && !au_meter_key_was) au_meter ^= 1;
         au_meter_key_was = m;
+
         /* The help/about card. A is the historic key and stays.
          *
          * macOS convention: there is NO F1 here - the top row is display
          * brightness unless the user holds Fn - and the system shortcut for
-         * Help is Command-Question Mark. Apple deliberately calls it
-         * "Command-?" rather than "Command-Shift-/" because ? and / are not
-         * on the same key in every layout, so test the MODIFIER and let the
-         * layout put ? wherever it likes.
+         * Help is Command-Question Mark, which the menu bar serves.
          *
-         * Accepted: A, ?, Cmd-?, and H. A Mac user reaching for help will try
-         * one of those; none of them should miss. */
-        SDL_Keymod mod = SDL_GetModState();
-        int shifted    = (mod & KMOD_SHIFT) != 0;
-        /* ⚠ Cmd-? is handled by the MENU BAR, not here. SDLApplication's
-         * sendEvent: runs the menu key equivalent AND still forwards the key
-         * to SDL, so polling it here too would toggle the card twice and look
-         * like the shortcut does nothing. Ignore the press when Command is
-         * down and let the menu own it. */
-        int qmark      = ks && ks[SDL_SCANCODE_SLASH] && shifted && !(mod & KMOD_GUI);
-        int a = ks ? (ks[SDL_SCANCODE_A] || ks[SDL_SCANCODE_H] || qmark) : 0;
+         * Accepted here: A, H, and a bare Shift-/ for "?". Cmd-? arrives via
+         * the menu instead. A Mac user reaching for help tries one of those.
+         *
+         * ⚠ SDL_SCANCODE_SLASH is a PHYSICAL key position, so the bare "?"
+         * only lands on layouts that put ? on shift-slash (US, UK). On AZERTY
+         * or German it will not fire. Left that way on purpose: the
+         * layout-correct path is the menu's Cmd-?, which AppKit matches by
+         * CHARACTER, and A and H cover the rest. Doing it properly here would
+         * need an SDL_TEXTINPUT handler, which this polled tick has no room
+         * for. */
+        int qmark = ks && ks[SDL_SCANCODE_SLASH] && shifted;
+        int a     = ks ? (ks[SDL_SCANCODE_A] || ks[SDL_SCANCODE_H] || qmark) : 0;
         if (a && !au_about_key_was) au_about ^= 1;
         au_about_key_was = a;
         int k = ks ? (ks[SDL_SCANCODE_SPACE] || ks[SDL_SCANCODE_RETURN]) : 0;
@@ -606,6 +649,9 @@ static void au_dim(uint32_t *fb, int w, int h, int x0, int y0, int rw, int rh)
     }
 }
 
+/* Draw a string in the built-in 3x5 font and return the x it ended at.
+ * Upper-cased on the way through because the glyph table only has capitals —
+ * cheaper than carrying a second alphabet for a HUD nobody reads closely. */
 static int au_text(uint32_t *fb, int w, int h, int x, int y, int s, uint32_t c, const char *t)
 {
     for (; *t; t++) {
@@ -623,6 +669,9 @@ static int au_text(uint32_t *fb, int w, int h, int x, int y, int s, uint32_t c, 
     return x;
 }
 
+/* One meter bar: sunken well, two-tone fill with a brighter cap, and a white
+ * tick at the peak-hold. The cap and the tick are what make the level
+ * readable at a glance on top of a moving picture. */
 static void au_bar(uint32_t *fb, int w, int h, int x, int ybot, int bw, int bh,
                    int s, uint16_t v, uint16_t hold, uint32_t c)
 {
@@ -643,6 +692,9 @@ static void au_bar(uint32_t *fb, int w, int h, int x, int ybot, int bw, int bh,
         au_rect(fb, w, h, x, ybot - hh - (s > 1 ? s / 2 : 0), bw, s > 1 ? s / 2 : 1, 0xFFFFFFFFu);
 }
 
+/* The M-key HUD. Everything is scaled off s, derived from frame height, so
+ * the panel is the same physical size on a laptop screen and a 4K display.
+ * Bails out rather than clipping when the frame is too small to hold it. */
 void jd_audio_meter_draw(uint32_t *fb, int w, int h)
 {
     if (!au_meter || !fb || w < 160 || h < 120) return;

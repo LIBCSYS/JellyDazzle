@@ -125,6 +125,8 @@ static uint32_t ease_ss(uint32_t x) {
     return (uint32_t)(r < 0 ? 0 : (r > 65536 ? 65536 : r));
 }
 
+/* Monotonic, not wall clock: this feeds the cost model, and an NTP step or a
+ * DST jump must never be read as a 3600-second frame. */
 static double now_ms(void) {
     struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
@@ -151,6 +153,10 @@ static int recent_has(uint16_t rt)
 
 static void probe_cache_save(void);
 
+/* Remember that a run opened with this routine, then flush the cache NOW.
+ * Immediately rather than at exit because a screensaver is killed, never
+ * shut down cleanly — anything deferred to an exit path is simply never
+ * written, which is how the cross-launch memory silently did nothing. */
 static void recent_note(uint16_t rt)
 {
     if (!recent_has(rt)) {
@@ -336,6 +342,10 @@ static void stat_image(const uint32_t *b, int n, jd_stat *s)
     }
 }
 
+/* Mean per-channel change between two frames, Q8 — the engine's one measure
+ * of how much a routine actually moves. Every third pixel: it is an average
+ * over tens of thousands of samples either way, and the probe has to fit
+ * inside a frame budget. */
 static uint32_t delta_q8_of(const uint32_t *a, const uint32_t *b, int n)
 {
     uint64_t s = 0; int cnt = 0;
@@ -352,6 +362,9 @@ static uint32_t delta_q8_of(const uint32_t *a, const uint32_t *b, int n)
     return (uint32_t)(s * 256 / cnt);
 }
 
+/* Sort a probed routine into the layer it belongs in. Coverage — how much of
+ * the frame it paints — picks the role; the luma guards below then demote
+ * anything too dark to carry that layer on its own. */
 static void role_from_cov(jd_stat *s)
 {
     int cov = 255 - s->dark;                     /* 0..255 */
@@ -396,6 +409,10 @@ static uint32_t pr_seed, pr_dsum, pr_dmax;
 static int      pr_dn;
 static double   pr_tsmall;
 
+/* Begin probing one routine. Everything lives in the pr_* statics because the
+ * probe is resumable across frames (see the note above them). Both buffers
+ * are cleared so the first motion delta is measured against black instead of
+ * against whatever the previous routine left in them. */
 static void probe_open(int rt, uint32_t *a, uint32_t *b)
 {
     pr_rt = rt; pr_phase = 0; pr_f = 0;
@@ -479,6 +496,9 @@ static int probe_advance(uint32_t *a, uint32_t *b, const uint32_t *pal, int full
     }
 }
 
+/* Stand-in statistics for every routine, installed before the probe has
+ * measured anything. The engine draws from frame one, so it needs a complete
+ * table immediately; each row is overwritten as its real measurement lands. */
 static void stats_defaults(void)
 {
     /* asm modes: role is forced (they read jd_palette directly and can only
@@ -532,6 +552,10 @@ static int routine_live(int rt)
     return 0;
 }
 
+/* Measure a routine from the copy already on screen rather than probing it.
+ * The probe may never render a LIVE routine — it would fight for the same
+ * buffer — so one that spawned before its turn came gets measured here for
+ * free, out of the frame it is already drawing. */
 static void stat_from_live(int rt)
 {
     for (int i = 0; i < JD_NBUF; i++) {
@@ -629,6 +653,11 @@ static int bag_recent(const jd_bag *b, uint16_t v, int win)
     return 0;
 }
 
+/* Reshuffle a bag for a new cycle, then repair the seam. Fisher-Yates alone
+ * is fair but knows nothing about what played LAST cycle, so the second loop
+ * swaps anything in the opening entries that is still in recent history out
+ * for something from the tail. Swapping rather than re-rolling keeps it a
+ * permutation — which is the entire point of using a bag. */
 static void bag_refill(jd_bag *b)
 {
     b->seed = mix32(b->seed ^ 0x9E3779B9u);
@@ -686,6 +715,8 @@ static uint16_t bag_draw(jd_bag *b, int (*ok)(uint16_t, int), int slot)
 
 static uint32_t probe_stamp(void);
 
+/* Where the measured statistics live between launches. NULL with no HOME,
+ * which is the one case where we just re-probe and carry on. */
 static const char *probe_cache_path(void)
 {
     static char p[1024];
@@ -767,6 +798,9 @@ static void probe_cache_save(void)
     TR("PROBE cache written: %s\n", p);
 }
 
+/* Deal every routine into the bag for its role. Leaving head == n marks all
+ * four bags spent, so the first draw from each forces a shuffle instead of
+ * handing out the table in registry order. */
 static void bags_init(void)
 {
     for (int r = 0; r < R_NROLE; r++) {
@@ -831,6 +865,10 @@ static void pal_features(void)
     g_pthresh = m ? (acc / m) * 0.55f : 0.0f;
 }
 
+/* Distance between two schemes over the 14 features pal_features() measured:
+ * 12 hue buckets at half weight, saturation and value at 1.4. Hue is weighted
+ * DOWN on purpose — two schemes can cover the same hues and still look
+ * nothing alike when one is pastel and the other is neon. */
 static float pal_dist(int a, int b)
 {
     float d = 0;
@@ -843,6 +881,10 @@ static float pal_dist(int a, int b)
     return d + 1.4f * (ds < 0 ? -ds : ds) + 1.4f * (dv < 0 ? -dv : dv);
 }
 
+/* A plain shuffle of every scheme for one epoch, with no regard for what ends
+ * up next to what. pal_build() layers the adjacency rules on top; keeping the
+ * raw deal separate is what lets it cheaply reconstruct the PREVIOUS epoch to
+ * check across the boundary. */
 static void pal_shuffle_raw(uint32_t epoch, uint8_t *out)
 {
     for (int i = 0; i < g_ns; i++) out[i] = (uint8_t)i;
@@ -892,6 +934,10 @@ static void pal_build(uint32_t epoch, uint8_t *out, const uint8_t *prev_built)
     }
 }
 
+/* Which scheme leg N shows. Epochs are built lazily and two are kept at once
+ * in g_pbag: a leg near a boundary needs both sides, and the walk only ever
+ * moves forward, so alternating two slots by epoch parity is enough to never
+ * rebuild the same epoch twice running. */
 static int scheme_at(uint32_t leg)
 {
     uint32_t epoch = leg / (uint32_t)g_ns, pos = leg % (uint32_t)g_ns;
@@ -993,6 +1039,10 @@ static void palette_jump(int frame)
        frame, cur, scheme_at(leg + best), best, (double)bd);
 }
 
+/* Build the ramp every layer reads this frame. The walk eases scheme A into
+ * scheme B across a 1024-frame leg, so this is a 32k-entry blend that would
+ * otherwise run every frame — the key check below is what keeps it off the
+ * per-frame path whenever nothing has actually moved. */
 static void palette_update(int frame)
 {
     /* consume the C request first: everything below reads the walk */
@@ -1232,6 +1282,9 @@ static void span_max(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     }
 }
 
+/* SCREEN: inverse-multiply, so this can only ever lighten what is under it.
+ * pick_blend reaches for it when a routine measured as mostly dark BUT
+ * coloured — the lit parts come through without the hard edges B_MAX cuts. */
 static void span_screen(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
     for (int i = 0; i < n; i++) {
@@ -1249,6 +1302,9 @@ static void span_screen(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     }
 }
 
+/* ADD with a hard per-channel clamp — the brightest and least forgiving of
+ * the blends: where two lit layers overlap it saturates to white rather than
+ * to a colour. */
 static void span_add(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
     for (int i = 0; i < n; i++) {
@@ -1396,6 +1452,9 @@ static int recent_in_role(int role)
     return n;
 }
 
+/* The admission test every candidate must pass to take a slot. Called through
+ * bag_draw, so a refusal costs the candidate its place at the FRONT of the
+ * cycle but never its place IN the cycle. Rules are ordered cheapest first. */
 static int admissible(uint16_t r, int slot)
 {
     const jd_stat *st = &g_st[r];
@@ -1492,6 +1551,10 @@ static const uint8_t SLOT_ROLE[JD_NSLOT][2] = {
     { R_FIGURE, R_SPARK }, { R_SPARK,  R_FIGURE },
 };
 
+/* Which role this slot would prefer to host — the ground slot mostly wants
+ * grounds, the spark slot mostly wants sparks. The fallbacks matter more than
+ * the preference: early in a run the probe has sorted almost nothing, most
+ * bags are empty, and the caller still needs a usable role back. */
 static int pick_role(int slot, uint32_t r)
 {
     static const uint8_t tab[JD_NSLOT][4] = {
@@ -1507,6 +1570,10 @@ static int pick_role(int slot, uint32_t r)
     return R_GROUND;
 }
 
+/* Decide how this tenancy composites and how far up it may come. Both fall
+ * out of what the routine MEASURED as rather than what it is called: dark but
+ * coloured material screens, the rest maxes, and a little difference-blend is
+ * sprinkled on slow material so the stack cannot settle into one look. */
 static int pick_blend(const jd_stat *st, uint32_t r, uint16_t *peak, int slot)
 {
     uint32_t lo = PEAK_LO[slot], hi = PEAK_HI[slot];
@@ -1561,6 +1628,9 @@ static void canvas_prime(jd_layer *L, int rt, int frame)
     TR("PRIME rt=%d %.1f ms\n", rt, now_ms() - t0);
 }
 
+/* Fill one slot: pick a role, draw a routine that passes admission, install
+ * it. Returning 0 is a normal outcome, not an error — early in a run there
+ * may be nothing admissible yet, and the caller simply tries again later. */
 static int try_spawn(int slot, int frame)
 {
     int sidx = (slot == JD_SHADOW) ? 0 : slot;
@@ -1834,6 +1904,10 @@ static int try_spawn(int slot, int frame)
     return 1;
 }
 
+/* This layer's weight this frame, Q16 — its whole life in one expression:
+ * silent outside (t_in, t_end), flat at its peak between t_full and t_out,
+ * smootherstep on both ramps. Every entry, exit and handover in the engine
+ * runs through here, which is why nothing in the picture ever cuts. */
 static uint32_t layer_w_q16(const jd_layer *L, int f)
 {
     if (f <= L->t_in || f >= L->t_end) return 0;
