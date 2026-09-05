@@ -243,6 +243,7 @@ static int       g_rest[JD_NBUF];          /* frame at which slot may spawn */
 static uint32_t  g_blend[PAL_N];           /* shared scheme-blended ramp  */
 static int       g_blend_key = -1;
 static int       g_ns = JD_NS;
+static int       g_pal_last = -1;   /* previous scheme, so C cannot bounce A->B->A */
 static uint8_t   g_pbag[2][256];
 static uint32_t  g_pepoch[2] = { 0xFFFFFFFFu, 0xFFFFFFFFu };
 static float     g_pfeat[256][14];         /* hue12 + sat + val           */
@@ -250,6 +251,13 @@ static float     g_pthresh = 0.0f;
 static uint32_t  g_pal_from[PAL_N];        /* the ramp a C-jump is leaving */
 static int       g_cfade = 0;              /* frames left in that crossfade */
 #define JD_CJUMP 40                        /* 2/3 s: a cut without a strobe */
+/* Widest scheme library we will index on the stack in palette_jump(). JD_NS is
+   180 today and the env override is capped at 256, so 256 is the real ceiling. */
+#define JD_NS_MAX 257
+/* How wide the "extreme" band is, as a fraction of the furthest distance
+   available. 0.70 keeps the jump dramatic while leaving enough candidates that
+   the choice is genuinely varied rather than a two-scheme toggle. */
+#define JD_CJ_BAND 0.70f
 
 /* ---------------- engine state ---------------- */
 static int    g_w = 0, g_h = 0;
@@ -917,11 +925,52 @@ static void palette_jump(int frame)
     uint32_t pf  = (uint32_t)frame + g_pal_bias;
     uint32_t leg = pf >> 10;
     int cur = scheme_at(leg);
-    uint32_t best = 1; float bd = -1.0f;
+
+    /* Pick the NEW scheme.
+     *
+     * 3.0.0 took the single most-distant scheme every time. That is
+     * deterministic, and pal_dist() is symmetric: from A the furthest is B,
+     * and from B the furthest is A again — so C ping-ponged between exactly
+     * two palettes forever and the other 178 never appeared. J caught it.
+     *
+     * Fix: still insist on EXTREME, but choose at random inside the extreme
+     * band rather than taking its single winner. Score every candidate, then
+     * keep those within JD_CJ_BAND of the best and pick one of those at
+     * random. Extremity is preserved (the band is measured against the
+     * furthest available, not an absolute), the choice is genuinely random,
+     * and over time it reaches the whole library instead of two entries. */
+    float dist[JD_NS_MAX]; float bd = -1.0f;
     for (uint32_t k = 1; k <= (uint32_t)g_ns; k++) {
         float d = pal_dist(cur, scheme_at(leg + k));
-        if (d > bd) { bd = d; best = k; }
+        dist[k] = d;
+        if (d > bd) bd = d;
     }
+
+    /* Candidates: within the band, and never the scheme we are already on
+     * (distance 0 to itself, so it cannot qualify — but guard anyway) and
+     * never an immediate repeat of the previous jump, which is what made the
+     * old behaviour feel like a toggle. */
+    uint32_t cand[JD_NS_MAX]; int nc = 0;
+    const float floor_d = bd * JD_CJ_BAND;
+    for (uint32_t k = 1; k <= (uint32_t)g_ns; k++) {
+        if (dist[k] < floor_d) continue;
+        int sch = scheme_at(leg + k);
+        if (sch == cur || sch == g_pal_last) continue;
+        cand[nc++] = k;
+    }
+    /* If the band plus the no-repeat rule emptied the list (tiny libraries,
+     * or a run of near-identical schemes), relax the no-repeat rule before
+     * giving up — a repeat is better than not answering the key at all. */
+    if (nc == 0) {
+        for (uint32_t k = 1; k <= (uint32_t)g_ns; k++)
+            if (dist[k] >= floor_d && scheme_at(leg + k) != cur) cand[nc++] = k;
+    }
+    if (nc == 0) { for (uint32_t k = 1; k <= (uint32_t)g_ns; k++) cand[nc++] = k; }
+
+    uint32_t r = mix32((uint32_t)frame ^ g_run ^ 0xC0107Eu ^ ((uint32_t)cur << 7));
+    uint32_t best = cand[(r >> 8) % (uint32_t)nc];
+    bd = dist[best];
+    g_pal_last = cur;                      /* remember, so the next jump cannot bounce back */
     /* Keep the ramp we are standing on so the change can be a fade rather
      * than a cut, then put the clock on the HEAD of the winning leg: phase
      * zero, so what comes up is the chosen scheme itself. */

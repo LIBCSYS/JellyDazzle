@@ -34,12 +34,17 @@ ENGINE   = src/engine/compositor.c src/engine/routines_asm.s
 AUDIO    = src/audio/listen.c src/audio/systap.m
 # systap.m: Core Audio process tap (system-output capture) — needs these frameworks
 AUDIOLIB = -framework CoreAudio -framework Foundation -lobjc
+# menu_mac.m: the native NSMenu menu bar - needs AppKit. SDLFLAGS only carries
+# -framework Cocoa on the vendored-SDL branch; the sdl2-config fallback does not,
+# so link it explicitly here rather than depending on which branch fired.
+UI       = src/app/menu_mac.m
+UILIB    = -framework Cocoa
 APP      = src/app/main.c
 PATTERNS = $(filter-out src/patterns/_harness.c,$(wildcard src/patterns/[0-9]*.c)) src/patterns/_registry.c
 ASSETS   = assets/palette.bin assets/sintab.bin src/engine/palette_count.h
 
-jellydazzle: VERSION $(APP) $(AUDIO) $(ENGINE) $(PATTERNS) src/engine/jellydazzle.h $(ASSETS)
-	$(CC) $(CFLAGS) $(APP) $(AUDIO) $(ENGINE) $(PATTERNS) -o $@ $(SDLFLAGS) $(AUDIOLIB)
+jellydazzle: VERSION $(APP) $(UI) $(AUDIO) $(ENGINE) $(PATTERNS) src/engine/jellydazzle.h $(ASSETS)
+	$(CC) $(CFLAGS) $(APP) $(UI) $(AUDIO) $(ENGINE) $(PATTERNS) -o $@ $(SDLFLAGS) $(AUDIOLIB) $(UILIB)
 
 $(ASSETS): tools/gen_palettes.py assets/palettes/lospec.json $(wildcard assets/palettes/designed/*.json)
 	python3 tools/gen_palettes.py

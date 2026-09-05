@@ -34,13 +34,23 @@ screen.
 |---|---|
 | **C** | **new colours.** The whole palette cycles to a different scheme — not the next one, the one furthest from what is on screen. |
 | **S** | **new shapes.** Every routine currently drawing is retired and the stack fills again from the library. Colour is left alone. |
-| **A** | about card — version, links, what is playing right now |
+| **A** · **?** · **H** | help / about card — version, links, what is playing right now. Also **Help ▸ JellyDazzle Help (⌘?)** in the menu bar. |
 | **M** | audio meter |
 | **F** | full screen |
 | **ESC** | quit |
 
 **C** and **S** are the 3.0 feature and they split the show in two: one key changes what
 it looks like, the other changes what it is doing. Either can be pressed at any time.
+
+**C picks at random inside the extreme band.** It scores every scheme in the 180-strong
+library against what is on screen, keeps the ones within 70% of the furthest, and chooses
+among those — never repeating the scheme it just left. Taking the single furthest every time
+looked right on paper but was deterministic, and colour distance is symmetric: from A the
+furthest was B and from B the furthest was A again, so it toggled between two palettes and
+the other 178 never appeared.
+
+There is no F1 on macOS — the top row is display brightness — so help is on **⌘?** from the
+Help menu, alongside the **A**, **?** and **H** keys.
 
 Neither of them cuts. The engine has one law — nothing strobes — and a key press is not an
 exemption from it: **C** crossfades to the new palette over two thirds of a second, and

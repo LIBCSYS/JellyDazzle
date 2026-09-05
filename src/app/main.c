@@ -9,6 +9,8 @@
  * ============================================================ */
 
 #include <SDL.h>
+
+extern void jd_menu_install(void);   /* src/app/menu_mac.m */
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
@@ -53,6 +55,10 @@ static void fb_pick(int dw, int dh, int *rw, int *rh)
 int main(void)
 {
     SDL_Init(SDL_INIT_VIDEO);
+    /* Install the native menu bar AFTER SDL_Init: SDL builds its own bar during
+     * init and only when [NSApp mainMenu] is nil, so we append to it. Doing this
+     * first would make SDL skip its activation-policy setup entirely. */
+    jd_menu_install();
 
     SDL_Window *win = SDL_CreateWindow(
         "JellyDazzle v" JD_VERSION,
@@ -86,7 +92,11 @@ int main(void)
                 (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE))
                 running = 0;
             /* F (or cmd-F) toggles full screen */
-            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_f)
+            /* Bare F only. SDL's own View menu binds Ctrl-Cmd-F to fullscreen, and
+             * AppKit fires that menu item AND still delivers the key here — so
+             * without this guard Ctrl-Cmd-F toggles twice and does nothing. */
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_f
+                && !(e.key.keysym.mod & (KMOD_GUI | KMOD_CTRL)))
                 SDL_SetWindowFullscreen(win,
                     (SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN_DESKTOP)
                     ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);

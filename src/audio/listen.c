@@ -329,6 +329,14 @@ static void au_decay_all(void)
     g_audio.live  = 0;
 }
 
+/* MENU BAR hooks (src/app/menu_mac.m). The macOS menu drives exactly the same
+ * state the A key drives — one source of truth, no second flag to keep in sync.
+ * All of these run on the main thread between frames: the menu action fires
+ * inside SDL_PollEvent, the key poll inside jd_audio_tick, the draw inside
+ * jd_frame. */
+void jd_about_toggle(void) { au_about ^= 1; }
+int  jd_about_is_on(void)  { return au_about; }
+
 void jd_audio_tick(void)
 {
     /* M toggles the meter — polled here so main.c needs no change; the
@@ -338,7 +346,26 @@ void jd_audio_tick(void)
         int m = ks ? ks[SDL_SCANCODE_M] : 0;
         if (m && !au_meter_key_was) au_meter ^= 1;
         au_meter_key_was = m;
-        int a = ks ? ks[SDL_SCANCODE_A] : 0;      /* A toggles the about card */
+        /* The help/about card. A is the historic key and stays.
+         *
+         * macOS convention: there is NO F1 here - the top row is display
+         * brightness unless the user holds Fn - and the system shortcut for
+         * Help is Command-Question Mark. Apple deliberately calls it
+         * "Command-?" rather than "Command-Shift-/" because ? and / are not
+         * on the same key in every layout, so test the MODIFIER and let the
+         * layout put ? wherever it likes.
+         *
+         * Accepted: A, ?, Cmd-?, and H. A Mac user reaching for help will try
+         * one of those; none of them should miss. */
+        SDL_Keymod mod = SDL_GetModState();
+        int shifted    = (mod & KMOD_SHIFT) != 0;
+        /* ⚠ Cmd-? is handled by the MENU BAR, not here. SDLApplication's
+         * sendEvent: runs the menu key equivalent AND still forwards the key
+         * to SDL, so polling it here too would toggle the card twice and look
+         * like the shortcut does nothing. Ignore the press when Command is
+         * down and let the menu own it. */
+        int qmark      = ks && ks[SDL_SCANCODE_SLASH] && shifted && !(mod & KMOD_GUI);
+        int a = ks ? (ks[SDL_SCANCODE_A] || ks[SDL_SCANCODE_H] || qmark) : 0;
         if (a && !au_about_key_was) au_about ^= 1;
         au_about_key_was = a;
         int k = ks ? (ks[SDL_SCANCODE_SPACE] || ks[SDL_SCANCODE_RETURN]) : 0;
