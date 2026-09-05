@@ -129,4 +129,10 @@ Questions, bugs, or anything else: **support@libcsys.com** ·
 
 ---
 
-MIT licensed. Built by John Elia / LIBCSYSTEMS LLC.
+MIT licensed. Built by John Elia / LIBCSYSTEMS LLC.> ### ✅ Signed by Apple — installs with no warnings
+> The download is **code-signed as `Developer ID Application: LIBCSYSTEMS LLC`** and
+> **notarised by Apple**, with the ticket stapled so it verifies offline. No
+> "cannot verify" dialog, no right-click trick — download it and open it.
+> **Mac App Store submission is in review.**
+
+
