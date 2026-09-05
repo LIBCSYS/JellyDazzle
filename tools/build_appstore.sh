@@ -27,12 +27,15 @@ ENTITLEMENTS=packaging/JellyDazzle.entitlements
 # --- locate the two certificates -------------------------------------------
 # Fail loudly and specifically. "codesign: no identity found" three steps later
 # is a much worse experience than being told which cert is missing up front.
+# Match by SHA-1 HASH, not by name. Three Apple Distribution certs can share
+# one display name (Xcode downloads copies), and codesign refuses a name that
+# matches more than one: "ambiguous (matches ... and ...)". The hash is unique.
 APP_ID=$(security find-identity -v -p codesigning \
-         | grep -E '"(Apple Distribution|3rd Party Mac Developer Application)' \
-         | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
+         | grep -E 'Apple Distribution|3rd Party Mac Developer Application' \
+         | tail -1 | awk '{print $2}' || true)
 PKG_ID=$(security find-identity -v \
-         | grep -E '"3rd Party Mac Developer Installer' \
-         | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)
+         | grep -E '3rd Party Mac Developer Installer' \
+         | head -1 | awk '{print $2}' || true)
 
 if [ -z "$APP_ID" ]; then
   echo "ERROR: no 'Apple Distribution' certificate in the keychain." >&2
@@ -52,6 +55,23 @@ echo "pkg signing : $PKG_ID"
 # Reusing build_app.sh keeps the Info.plist, icon and SDL2 vendoring in ONE
 # place. It ad-hoc signs; everything below re-signs properly over the top.
 tools/build_app.sh >/dev/null
+
+# --- embed the provisioning profile ------------------------------------------
+# ITMS-90889: without Contents/embedded.provisionprofile the upload still lands,
+# but the build is not eligible for TestFlight and Apple emails a warning.
+# It has to be in place BEFORE signing — the signature seals the bundle, so
+# dropping the file in afterwards invalidates it.
+PROFILE=packaging/JellyDazzle_MacAppStore.provisionprofile
+if [ -f "$PROFILE" ]; then
+    cp "$PROFILE" "$APP/Contents/embedded.provisionprofile"
+    echo "embedded provisioning profile: $PROFILE"
+else
+    echo "WARNING: $PROFILE not found — uploading without one." >&2
+    echo "         Apple accepts the build but replies ITMS-90889 and TestFlight" >&2
+    echo "         will not take it. Create a Mac App Store profile at" >&2
+    echo "         developer.apple.com > Profiles > + > Mac App Store, download it," >&2
+    echo "         and save it to that path." >&2
+fi
 
 # --- strip quarantine ------------------------------------------------------
 # Anything that has been downloaded or dragged carries com.apple.quarantine,
