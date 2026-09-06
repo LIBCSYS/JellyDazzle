@@ -5,8 +5,15 @@ cd "$(dirname "$0")/.."
 VER=$(cat VERSION)
 # Read MACMIN from the Makefile rather than repeating it. These two disagreeing
 # is exactly how a build ships claiming macOS 11 while refusing to launch on it.
-MACMIN=$(awk -F= '/^MACMIN/{gsub(/ /,"",$2); print $2}' Makefile)
-MACMIN=${MACMIN:-11.0}
+# Environment wins. The App Store build passes MACMIN=12.0 because Apple
+# rejects an arm64-only bundle below that (error 90869), and it reads
+# LSMinimumSystemVersion from the plist written here — so this value and the
+# compiler's -mmacosx-version-min must agree or the upload fails while the
+# binary looks correct.
+if [ -z "${MACMIN:-}" ]; then
+    MACMIN=$(awk -F= '/^MACMIN/{gsub(/[ ?]/,"",$2); print $2}' Makefile)
+    MACMIN=${MACMIN:-11.0}
+fi
 APP=dist/JellyDazzle.app
 make
 rm -rf "$APP"

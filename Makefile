@@ -17,7 +17,13 @@ NSCHEMES = $(shell awk '/define JD_SCHEMES/{print $$3}' src/engine/palette_count
 # the public download only worked for people already on the newest OS. The
 # Core Audio process tap is guarded by a runtime @available(macOS 14.2) check
 # and falls back to the microphone, so nothing here needs a modern OS.
-MACMIN   = 11.0
+# 11.0 for the direct download — widest reach on Apple Silicon.
+# ⚠ The APP STORE build overrides this to 12.0: Apple rejects an arm64-only
+# bundle (error 90869) unless the deployment target is 12.0 or higher. Intel
+# Macs cannot run this anyway — the renderer is ARM64 assembly — so raising the
+# floor costs nothing there, but it does drop macOS 11 users from the store
+# build, which is why the download keeps 11.0.
+MACMIN  ?= 11.0
 CFLAGS   = -O2 -mmacosx-version-min=$(MACMIN) -Isrc/engine -DJD_VERSION='"$(VERSION)"' -DJD_NS=$(NSCHEMES)
 # Prefer a portable SDL2 built against MACMIN. Homebrew's SDL is compiled for
 # whatever macOS the machine runs, so bundling it pins the app to that OS no
@@ -43,7 +49,7 @@ APP      = src/app/main.c
 PATTERNS = $(filter-out src/patterns/_harness.c,$(wildcard src/patterns/[0-9]*.c)) src/patterns/_registry.c
 ASSETS   = assets/palette.bin assets/sintab.bin src/engine/palette_count.h
 
-jellydazzle: VERSION $(APP) $(UI) $(AUDIO) $(ENGINE) $(PATTERNS) src/engine/jellydazzle.h $(ASSETS)
+jellydazzle: VERSION .macmin $(APP) $(UI) $(AUDIO) $(ENGINE) $(PATTERNS) src/engine/jellydazzle.h $(ASSETS)
 	$(CC) $(CFLAGS) $(APP) $(UI) $(AUDIO) $(ENGINE) $(PATTERNS) -o $@ $(SDLFLAGS) $(AUDIOLIB) $(UILIB)
 
 $(ASSETS): tools/gen_palettes.py assets/palettes/lospec.json $(wildcard assets/palettes/designed/*.json)
@@ -52,7 +58,18 @@ $(ASSETS): tools/gen_palettes.py assets/palettes/lospec.json $(wildcard assets/p
 src/patterns/_registry.c: $(wildcard src/patterns/[0-9]*.c)
 	tools/gen_registry.sh
 
-.PHONY: run assets registry app clean
+# MACMIN is a compiler flag, not a file, so make cannot see it change. Switching
+# from the download build (11.0) to the App Store build (12.0) therefore left the
+# PREVIOUS binary in place while build_app.sh wrote the new floor into Info.plist
+# — measured: plist 12.0, binary still 11.0. That mismatch looks fine locally and
+# is what Apple rejects on upload. This stamp turns the flag into a dependency.
+# It rewrites only when the value actually changes, so ordinary builds are
+# untouched and no-op rebuilds stay no-ops.
+.macmin: FORCE
+	@[ "$$(cat $@ 2>/dev/null)" = "$(MACMIN)" ] || echo "$(MACMIN)" > $@
+
+.PHONY: run assets registry app clean FORCE
+FORCE:
 run: jellydazzle
 	./jellydazzle
 assets:
