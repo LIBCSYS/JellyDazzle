@@ -1343,6 +1343,18 @@ static void span_diff(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
  *
  * Cost measured at 1280x960: the engine had ~2.8x headroom (167 fps), and a
  * transformed layer costs about one extra pass over its own buffer. */
+/* Reflect a coordinate back inside [0,n) instead of falling off the edge.
+ * Period is 2n-2 so the sequence runs 0,1,..,n-1,n-2,..,1 and repeats with
+ * no doubled pixel at the turn. */
+static inline int jd_mirror(int i, int n)
+{
+    if (n <= 1) return 0;
+    int p = 2 * n - 2;
+    i %= p;
+    if (i < 0) i += p;
+    return i < n ? i : p - i;
+}
+
 static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
                        int w, int h)
 {
@@ -1361,8 +1373,21 @@ static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
         uint32_t *d = dst + (size_t)y * w;
         for (int x = 0; x < w; x++) {
             int ix = sx >> 16, iy = sy >> 16;
-            d[x] = ((unsigned)ix < (unsigned)w && (unsigned)iy < (unsigned)h)
-                 ? src[(size_t)iy * w + ix] : 0xFF000000u;
+            /* Outside the source used to be filled with OPAQUE BLACK, which
+             * is the "you can see the box" artefact: a layer zoomed out or
+             * panned drags a hard black rectangle across the frame. It only
+             * showed on B_MIX, because black is a no-op under MAX/SCREEN/ADD
+             * - which is why it looked intermittent.
+             *
+             * Mirroring instead makes the pattern continue past its own
+             * edge seamlessly, and suits a kaleidoscope better than tiling
+             * would (tiling repeats the centre; reflection preserves the
+             * symmetry). The in-bounds path is untouched, so the cost is
+             * paid only by the pixels that were broken before. */
+            if ((unsigned)ix < (unsigned)w && (unsigned)iy < (unsigned)h)
+                d[x] = src[(size_t)iy * w + ix];
+            else
+                d[x] = src[(size_t)jd_mirror(iy, h) * w + jd_mirror(ix, w)];
             sx += dxx; sy += dxy;
         }
     }

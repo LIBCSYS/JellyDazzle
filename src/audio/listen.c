@@ -832,11 +832,26 @@ void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs)
     static const char *L3 = "THIS HAPPENS ONCE";
     char L4[64], L5[64];
     snprintf(L4, sizeof L4, "%d%%   %d:%02d ELAPSED", pct, secs / 60, secs % 60);
-    snprintf(L5, sizeof L5, "PRESS SPACE TO CONTINUE ANYWAY");
+    /* "CONTINUE ANYWAY" implied the build stops if you skip it. It does not:
+     * au_skip only suppresses THIS CARD (compositor.c, the !au_skip test on
+     * the draw call). The probe keeps running on spare frame time and folds
+     * results into the scheduler as they arrive. Say what actually happens. */
+    snprintf(L5, sizeof L5, "PRESS SPACE TO DISMISS - IT KEEPS BUILDING");
     int w1 = (int)strlen(L1) * 4 * s, w2 = (int)strlen(L2) * 4 * s;
     int w3 = (int)strlen(L3) * 4 * s, w4 = (int)strlen(L4) * 4 * s;
     int w5 = (int)strlen(L5) * 4 * s;
     int tw = w2; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
+    /* Scale is picked from HEIGHT, so a tall narrow window can size the text
+     * wider than the window itself and run the card off the edge. The longest
+     * line grew from 30 to 41 characters, which made that reachable. Shrink
+     * until it fits rather than drawing off-screen. */
+    while (s > 2 && tw > w - 16 * s) {
+        s--;
+        w1 = (int)strlen(L1) * 4 * s; w2 = (int)strlen(L2) * 4 * s;
+        w3 = (int)strlen(L3) * 4 * s; w4 = (int)strlen(L4) * 4 * s;
+        w5 = (int)strlen(L5) * 4 * s;
+        tw = w2; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
+    }
     int pad = 10 * s, lh = 9 * s;
     int panel_w = tw + 2 * pad, panel_h = pad + lh * 5 + 8 * s + pad;
     if (panel_w > w) { s = s > 2 ? s - 1 : 2; }            /* shrink once if tight */
