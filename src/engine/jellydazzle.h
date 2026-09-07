@@ -50,3 +50,25 @@ const uint32_t *jd_blend_ramp(void);   /* shared ramp, read-only (gate) */
  * C asks for a different colour set, S for a different set of shapes. */
 extern int jd_req_palette;
 extern int jd_req_shape;
+
+/* ---- CONTRAST TAP (3.0.4, measurement only) --------------------------
+ * A hook into the composite, for tools/gate_harness.c `contrast`.  NULL in
+ * every shipping run, so a normal frame pays three predictable branches.
+ *
+ * Why a tap rather than two runs of the engine: the compositor ADAPTS to
+ * measured frame cost (g_ewma_ms, g_mood, g_hot), so two runs of the same
+ * start frame diverge and a with/without-overlays diff across runs measures
+ * the divergence, not the accent.  Within ONE frame the composite is a pure
+ * function of that frame's layer buffers, so the counterfactual "what was
+ * under the accent" is exact and free.
+ *
+ *   stage = JD_TAP_GROUND    fb holds the ground composite, no overlays yet;
+ *                            slot is the incumbent ground slot.
+ *   stage = JD_TAP_OVERLAY   fb holds the composite with overlay `slot` just
+ *                            blended on top; routine/w_now/blend describe it.
+ *   stage = JD_TAP_FINAL     fb is the delivered frame: boot ramp, dead-air
+ *                            gain, audio bloom, emblem and HUD all applied.
+ * The callback must not write fb. */
+enum { JD_TAP_GROUND = 0, JD_TAP_OVERLAY, JD_TAP_FINAL };
+extern void (*jd_tap)(int stage, int slot, int routine, int w_now, int blend,
+                      const uint32_t *fb, int w, int h);

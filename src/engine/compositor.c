@@ -72,7 +72,49 @@ uint32_t g_mode = 0;                       /* read by draw.s mode select */
  * the 24 asm grounds would sit the jump out and only the overlays would
  * change, which is the half-feature a viewer reads as "it barely did
  * anything". */
-uint32_t g_pal_bias = 0;                   /* read by draw.s colour leg     */
+uint32_t g_pal_bias = 0;
+
+/* ---- STAGE 1: weight means OPACITY, not a visibility threshold ---------
+ * span_max/span_screen/span_add scaled the SOURCE by the layer weight and
+ * then blended. For a lighten-only kernel that makes w a THRESHOLD: an
+ * overlay had to be 256/w times brighter than the ground to mark it at all.
+ * At the measured peaks (mid 144, accent 112, spark 91) a spark was
+ * mathematically invisible over any ground brighter than luma 91, which is
+ * most of them. That is the "foggy clutter where the accent is barely
+ * visible".
+ *
+ * The correct form interpolates the RESULT:  out = lerp(d, blend(d,s), w).
+ * It preserves the invariant the span_max comment claims - where the overlay
+ * is darker the ground survives BIT-EXACT, because max(d,s)==d there - while
+ * letting a dimmer accent contribute proportionally instead of not at all.
+ * span_diff already did it this way; max/screen/add were the anomaly.
+ *
+ * JD_BLENDW=0 restores the old behaviour in the same binary, for A/B. */
+static int g_blendw = -1;
+static inline int blendw_on(void)
+{
+    if (g_blendw < 0) {
+        const char *e = getenv("JD_BLENDW");
+        g_blendw = (e && atoi(e) == 0) ? 0 : 1;   /* default ON */
+    }
+    return g_blendw;
+}
+
+/* ---- TELEMETRY (3.0.4 diversity work) ---------------------------------
+ * Off unless JD_TELEMETRY names a file, so a normal run pays nothing but a
+ * null check. Every scheduling decision the engine makes is written as one
+ * CSV row, because "it feels repetitive" cannot be argued with - a chi-
+ * squared statistic on 5,000 real spawns can. */
+static FILE *g_tel = NULL;
+static void tel_open(void)
+{
+    const char *path = getenv("JD_TELEMETRY");
+    if (!path || g_tel) return;
+    g_tel = fopen(path, "w");
+    if (g_tel)
+        fprintf(g_tel, "event,frame,slot,routine,name,role,cls,blend,peak,"
+                       "life,mood,span,off,wild,hrot,tz,tx,ty,tr,schemeA,schemeB,leg\n");
+}                   /* read by draw.s colour leg     */
 extern void draw_frame(uint32_t*, int, int, int);
 extern const uint32_t jd_palette[];        /* JD_NS*32768 ARGB, in draw.s */
 extern const jd_pattern_fn jd_patterns[];  /* registry.c, indexed 0..N-1 */
@@ -297,6 +339,32 @@ static uint8_t  g_lsig_ok[JD_NBUF];
 static int      g_sig_n = 0;
 static double   g_motion = 0.0;            /* EWMA composite delta        */
 static int      g_slot_cap = JD_NSLOT;
+
+/* CONTRAST TAP (3.0.4).  Declared in jellydazzle.h; NULL unless a measurement
+ * tool installs one, so the shipping cost is three predictable branches per
+ * frame.  See the header for why the counterfactual is taken INSIDE the frame
+ * rather than by re-running the engine with the overlays suppressed. */
+void (*jd_tap)(int stage, int slot, int routine, int w_now, int blend,
+               const uint32_t *fb, int w, int h) = NULL;
+static double g_tap_ms = 0.0;      /* time spent INSIDE the tap this frame */
+
+/* Call the tap and give the time back.
+ *
+ * This matters more than it looks.  jd_frame times ITSELF (g_ewma_ms), and
+ * g_ewma_ms decides g_hot, which half-rates the top overlay, which changes
+ * the picture.  A measurement callback that walks the frame three times costs
+ * several milliseconds, so an instrumented run would silently push the engine
+ * into its thermal-throttle behaviour and then report on a show the user never
+ * sees.  Measured: an instrumented run scored accent visibility 0.31 where the
+ * same seed uninstrumented scored 0.62.  The observer has to pay its own bill. */
+static void tap(int stage, int slot, int routine, int w_now, int blend,
+                const uint32_t *fb, int w, int h)
+{
+    if (!jd_tap) return;
+    double t = now_ms();
+    jd_tap(stage, slot, routine, w_now, blend, fb, w, h);
+    g_tap_ms += now_ms() - t;
+}
 
 /* ============================================================
  * 1. statistics: probe every pattern at two resolutions
@@ -1271,14 +1339,32 @@ static void span_lerp(uint32_t *dst, const uint32_t *a, const uint32_t *b,
  * bit-exact.  That is what keeps a stack readable instead of grey. */
 static void span_max(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
+    if (!blendw_on()) {                      /* JD_BLENDW=0: pre-3.0.4 behaviour */
+        for (int i = 0; i < n; i++) {
+            uint32_t d = dst[i], s = src[i];
+            uint32_t srb = (((s & 0x00FF00FFu) * w) >> 8) & 0x00FF00FFu;
+            uint32_t sg  = (((s & 0x0000FF00u) * w) >> 8) & 0x0000FF00u;
+            uint32_t dr = d & 0x00FF0000u, dg = d & 0x0000FF00u, db = d & 0xFFu;
+            uint32_t sr = srb & 0x00FF0000u, sb = srb & 0xFFu;
+            dst[i] = 0xFF000000u | (dr > sr ? dr : sr) | (dg > sg ? dg : sg)
+                                 | (db > sb ? db : sb);
+        }
+        return;
+    }
+    /* max FIRST, then interpolate the result toward it by w. Because
+     * max(d,s) >= d channel-wise, (m - d) can never go negative, so the
+     * packed two-at-a-time subtract cannot borrow across channel lanes. */
     for (int i = 0; i < n; i++) {
         uint32_t d = dst[i], s = src[i];
-        uint32_t srb = (((s & 0x00FF00FFu) * w) >> 8) & 0x00FF00FFu;
-        uint32_t sg  = (((s & 0x0000FF00u) * w) >> 8) & 0x0000FF00u;
-        uint32_t dr = d & 0x00FF0000u, dg = d & 0x0000FF00u, db = d & 0xFFu;
-        uint32_t sr = srb & 0x00FF0000u, sb = srb & 0xFFu;
-        dst[i] = 0xFF000000u | (dr > sr ? dr : sr) | (dg > sg ? dg : sg)
-                             | (db > sb ? db : sb);
+        uint32_t dr = (d >> 16) & 255, dg = (d >> 8) & 255, db = d & 255;
+        uint32_t sr = (s >> 16) & 255, sg = (s >> 8) & 255, sb = s & 255;
+        uint32_t mr = dr > sr ? dr : sr;
+        uint32_t mg = dg > sg ? dg : sg;
+        uint32_t mb = db > sb ? db : sb;
+        uint32_t r = dr + (((mr - dr) * w) >> 8);
+        uint32_t g = dg + (((mg - dg) * w) >> 8);
+        uint32_t b = db + (((mb - db) * w) >> 8);
+        dst[i] = 0xFF000000u | (r << 16) | (g << 8) | b;
     }
 }
 
@@ -1290,12 +1376,27 @@ static void span_screen(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     for (int i = 0; i < n; i++) {
         uint32_t d = dst[i], s = src[i];
         uint32_t dr = (d >> 16) & 255, dg = (d >> 8) & 255, db = d & 255;
-        uint32_t sr = (((s >> 16) & 255) * w) >> 8;
-        uint32_t sg = (((s >>  8) & 255) * w) >> 8;
-        uint32_t sb = (( s        & 255) * w) >> 8;
-        uint32_t r = dr + sr - ((dr * sr) >> 8);
-        uint32_t g = dg + sg - ((dg * sg) >> 8);
-        uint32_t b = db + sb - ((db * sb) >> 8);
+        uint32_t sr, sg, sb, r, g, b;
+        if (blendw_on()) {
+            /* screen at FULL source, then lerp the result toward it by w.
+             * Weighting the source first is what made this fog: it lifted
+             * every pixel a little instead of lifting the lit ones a lot. */
+            sr = (s >> 16) & 255; sg = (s >> 8) & 255; sb = s & 255;
+            uint32_t fr = dr + sr - ((dr * sr) >> 8);
+            uint32_t fg = dg + sg - ((dg * sg) >> 8);
+            uint32_t fb_ = db + sb - ((db * sb) >> 8);
+            if (fr > 255) fr = 255; if (fg > 255) fg = 255; if (fb_ > 255) fb_ = 255;
+            r = dr + (((fr - dr) * w) >> 8);
+            g = dg + (((fg - dg) * w) >> 8);
+            b = db + (((fb_ - db) * w) >> 8);
+        } else {
+            sr = (((s >> 16) & 255) * w) >> 8;
+            sg = (((s >>  8) & 255) * w) >> 8;
+            sb = (( s        & 255) * w) >> 8;
+            r = dr + sr - ((dr * sr) >> 8);
+            g = dg + sg - ((dg * sg) >> 8);
+            b = db + sb - ((db * sb) >> 8);
+        }
         dst[i] = 0xFF000000u | (r > 255 ? 255u : r) << 16
                              | (g > 255 ? 255u : g) << 8
                              | (b > 255 ? 255u : b);
@@ -1309,9 +1410,24 @@ static void span_add(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
     for (int i = 0; i < n; i++) {
         uint32_t d = dst[i], s = src[i];
-        uint32_t r = ((d >> 16) & 255) + ((((s >> 16) & 255) * w) >> 8);
-        uint32_t g = ((d >>  8) & 255) + ((((s >>  8) & 255) * w) >> 8);
-        uint32_t b = ( d        & 255) + (((  s        & 255) * w) >> 8);
+        /* ADD is unreachable today (pick_blend never returns B_ADD - 0 of
+         * 1,962 measured spawns) but is fixed for consistency: clamp the
+         * full-strength sum first, then lerp toward it. */
+        uint32_t dr = (d >> 16) & 255, dg2 = (d >> 8) & 255, db = d & 255;
+        uint32_t r, g, b;
+        if (blendw_on()) {
+            uint32_t ar = dr + ((s >> 16) & 255);
+            uint32_t ag = dg2 + ((s >> 8) & 255);
+            uint32_t ab = db + (s & 255);
+            if (ar > 255) ar = 255; if (ag > 255) ag = 255; if (ab > 255) ab = 255;
+            r = dr + (((ar - dr) * w) >> 8);
+            g = dg2 + (((ag - dg2) * w) >> 8);
+            b = db + (((ab - db) * w) >> 8);
+        } else {
+            r = dr + ((((s >> 16) & 255) * w) >> 8);
+            g = dg2 + ((((s >>  8) & 255) * w) >> 8);
+            b = db + (((  s        & 255) * w) >> 8);
+        }
         dst[i] = 0xFF000000u | (r > 255 ? 255u : r) << 16
                              | (g > 255 ? 255u : g) << 8
                              | (b > 255 ? 255u : b);
@@ -1355,6 +1471,69 @@ static inline int jd_mirror(int i, int n)
     return i < n ? i : p - i;
 }
 
+/* ---- MINIFICATION DILATE -----------------------------------------------
+ * layer_warp samples nearest-neighbour. When a layer is minified (tz < 1)
+ * the sampling step exceeds one pixel, so most source pixels are never read
+ * at all: a 1-pixel highlight survives with probability tz^2 - measured
+ * 15.9% at tz=0.40, and overlays spawn as low as 0.40. Worse, the transform
+ * drifts every frame, so only ~0.7% of the survivors persist into the next
+ * frame. That is temporal white noise, and the eye integrates temporal noise
+ * into flat haze. It is a mechanical explanation of "foggy clutter where the
+ * accent is barely visible".
+ *
+ * The fix is to DILATE BEFORE DECIMATING: build a half-size copy with a 2x2
+ * per-channel MAX, so a lone bright pixel is guaranteed to survive into the
+ * reduced image. It must be MAX, not an average - averaging divides a lone
+ * spark by four, which destroys exactly what we are trying to keep.
+ *
+ * It is also FASTER, not a cost: the half-size source is a quarter of the
+ * memory and becomes cache-resident, so the warp stops missing cache on
+ * every rotated step.
+ *
+ * JD_WARPFIX=0 restores the old sampling in the same binary. */
+static uint32_t *g_half = NULL;
+static int g_half_w = 0, g_half_h = 0;
+
+static int warpfix_on(void)
+{
+    static int on = -1;
+    if (on < 0) { const char *e = getenv("JD_WARPFIX"); on = (e && atoi(e) == 0) ? 0 : 1; }
+    return on;
+}
+
+/* 2x2 per-channel MAX into g_half. Odd sizes clamp, so the last row/column
+ * is compared against itself rather than read out of bounds. */
+static int half_max_build(const uint32_t *src, int w, int h)
+{
+    int hw = w >> 1, hh = h >> 1;
+    if (hw < 1 || hh < 1) return 0;
+    if (g_half_w != hw || g_half_h != hh) {
+        free(g_half);
+        g_half = (uint32_t *)malloc((size_t)hw * hh * 4);
+        if (!g_half) { g_half_w = g_half_h = 0; return 0; }
+        g_half_w = hw; g_half_h = hh;
+    }
+    for (int y = 0; y < hh; y++) {
+        const uint32_t *r0 = src + (size_t)(y * 2) * w;
+        const uint32_t *r1 = ((y * 2 + 1) < h) ? r0 + w : r0;
+        uint32_t *o = g_half + (size_t)y * hw;
+        for (int x = 0; x < hw; x++) {
+            int x0 = x * 2, x1 = (x0 + 1 < w) ? x0 + 1 : x0;
+            uint32_t a = r0[x0], b = r0[x1], c = r1[x0], e2 = r1[x1];
+            /* per-channel max of the four, two at a time */
+            uint32_t m1r = ((a >> 16) & 255) > ((b >> 16) & 255) ? a : b;
+            uint32_t m2r = ((c >> 16) & 255) > ((e2 >> 16) & 255) ? c : e2;
+            uint32_t R = ((m1r >> 16) & 255) > ((m2r >> 16) & 255) ? (m1r >> 16) & 255 : (m2r >> 16) & 255;
+            uint32_t G = (a >> 8) & 255, B = a & 255;
+            uint32_t gs[4] = { (b >> 8) & 255, (c >> 8) & 255, (e2 >> 8) & 255, G };
+            uint32_t bs[4] = { b & 255, c & 255, e2 & 255, B };
+            for (int k = 0; k < 4; k++) { if (gs[k] > G) G = gs[k]; if (bs[k] > B) B = bs[k]; }
+            o[x] = 0xFF000000u | (R << 16) | (G << 8) | B;
+        }
+    }
+    return 1;
+}
+
 static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
                        int w, int h)
 {
@@ -1367,6 +1546,15 @@ static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
     float sy0 = (0.5f - ox) * sn + (0.5f - oy) * cs + cy;
     int32_t dxx = (int32_t)(cs * 65536.0f), dxy = (int32_t)(sn * 65536.0f);
     int32_t dyx = (int32_t)(-sn * 65536.0f), dyy = (int32_t)(cs * 65536.0f);
+
+    /* Below this the sampling step is wide enough to walk over lone pixels.
+     * 0.80 rather than 1.00 leaves a margin so the switch never sits exactly
+     * on the boundary and flicker between the two paths. */
+    const uint32_t *S = src; int sw = w, sh = h, shift = 0;
+    if (warpfix_on() && L->tz < 0.80f && half_max_build(src, w, h)) {
+        S = g_half; sw = g_half_w; sh = g_half_h; shift = 1;
+    }
+
     for (int y = 0; y < h; y++) {
         int32_t sx = (int32_t)((sx0 + dyx * (float)y / 65536.0f) * 65536.0f);
         int32_t sy = (int32_t)((sy0 + dyy * (float)y / 65536.0f) * 65536.0f);
@@ -1384,10 +1572,14 @@ static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
              * would (tiling repeats the centre; reflection preserves the
              * symmetry). The in-bounds path is untouched, so the cost is
              * paid only by the pixels that were broken before. */
-            if ((unsigned)ix < (unsigned)w && (unsigned)iy < (unsigned)h)
-                d[x] = src[(size_t)iy * w + ix];
+            /* shift==1 means we are reading the dilated half-size copy, so
+             * the full-res source coordinate halves. Everything else about
+             * the transform is unchanged. */
+            int jx = ix >> shift, jy = iy >> shift;
+            if ((unsigned)jx < (unsigned)sw && (unsigned)jy < (unsigned)sh)
+                d[x] = S[(size_t)jy * sw + jx];
             else
-                d[x] = src[(size_t)jd_mirror(iy, h) * w + jd_mirror(ix, w)];
+                d[x] = S[(size_t)jd_mirror(jy, sh) * sw + jd_mirror(jx, sw)];
             sx += dxx; sy += dxy;
         }
     }
@@ -1920,6 +2112,20 @@ static int try_spawn(int slot, int frame)
     g_gap = 30 + (int)(mix32(r ^ 0x6A9F00Du) % 211u);       /* 0.5..4 s, never the same twice */
     TR("SPAWN f=%d slot=%d rt=%d role=%d blend=%d peak=%d life=%d mood=%d span=%u\n",
        frame, slot, (int)v, g_st[v].role, L->blend, L->w_peak, hold, g_mood, L->span);
+    if (g_tel) {
+        uint32_t pf  = (uint32_t)frame + g_pal_bias;
+        uint32_t leg = pf >> 10;
+        fprintf(g_tel,
+            "spawn,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%u,%u,%d,%d,"
+            "%.4f,%.4f,%.4f,%.4f,%d,%d,%u\n",
+            frame, slot, (int)v,
+            (v < JD_NASM ? "asm" : jd_pattern_names[v - JD_NASM]),
+            g_st[v].role, g_st[v].cls, L->blend, L->w_peak, hold, g_mood,
+            L->span, L->off, (int)L->wild, (int)L->hrot,
+            (double)L->tz, (double)L->tx, (double)L->ty, (double)L->tr,
+            scheme_at(leg), scheme_at(leg + 1), leg);
+        fflush(g_tel);
+    }
     recent_note((uint16_t)v);          /* every spawn joins the ring */
     if (g_opening) {
         g_opening = 0;
@@ -2138,6 +2344,7 @@ static void engine_init(uint32_t *fb, int w, int h, int frame)
 {
     (void)fb;
     g_w = w; g_h = h; g_frame0 = frame;
+    tel_open();
     g_run = mix32((uint32_t)frame * 2654435761u + 0x1D0F1E55u); g_gpostponed = 0;
     g_nr = JD_NASM + jd_pattern_count;
     if (g_nr > JD_MAXR) g_nr = JD_MAXR;
@@ -2347,6 +2554,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     if (mode_override(fb, w, h, frame)) return;
 
     double t_frame = now_ms();
+    g_tap_ms = 0.0;                 /* measurement time, refunded below */
     int npix = w * h;
 
     /* Finish measuring the library in the background of the first seconds,
@@ -2563,6 +2771,8 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     } else {
         memcpy(fb, g_L[gnd[0]].buf, (size_t)npix * 4);
     }
+    tap(JD_TAP_GROUND, gnd[0], g_L[gnd[0]].routine,
+        g_L[gnd[0]].w_now, B_MIX, fb, w, h);
 
     /* ---- overlays, bottom up ---- */
     for (int k = 0; k < no; k++) {
@@ -2578,6 +2788,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             }
             blend_span(fb, srcp, npix, L->w_now, L->blend);
         }
+        tap(JD_TAP_OVERLAY, ov[k], L->routine, L->w_now, L->blend, fb, w, h);
     }
 
     /* ---- boot: ease up over the first 2 s, FROM A FLOOR ----
@@ -2754,13 +2965,15 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
      * gain and after the health probes, so it is never brightened, never
      * counted as motion, and always legible. */
     jd_audio_meter_draw(fb, w, h); jd_about_draw(fb, w, h);
+    tap(JD_TAP_FINAL, -1, -1, 0, 0, fb, w, h);
 
     TRF("F %d n=%d/%d w=%d,%d,%d,%d,%d A=%d key=%d p0=%08x b0=%08x sl0=%d rt0=%d\n",
         frame, ng, no,
         g_L[0].w_now, g_L[1].w_now, g_L[2].w_now, g_L[3].w_now, g_L[4].w_now,
         g_blend_key >> 17, g_blend_key, g_pal[0][1000], g_blend[1000],
         g_L[0].sl, g_L[0].routine);
-    double ms = now_ms() - t_frame;
+    double ms = now_ms() - t_frame - g_tap_ms;   /* the tap does not get to
+                                                   change what it measures */
     g_ewma_ms = g_ewma_ms * 0.92 + ms * 0.08;
     if (!g_hot && g_ewma_ms > 13.5) {
         g_hot = 1; g_cool = 0;

@@ -24,7 +24,7 @@ under a library of 610 C pattern plug-ins.
 > trick — download it and open it.
 > **Mac App Store submission is in review.**
 
-**Version 3.0.3** · macOS 11+ · Apple Silicon · MIT
+**Version 3.0.4** · macOS 11+ · Apple Silicon · MIT
 · [dazzle.jelia.nyc](https://dazzle.jelia.nyc/)
 · [browse every routine](https://dazzle.jelia.nyc/library/)
 
