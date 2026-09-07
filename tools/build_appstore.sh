@@ -6,6 +6,11 @@
 #   build_app.sh    -> ad-hoc signed .app for local use
 #   release_app.sh  -> "Developer ID Application" + notarisation, for direct
 #                      download from your own site. No sandbox, no review.
+#   DO NOT NOTARISE THE OUTPUT OF THIS SCRIPT. It is signed with Apple
+#   Distribution, which notarytool rejects ("not signed with a valid Developer
+#   ID certificate") - that exact mistake wasted a submission on 2026-09-05.
+#   Upload the .pkg to App Store Connect; Apple notarises the store copy.
+#
 #   THIS SCRIPT     -> "Apple Distribution" + App Sandbox + a signed .pkg,
 #                      uploaded to App Store Connect. Sandbox is MANDATORY and
 #                      a Developer ID signature is REJECTED here.

@@ -25,15 +25,49 @@ echo "signing identity: $IDENTITY"
 ./tools/build_app.sh >/dev/null        # fresh unsigned bundle + libs
 
 # sign inside-out, hardened runtime + secure timestamp (notarization requires both)
-codesign --force --options runtime --timestamp \
-    --sign "$IDENTITY" "$APP/Contents/Frameworks/libSDL3.dylib"
+# libSDL3 is not vendored. build_app.sh already guards this; this script did not,
+# so it aborted here under set -e and never reached the notarisation step - which
+# is why no release was ever produced despite the script "running".
+if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
+    codesign --force --options runtime --timestamp \
+        --sign "$IDENTITY" "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
 codesign --force --options runtime --timestamp \
     --sign "$IDENTITY" "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
+# Entitlements MUST be repeated on every re-sign. Omit them here and the
+# hardened runtime strips microphone access, so the app builds, ships, and
+# then silently fails to react to audio - the one thing it does.
 codesign --force --options runtime --timestamp \
+    --entitlements packaging/JellyDazzle.entitlements \
     --sign "$IDENTITY" "$APP/Contents/MacOS/JellyDazzle"
 codesign --force --options runtime --timestamp \
+    --entitlements packaging/JellyDazzle.entitlements \
     --sign "$IDENTITY" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
+
+# GUARD. On 2026-09-05 a JellyDazzle-3.0.2.pkg was submitted here and came back
+# Invalid: "The binary is not signed with a valid Developer ID certificate."
+# That pkg was the APP STORE artifact, signed with Apple Distribution.
+#
+# The three destinations take three different certificates and only ONE of them
+# is notarised by you:
+#   direct download  -> Developer ID Application -> notarise here    (this script)
+#   Mac App Store    -> Apple Distribution       -> upload, Apple notarises
+#   local testing    -> ad-hoc                   -> never leaves the machine
+#
+# Refuse to submit anything that is not Developer ID rather than burning five
+# minutes to be told so by Apple.
+AUTH=$(codesign -dvv "$APP" 2>&1 | grep -m1 "^Authority=" | sed 's/^Authority=//')
+case "$AUTH" in
+  "Developer ID Application"*) : ;;
+  *) echo "ERROR: refusing to notarise - the bundle is signed as:" >&2
+     echo "         ${AUTH:-(unsigned or ad-hoc)}" >&2
+     echo "       Notarisation requires 'Developer ID Application'." >&2
+     echo "       If you meant the App Store, use tools/build_appstore.sh and" >&2
+     echo "       upload the .pkg - Apple notarises that side, not you." >&2
+     exit 1 ;;
+esac
+echo "verified signing authority: $AUTH"
 
 rm -f dist/JellyDazzle-notarize.zip
 ditto -c -k --keepParent "$APP" dist/JellyDazzle-notarize.zip

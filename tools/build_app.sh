@@ -68,12 +68,45 @@ xattr -cr "$APP"
 # SDL3 is only present when the SDL2 we linked is Homebrew's sdl2-compat shim.
 # With the vendored real SDL2 there is nothing to sign here, and signing a file
 # that does not exist aborted the whole script under `set -e`.
-if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
-    codesign --force -s - "$APP/Contents/Frameworks/libSDL3.dylib"
+# SIGNING. This used to hard-code `-s -` (ad-hoc), which was correct while the
+# Apple enrolment was still pending and wrong the moment the certificates
+# arrived: an ad-hoc bundle is REJECTED by Gatekeeper, so double-clicking the
+# download does nothing but show a scary dialog.
+#
+# Prefer the real Developer ID identity when the keychain has one; fall back to
+# ad-hoc so the script still works on a machine without the certificate.
+ID=$(security find-identity -v -p codesigning 2>/dev/null      | grep "Developer ID Application" | head -1      | sed -E 's/.*"(.*)"/\1/')
+if [ -n "$ID" ]; then
+    echo "signing as: $ID"
+    # --options runtime is the hardened runtime, which notarisation REQUIRES.
+    # Under it, microphone access needs the entitlement declared - the Info.plist
+    # usage string alone is not enough.
+    ENT="--entitlements packaging/JellyDazzle.entitlements"
+else
+    echo "WARNING: no Developer ID Application certificate found - signing ad-hoc."
+    echo "         Gatekeeper will reject the result. Fine for local testing only."
+    ENT=""
 fi
-codesign --force -s - "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
-codesign --force -s - "$APP/Contents/MacOS/JellyDazzle"
-codesign --force -s - "$APP"
+
+# A FUNCTION, not a variable. The identity string contains spaces, so holding
+# the whole command in a variable word-splits it and codesign ends up looking
+# for a file called "ID:".
+sign_it () {
+    if [ -n "$ID" ]; then
+        codesign --force --timestamp --options runtime -s "$ID" "$@"
+    else
+        codesign --force -s - "$@"
+    fi
+}
+
+if [ -f "$APP/Contents/Frameworks/libSDL3.dylib" ]; then
+    sign_it "$APP/Contents/Frameworks/libSDL3.dylib"
+fi
+# Libraries are signed WITHOUT entitlements; only the main executable and the
+# bundle carry them. Signing a dylib with entitlements is invalid.
+sign_it "$APP/Contents/Frameworks/libSDL2-2.0.0.dylib"
+sign_it $ENT "$APP/Contents/MacOS/JellyDazzle"
+sign_it $ENT "$APP"
 codesign --verify --deep --strict "$APP"
 rm -f dist/JellyDazzle.app.zip
 # --sequesterRsrc keeps metadata out of the bundle tree on extraction
