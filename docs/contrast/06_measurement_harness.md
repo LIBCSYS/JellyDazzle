@@ -388,8 +388,11 @@ python3 tools/ct_pool.py 5 /tmp/ctbase/t_*.csv    # all overlays
   shipping — tile size scales with the frame, so V is resolution-stable in
   principle, but that is an assumption, not a measurement.
 
-Keep `/tmp/ctbase` — copy it to `docs/contrast/baseline/`. The CSVs are the
-before-measurement; the summary lines alone are not enough to re-pool.
+Keep `/tmp/ctbase`. **The before-measurement from this session is already in
+`docs/contrast/baseline/`** — 16 tenancy CSVs (8 seeds x 2 arms) plus
+`SUMMARY.txt` with the commit, the per-seed `CONTRAST` lines and the guardrail
+numbers. The CSVs are the baseline; the summary lines alone are not enough to
+re-pool.
 
 ---
 
@@ -1105,5 +1108,9 @@ And the dispatch, in `main`:
   nothing now that the protocol pre-creates the tree, but it is a live bug for
   any user whose `~/Library` is missing, and it makes ad-hoc measurement runs
   quietly wrong.
-- **Store the baseline CSVs in the repo** (`docs/contrast/baseline/`), not just
-  the summary lines. Re-pooling needs the tenancy rows.
+- **The `ALL-OV` series double-counts** where two overlays touch the same pixel;
+  it answers "is any accent visible here", not "how many". Fine for its purpose,
+  wrong if anyone tries to read a per-layer number out of it.
+- **`EVERY=5` was used for the baseline, `EVERY=3` is the default.** Compare
+  arms at the same setting; the sampling rate does not bias V but it does change
+  how many samples a tenancy contributes to its own weight.
