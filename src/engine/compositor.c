@@ -333,6 +333,17 @@ static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
 static int    g_hot = 0, g_cool = 0, g_jitter = 0;
+/* Above this the upper slots are refused outright rather than half-rated.
+ * 26 ms is ~38 fps: past it a half-rate overlay (5.9-17.7 ms) can no longer
+ * fit in the frame it is amortised over, so admitting one buys clutter at the
+ * price of judder.  Between the 13.5 ms g_hot threshold and here, the slot
+ * enters thinned — which is the band the whole Retina case lives in. */
+#define JD_GATE_REFUSE_MS 26.0
+/* Live-overlay count at or above which a pressured upper slot is refused as
+ * before.  Below it the stack has collapsed toward a bare ground and a thinned
+ * layer is admitted.  2 rather than 1 because a solo overlay is exactly the
+ * degenerate picture this is meant to prevent. */
+#define JD_GATE_STARVED 2
 static uint32_t g_sig[1024];
 static uint32_t g_lsig[JD_NBUF][512];      /* per-layer motion signature   */
 static uint8_t  g_lsig_ok[JD_NBUF];
@@ -2315,6 +2326,11 @@ static void sched_tick(int frame)
         }
     }
 
+    /* How thin is the stack right now?  Only a COLLAPSED stack earns the
+     * relaxed gate below — see the starvation note there. */
+    int nlive = 0;
+    for (int s = 1; s < JD_NSLOT; s++) if (g_L[s].live) nlive++;
+
     /* overlays */
     for (int s = 1; s < JD_NSLOT; s++) {
         if (s >= g_slot_cap) { continue; }
@@ -2331,8 +2347,39 @@ static void sched_tick(int frame)
          * and nothing enters while the ground is being handed over */
         /* under load, thin the stack to base+mid — but never to a bare
          * ground: a solo layer has nothing to dilute its motion */
-        if (handover || (g_hot && s >= 2) || frame - g_last_change < g_gap) continue;
-        if (!try_spawn(s, frame)) g_rest[s] = frame + 120;
+        if (handover || frame - g_last_change < g_gap) continue;
+        /* Under load, THIN the stack; do not amputate it.
+         *
+         * This used to read `(g_hot && s >= 2) continue`, which is a cliff and
+         * not a ramp.  g_hot latches above 13.5 ms and clears only after 120
+         * CONSECUTIVE frames under 10.5 ms, so at 3456x2160 — measured duty
+         * 87-100%, mean frame 11.5-43.9 ms — one early crossing removed slots
+         * 2 and 3 for the rest of the run.  The instrumented spawn rate for
+         * both was 0.0%: the accent and spark layers were not dim, they were
+         * NEVER DRAWN.  Every theory about blend modes and bright grounds was
+         * explaining the invisibility of something that did not exist.
+         *
+         * Half rate costs 5.9-17.7 ms against 11.8-35.4 ms at full, so a
+         * pressured slot can enter thinned rather than not at all.  Refusal
+         * survives as the last step, for genuine overload only. */
+        /* STARVATION ONLY.  Relaxing the refusal whenever g_hot is set was
+         * measured at 1920x1080 to make things WORSE, not better: the spark
+         * slot joined an already-populated stack and the extra coat of
+         * translucency collapsed dynamic range 226.9 -> 81.7 and local RMS
+         * contrast 0.3116 -> 0.0475, with fog up 0.056 -> 0.125.  That is the
+         * "foggy clutter" failure, arrived at from the other direction.
+         *
+         * So the relaxation is conditioned on the stack having actually
+         * COLLAPSED, which is the 3456x2160 case (measured mean overlays live
+         * 0.00-1.00) and not the 1080p case (0.72-1.77).  A thin stack gets
+         * help; a populated one is left alone. */
+        int pressured = (g_hot && s >= 2);
+        if (pressured && (nlive >= JD_GATE_STARVED || g_ewma_ms > JD_GATE_REFUSE_MS)) continue;
+        if (!try_spawn(s, frame)) { g_rest[s] = frame + 120; continue; }
+        if (pressured) {            /* admitted, but at half rate */
+            g_L[s].half   = 1;
+            g_L[s].parity = (uint8_t)(frame & 1);
+        }
     }
 }
 
