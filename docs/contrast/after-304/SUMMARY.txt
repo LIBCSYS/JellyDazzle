@@ -1,0 +1,45 @@
+# after-measurement captured 2026-09-14, protocol = docs/contrast/06 §8
+# commit: 7fb9284815999001d6671a2a2f45651d68537b49 (clean tree — the shipped 3.0.4 gate fix + starvation guard)
+# 640x360, 18000 frames, EVERY=5, warm frozen probe cache, 8 seeds, default arm
+
+CONTRAST seed=2300000 meas=3480 ten=49 acc_present=0.9005 acc_visible=0.6506 acc_v50=1.9123 all_visible=0.5552 fog=0.3114 lrms=0.2587 dr=148.4 gluma=90.5 finluma=81.6
+CONTRAST seed=3100000 meas=3480 ten=45 acc_present=0.9157 acc_visible=0.7597 acc_v50=2.3318 all_visible=0.7770 fog=0.1961 lrms=0.2847 dr=152.0 gluma=71.5 finluma=75.3
+CONTRAST seed=1700000 meas=3480 ten=44 acc_present=0.7925 acc_visible=0.6992 acc_v50=1.6788 all_visible=0.6913 fog=0.2155 lrms=0.2650 dr=148.9 gluma=78.5 finluma=80.8
+CONTRAST seed=6700000 meas=3480 ten=56 acc_present=0.7320 acc_visible=0.6096 acc_v50=2.0915 all_visible=0.7031 fog=0.2919 lrms=0.2322 dr=147.2 gluma=93.5 finluma=84.9
+CONTRAST seed=4700000 meas=3480 ten=50 acc_present=0.9423 acc_visible=0.3167 acc_v50=0.9636 all_visible=0.6783 fog=0.2090 lrms=0.3057 dr=161.1 gluma=76.5 finluma=77.4
+CONTRAST seed=7300000 meas=3480 ten=47 acc_present=0.8887 acc_visible=0.7188 acc_v50=2.0041 all_visible=0.7164 fog=0.1760 lrms=0.3076 dr=149.8 gluma=70.5 finluma=77.8
+CONTRAST seed=5900000 meas=3480 ten=44 acc_present=0.8149 acc_visible=0.5290 acc_v50=1.0296 all_visible=0.7492 fog=0.2822 lrms=0.2307 dr=145.9 gluma=75.5 finluma=77.5
+CONTRAST seed=8100000 meas=3480 ten=44 acc_present=0.9192 acc_visible=0.6507 acc_v50=1.7048 all_visible=0.8247 fog=0.3307 lrms=0.2280 dr=135.8 gluma=77.5 finluma=84.8
+
+## guardrails (uninstrumented, seed 1700000)
+MAXDELTA 6.74@1701571 ge8=0 ge4=443 mean=1.36
+FPS 207.1
+# NOTE: FPS 207.1 vs 295.4 at baseline — the gate fix costs ~30% harness
+# throughput; still 3.4x a 60fps budget at 640x360.
+
+## pooled vs baseline BLENDW=1 arm (bootstrap over tenancies, ct_pool.py)
+=== POOL accent (after) ===
+tenancies n = 66   (median 195 samples each)
+visible fraction    0.6165   95% CI [0.5329, 0.6984]   half-width 0.0827
+median V            1.7780   95% CI [1.4755, 2.1012]   half-width 0.3128
+ground luma        81.8552   95% CI [75.6756, 87.8165]   half-width 6.0704
+=== POOL all-overlays (after) ===
+tenancies n = 155   (median 134 samples each)
+visible fraction    0.7082   95% CI [0.6660, 0.7504]   half-width 0.0422
+median V            2.2554   95% CI [2.0090, 2.5111]   half-width 0.2510
+ground luma        81.0130   95% CI [76.2599, 85.6989]   half-width 4.7195
+=== POOL accent (baseline BLENDW=1 arm) ===
+tenancies n = 73   (median 195 samples each)
+visible fraction    0.5512   95% CI [0.4695, 0.6305]   half-width 0.0805
+median V            1.5267   95% CI [1.2557, 1.8255]   half-width 0.2849
+ground luma        75.4534   95% CI [69.3266, 82.2818]   half-width 6.4776
+=== POOL all-overlays (baseline BLENDW=1 arm) ===
+tenancies n = 166   (median 149 samples each)
+visible fraction    0.6458   95% CI [0.5917, 0.6971]   half-width 0.0527
+median V            1.8558   95% CI [1.6502, 2.0844]   half-width 0.2171
+ground luma        77.5337   95% CI [72.6845, 82.9035]   half-width 5.1095
+
+# READ: every headline moved the right way (accent visible 0.551->0.617,
+# all-overlays 0.646->0.708, median V +0.25/+0.40) but accent CIs overlap
+# at 8 seeds. Directionally positive; NOT the 0.48->0.80 fix the complaint
+# describes. Per 06 §7: a real fix should not need statistics to see.
