@@ -6,27 +6,38 @@ playing and paints to it — never the same pattern, never the same colours.
 An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
 under a library of 610 C pattern plug-ins.
 
+## ⬇️ Download
+
+### **[Download JellyDazzle 3.0.4 — macOS · Apple Silicon (.zip, 5.6 MB)](https://github.com/LIBCSYS/JellyDazzle/releases/download/v3.0.4/JellyDazzle-3.0.4-macOS-arm64.zip)**
+
+1. Unzip.
+2. Drag **JellyDazzle.app** into **Applications**.
+3. Open it. That is the whole install.
+
+Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised by Apple**,
+with the ticket stapled so it verifies offline. No "cannot verify" dialog, no right-click
+trick — download it and open it.
+
+**macOS 11 or later · Apple Silicon (M1+) · MIT** — a **Mac App Store** build is in review.
+
+> ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
+> probes audio devices. It is working, not hung. The measurements are cached, so every
+> later launch is immediate.
+
 > ### 🔊 Play music first
 > **JellyDazzle is audio-reactive — put something on before you watch it.** Anything playing on
 > your Mac: a record, a film, a livestream. On macOS 14.2+ it listens to the *system output*, so
 > it follows whatever app is making the sound. In silence it still runs, but on internal clocks —
 > and you are seeing maybe half of what it does.
 >
-> **Nothing to hand?** Play mine — *And I Need Ur Love* by
+> **Nothing on hand?** Play mine — *And I Need Ur Love* by
 > [The Rat's Asses](https://theratsasses.com/), featuring the guy who wrote this thing.
 > **[▶ Watch on YouTube](https://www.youtube.com/watch?v=u5IyinH_3s4)** — free, no account.
 > Also on [Spotify](https://open.spotify.com/track/3wRjyj2LlYPMx3cziUhb9y), though free
 > accounts only get a 30-second preview there.
 
-> ### Signed by Apple — installs with no warnings
-> Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised by Apple**,
-> with the ticket stapled so it verifies offline. No "cannot verify" dialog, no right-click
-> trick — download it and open it.
-> **Mac App Store submission is in review.**
-
-**Version 3.0.3** · macOS 11+ · Apple Silicon · MIT
-· [dazzle.jelia.nyc](https://dazzle.jelia.nyc/)
-· [browse every routine](https://dazzle.jelia.nyc/library/)
+More at [dazzle.jelia.nyc](https://dazzle.jelia.nyc/) ·
+[browse every routine](https://dazzle.jelia.nyc/library/)
 
 ---
 
@@ -88,7 +99,7 @@ frame and then discarded — never recorded, never stored, never transmitted. Th
 network capability at all. Without permission the visuals simply run on internal clocks.
 See the [privacy policy](https://dazzle.jelia.nyc/privacy/).
 
-## Build it
+## Build it yourself
 
 ```sh
 git clone https://github.com/LIBCSYS/JellyDazzle.git
@@ -104,18 +115,6 @@ Needs only the Xcode command line tools (`xcode-select --install`).
 deliberate: a Homebrew SDL is compiled for whichever macOS the build machine happens to run
 and silently pins the finished app to it — which is exactly what once made a public download
 refuse to launch on anything but the newest system.
-
-⚠️ **First launch can take 30–60 seconds** while it measures the library and probes audio
-devices. It is working, not hung. The measurements are cached, so every later launch is
-immediate.
-
-## Installing a downloaded build
-
-Current downloads are ad-hoc signed, so macOS warns that it cannot verify the app. Nothing
-is wrong with it — it has not been through Apple's signing and notarisation yet. Apple
-Developer enrolment under **LIBCSYSTEMS LLC** is in progress and the next release will be
-signed and notarised, opening with no warning. Until then: right-click the app → **Open** →
-**Open**.
 
 ## Layout
 
