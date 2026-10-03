@@ -8,6 +8,10 @@ VER=$(cat VERSION)
 # lets a re-delivery bump the build number without touching the marketing
 # version (CFBundleShortVersionString stays $VER).
 BUILD=${BUILD:-$VER}
+# ITMS-90257: macOS CFBundleVersion is AT MOST three period-separated integers.
+case "$BUILD" in
+  *[!0-9.]*|*.*.*.*|.*|*.) echo "ERROR: BUILD '$BUILD' must be 1-3 dot-separated integers (ITMS-90257)." >&2; exit 1;;
+esac
 # Read MACMIN from the Makefile rather than repeating it. These two disagreeing
 # is exactly how a build ships claiming macOS 11 while refusing to launch on it.
 # Environment wins. The App Store build passes MACMIN=12.0 because Apple
