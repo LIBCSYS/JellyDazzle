@@ -3,6 +3,11 @@
 set -e
 cd "$(dirname "$0")/.."
 VER=$(cat VERSION)
+# App Store Connect burns every CFBundleVersion it has ever SEEN, including
+# rejected deliveries — a failed upload still consumes its build number. BUILD
+# lets a re-delivery bump the build number without touching the marketing
+# version (CFBundleShortVersionString stays $VER).
+BUILD=${BUILD:-$VER}
 # Read MACMIN from the Makefile rather than repeating it. These two disagreeing
 # is exactly how a build ships claiming macOS 11 while refusing to launch on it.
 # Environment wins. The App Store build passes MACMIN=12.0 because Apple
@@ -46,7 +51,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
   <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
-  <key>CFBundleVersion</key><string>${VER}</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
   <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundleIconFile</key><string>JellyDazzle</string>
   <key>CFBundlePackageType</key><string>APPL</string>
