@@ -3,6 +3,9 @@
 **An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever your Mac is
 playing and paints to it — never the same pattern, never the same colours.
 
+**[Free on the Mac App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** ·
+**iPhone and iPad: version 3.5.8 is in App Review** — see [below](#iphone-and-ipad).
+
 An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
 under a library of 610 C pattern plug-ins.
 
@@ -18,7 +21,8 @@ Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised b
 with the ticket stapled so it verifies offline. No "cannot verify" dialog, no right-click
 trick — download it and open it.
 
-**macOS 11 or later · Apple Silicon (M1+) · MIT** — a **Mac App Store** build is in review.
+**macOS 11 or later · Apple Silicon (M1+) · MIT** — also on the
+**[Mac App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** since October 8, 2026.
 
 > ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
 > probes audio devices. It is working, not hung. The measurements are cached, so every
@@ -38,6 +42,23 @@ trick — download it and open it.
 
 More at [dazzle.jelia.nyc](https://dazzle.jelia.nyc/) ·
 [browse every routine](https://dazzle.jelia.nyc/library/)
+
+## iPhone and iPad
+
+**Version 3.5.8 is in App Review.** It is the same engine — the same ARM64 assembly core and
+all 634 routines — running on iOS and iPadOS 15 or later.
+
+- **Your music keeps playing.** iOS does not let one app hear another, so on a phone
+  JellyDazzle listens through the microphone. Spotify or Apple Music keeps playing at full
+  volume while it listens and paints.
+- **Lite on battery, Full when charging.** On battery, in Low Power Mode, or when the device
+  is warm it draws a softer picture at 30 frames a second; plugged in it runs at 60 with every
+  layer. It switches on its own, mid-show.
+- **Buttons.** **C**, **S** and **?** sit in the corner for colours, shapes and help, brighten
+  when you touch the screen and fade while you watch. Tap = colours, two fingers = shapes,
+  press and hold = help, three fingers = a performance readout.
+
+The iOS port and the 3.5 changes land in this repository with the release.
 
 ---
 
@@ -67,6 +88,7 @@ screen.
 | **M** | audio meter |
 | **F** | full screen |
 | **ESC** | quit |
+| buttons | from 3.5.8, **C · S · ? · X** in the bottom-right corner do the same with a click |
 
 **C** and **S** are the 3.0 feature and they split the show in two: one key changes what
 it looks like, the other changes what it is doing. Either can be pressed at any time.
@@ -142,7 +164,7 @@ in 1990. This is an homage, not affiliated with the original.
 ## Support
 
 Questions, bugs, or anything else: **support@libcsys.com** ·
-[support page](https://dazzle.jelia.nyc/support/)
+[support page](https://support.dazzle.jelia.nyc/)
 
 ---
 
