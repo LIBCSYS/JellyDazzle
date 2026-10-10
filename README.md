@@ -14,7 +14,13 @@ under a library of 610 C pattern plug-ins.
 
 ## ⬇️ Download
 
-### **[Download JellyDazzle 3.0.4 — macOS · Apple Silicon (.zip, 5.6 MB)](https://github.com/LIBCSYS/JellyDazzle/releases/download/v3.0.4/JellyDazzle-3.0.4-macOS-arm64.zip)**
+### **[Get JellyDazzle 3.5.8 on the App Store — Mac, iPhone and iPad](https://apps.apple.com/us/app/jellydazzle/id6808884433)**
+
+Free, and it updates itself. This is the current version.
+
+**Not using the App Store?** A signed, notarised direct download is available, but it is
+the older **3.0.4** until the next direct build ships with 3.5.9:
+[JellyDazzle 3.0.4 — macOS · Apple Silicon (.zip, 5.6 MB)](https://github.com/LIBCSYS/JellyDazzle/releases/download/v3.0.4/JellyDazzle-3.0.4-macOS-arm64.zip)
 
 1. Unzip.
 2. Drag **JellyDazzle.app** into **Applications**.
