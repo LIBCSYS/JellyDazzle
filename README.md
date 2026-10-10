@@ -6,11 +6,12 @@ on your Mac, iPhone or iPad — and paints to it, never the same pattern, never 
 ### 🎉 Version 3.5.8 is out — now on **Mac, iPhone and iPad**
 
 **[Free on the App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** — released
-October 9, 2026. The same ARM64 assembly engine and all 634 routines now run on
+October 9, 2026. The same engine and all 634 routines now run on
 [iPhone and iPad](#iphone-and-ipad), with Lite/Full power modes and on-screen controls.
 
-An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
-under a library of 610 C pattern plug-ins.
+An homage to **DAZZLE.EXE**, rebuilt from scratch — mostly C, with an ARM64 assembly core:
+24 engine modes hand-written in ARM64 assembly under a library of 610 C pattern plug-ins,
+layered by a compositor written in C.
 
 ## ⬇️ Download
 
@@ -77,7 +78,7 @@ The iOS port and the 3.5 changes land in this repository with the release.
 
 | | |
 |---|---|
-| **24** | ARMv9.2-A assembly engine modes |
+| **24** | ARM64 assembly engine modes |
 | **610** | C pattern plug-ins |
 | **634** | routines total |
 | **180** | palette schemes, interpolated in OKLab |
