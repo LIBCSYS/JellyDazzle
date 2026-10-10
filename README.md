@@ -1,10 +1,13 @@
 # JellyDazzle
 
-**An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever your Mac is
-playing and paints to it — never the same pattern, never the same colours.
+**An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever is playing —
+on your Mac, iPhone or iPad — and paints to it, never the same pattern, never the same colours.
 
-**[Free on the Mac App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** ·
-**iPhone and iPad: version 3.5.8 is in App Review** — see [below](#iphone-and-ipad).
+### 🎉 Version 3.5.8 is out — now on **Mac, iPhone and iPad**
+
+**[Free on the App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** — released
+October 9, 2026. The same ARM64 assembly engine and all 634 routines now run on
+[iPhone and iPad](#iphone-and-ipad), with Lite/Full power modes and on-screen controls.
 
 An homage to **DAZZLE.EXE**, rebuilt from scratch: a hand-written ARM64 assembly engine
 under a library of 610 C pattern plug-ins.
@@ -21,8 +24,11 @@ Code-signed as **`Developer ID Application: LIBCSYSTEMS LLC`** and **notarised b
 with the ticket stapled so it verifies offline. No "cannot verify" dialog, no right-click
 trick — download it and open it.
 
-**macOS 11 or later · Apple Silicon (M1+) · MIT** — also on the
-**[Mac App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** since October 8, 2026.
+**macOS 11 or later · Apple Silicon (M1+) · MIT**
+
+> **Which one do I want?** The **App Store** carries the current **3.5.8** for Mac, iPhone and
+> iPad and updates itself. The direct download above is **3.0.4** — the latest signed
+> Developer ID build, for Macs that do not use the App Store.
 
 > ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
 > probes audio devices. It is working, not hung. The measurements are cached, so every
@@ -45,7 +51,7 @@ More at [dazzle.jelia.nyc](https://dazzle.jelia.nyc/) ·
 
 ## iPhone and iPad
 
-**Version 3.5.8 is in App Review.** It is the same engine — the same ARM64 assembly core and
+**Version 3.5.8 is on the App Store now.** It is the same engine — the same ARM64 assembly core and
 all 634 routines — running on iOS and iPadOS 15 or later.
 
 - **Your music keeps playing.** iOS does not let one app hear another, so on a phone
