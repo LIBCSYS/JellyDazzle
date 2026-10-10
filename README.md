@@ -18,9 +18,8 @@ under a library of 610 C pattern plug-ins.
 
 Free, and it updates itself. This is the current version.
 
-**Not using the App Store?** A signed, notarised direct download is available, but it is
-the older **3.0.4** until the next direct build ships with 3.5.9:
-[JellyDazzle 3.0.4 — macOS · Apple Silicon (.zip, 5.6 MB)](https://github.com/LIBCSYS/JellyDazzle/releases/download/v3.0.4/JellyDazzle-3.0.4-macOS-arm64.zip)
+**Not using the App Store?** Signed, notarised direct download — always the latest version:
+[Download JellyDazzle for macOS · Apple Silicon (.zip)](https://github.com/LIBCSYS/JellyDazzle/releases/latest/download/JellyDazzle-macOS-arm64.zip)
 
 1. Unzip.
 2. Drag **JellyDazzle.app** into **Applications**.
@@ -33,8 +32,8 @@ trick — download it and open it.
 **macOS 11 or later · Apple Silicon (M1+) · MIT**
 
 > **Which one do I want?** The **App Store** carries the current **3.5.8** for Mac, iPhone and
-> iPad and updates itself. The direct download above is **3.0.4** — the latest signed
-> Developer ID build, for Macs that do not use the App Store.
+> iPad and updates itself. The direct download above is the same version, signed and notarised,
+> for Macs that do not use the App Store.
 
 > ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
 > probes audio devices. It is working, not hung. The measurements are cached, so every
