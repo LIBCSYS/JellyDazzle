@@ -3,19 +3,21 @@
 **An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever is playing —
 on your Mac, iPhone or iPad — and paints to it, never the same pattern, never the same colours.
 
-### 🎉 Version 3.5.8 is out — now on **Mac, iPhone and iPad**
+### 🎉 Version 3.5.9 is out on the Mac — **creatures and fractals**
 
-**[Free on the App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** — released
-October 9, 2026. The same engine and all 634 routines now run on
-[iPhone and iPad](#iphone-and-ipad), with Lite/Full power modes and on-screen controls.
+Eighteen animals now swim, fly, crawl and prowl through the show — jellyfish, a great whale, a
+school of fish, manta rays, an octopus, seahorses, a cat, a dog, beetles, an ant trail, a starling
+murmuration and more — plus ten new fractals. **638 routines** in all.
+**[Free on the App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** — Mac 3.5.9
+released October 10, 2026. [iPhone and iPad](#iphone-and-ipad) are on 3.5.8, with 3.5.9 in App Review.
 
 An homage to **DAZZLE.EXE**, rebuilt from scratch — mostly C, with an ARM64 assembly core:
-24 engine modes hand-written in ARM64 assembly under a library of 610 C pattern plug-ins,
+24 engine modes hand-written in ARM64 assembly under a library of 614 C pattern plug-ins,
 layered by a compositor written in C.
 
 ## ⬇️ Download
 
-### **[Get JellyDazzle 3.5.8 on the App Store — Mac, iPhone and iPad](https://apps.apple.com/us/app/jellydazzle/id6808884433)**
+### **[Get JellyDazzle on the App Store — Mac 3.5.9, iPhone and iPad 3.5.8](https://apps.apple.com/us/app/jellydazzle/id6808884433)**
 
 Free, and it updates itself. This is the current version.
 
@@ -32,9 +34,9 @@ trick — download it and open it.
 
 **macOS 11 or later · Apple Silicon (M1+) · MIT**
 
-> **Which one do I want?** The **App Store** carries the current **3.5.8** for Mac, iPhone and
-> iPad and updates itself. The direct download above is the same version, signed and notarised,
-> for Macs that do not use the App Store.
+> **Which one do I want?** The **App Store** carries **3.5.9 for Mac** (iPhone and iPad 3.5.8,
+> 3.5.9 in review) and updates itself. The direct download above is Mac 3.5.9 too, signed and
+> notarised, for Macs that do not use the App Store.
 
 > ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
 > probes audio devices. It is working, not hung. The measurements are cached, so every
@@ -79,8 +81,8 @@ The iOS port and the 3.5 changes land in this repository with the release.
 | | |
 |---|---|
 | **24** | ARM64 assembly engine modes |
-| **610** | C pattern plug-ins |
-| **634** | routines total |
+| **614** | C pattern plug-ins |
+| **638** | routines total |
 | **180** | palette schemes, interpolated in OKLab |
 
 Every routine in the tree is compiled into the shipping binary. Nothing is held back.
