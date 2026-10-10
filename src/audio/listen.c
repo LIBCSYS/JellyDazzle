@@ -47,6 +47,7 @@
  * /tmp/jd_audio_meter.log four times a second.
  */
 #include <SDL.h>
+#include <TargetConditionals.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -314,7 +315,9 @@ int jd_audio_init(void)
     /* auto mode landed on the mic: keep trying the tap for a minute (a
      * device that was mid-switch at launch usually comes good) */
     if (au_want_src == 0 && au_src == SRC_MIC) { au_tap_retry = 12; au_tap_retry_at = 300; }
-    au_on = 1;
+    /* release store: on iOS jd_audio_init runs on a helper thread (main.c), and
+     * jd_audio_tick on the main thread must not see au_on before the rest */
+    __atomic_store_n(&au_on, 1, __ATOMIC_RELEASE);
     return 1;
 }
 
@@ -357,6 +360,8 @@ static void au_decay_all(void)
  * inside SDL_PollEvent, the key poll inside jd_audio_tick, the draw inside
  * jd_frame. */
 void jd_about_toggle(void) { au_about ^= 1; }
+/* 3.5.1: a tap on iPhone/iPad does what SPACE does to the first-run card */
+void jd_ui_skip(void) { au_skip = 1; }
 int  jd_about_is_on(void)  { return au_about; }
 
 void jd_audio_tick(void)
@@ -426,7 +431,7 @@ void jd_audio_tick(void)
         au_shape_key_was = sh;
     }
 
-    if (!au_on) { au_decay_all(); return; }
+    if (!__atomic_load_n(&au_on, __ATOMIC_ACQUIRE)) { au_decay_all(); return; }
 
     if (au_src == SRC_MIC && au_tap_retry > 0 && --au_tap_retry_at <= 0) {
         au_tap_retry--; au_tap_retry_at = 300;
@@ -614,7 +619,10 @@ static const char *au_glyph(char c)
     case 'U': return "101101101101111"; case 'V': return "101101101101010";
     case 'W': return "101101111111101"; case 'X': return "101101010101101";
     case 'Y': return "101101010010010"; case 'Z': return "111001010100111";
-    case ':': return "000010000010000"; case '-': return "000000111000000";
+    case ':': return "000010000010000";
+    /* 3.5.1, for "TAP & BE GONE!" */
+    case '!': return "010010010000010"; case '?': return "111001011000010"; case '&': return "010101010110101";
+    case '%': return "101001010100101";   /* the first-run card always meant "6%", printed "6" */ case '-': return "000000111000000";
     case '.': return "000000000000010"; case '/': return "001001010100100";
     default:  return NULL;
     }
@@ -667,6 +675,63 @@ static int au_text(uint32_t *fb, int w, int h, int x, int y, int s, uint32_t c, 
         x += 4 * s;
     }
     return x;
+}
+
+/* 3.5.5: on-screen buttons (C S ? and X on the Mac). Drawn with an alpha so the
+ * bar can fade to a faint ghost when idle: a = 0..256. Square, dark well, light
+ * border, one big glyph centred — the 3x5 font scaled to half the button. */
+static void au_blend_rect(uint32_t *fb, int w, int h, int x0, int y0, int rw, int rh, uint32_t c, int a)
+{
+    if (x0 < 0) { rw += x0; x0 = 0; }
+    if (y0 < 0) { rh += y0; y0 = 0; }
+    if (x0 + rw > w) rw = w - x0;
+    if (y0 + rh > h) rh = h - y0;
+    uint32_t cr = (c >> 16) & 255, cg = (c >> 8) & 255, cb = c & 255;
+    for (int y = 0; y < rh; y++) {
+        uint32_t *row = fb + (size_t)(y0 + y) * w + x0;
+        for (int x = 0; x < rw; x++) {
+            uint32_t p = row[x];
+            uint32_t r = (((p >> 16) & 255) * (256 - a) + cr * a) >> 8;
+            uint32_t g = (((p >> 8) & 255) * (256 - a) + cg * a) >> 8;
+            uint32_t b = ((p & 255) * (256 - a) + cb * a) >> 8;
+            row[x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+        }
+    }
+}
+
+void jd_ui_button(uint32_t *fb, int w, int h, int x, int y, int size, char label, int a)
+{
+    if (!fb || size < 8 || a <= 0) return;
+    int bd = size / 24 + 1;                                   /* border */
+    au_blend_rect(fb, w, h, x, y, size, size, 0xFF0B0E14u, a * 3 / 4);          /* well */
+    au_blend_rect(fb, w, h, x, y, size, bd, 0xFFE6EDF3u, a / 2);                /* border */
+    au_blend_rect(fb, w, h, x, y + size - bd, size, bd, 0xFFE6EDF3u, a / 2);
+    au_blend_rect(fb, w, h, x, y, bd, size, 0xFFE6EDF3u, a / 2);
+    au_blend_rect(fb, w, h, x + size - bd, y, bd, size, 0xFFE6EDF3u, a / 2);
+    const char *g = au_glyph(label);
+    if (!g) return;
+    int s = size / 10; if (s < 1) s = 1;                      /* glyph = 5s tall = half the button */
+    int gx = x + (size - 3 * s) / 2, gy = y + (size - 5 * s) / 2;
+    for (int r = 0; r < 5; r++)
+        for (int col = 0; col < 3; col++)
+            if (g[r * 3 + col] == '1') au_blend_rect(fb, w, h, gx + col * s, gy + r * s, s, s, 0xFFF2F5F8u, a);
+}
+
+/* 3.5.3: the iOS performance HUD — plain lines, top-left, same font and dimming
+ * as the meter. main.c builds the text; this only paints it. */
+void jd_hud_lines(uint32_t *fb, int w, int h, const char *const *lines, int n)
+{
+    if (!fb || w < 160 || h < 120 || n <= 0) return;
+    int maxlen = 0;
+    for (int i = 0; i < n; i++) { int l = (int)strlen(lines[i]); if (l > maxlen) maxlen = l; }
+    /* Sized to the WIDTH: the longest line spans ~90% of the screen. J reads with low
+     * vision; 3.5.3 sized this off the short side and it came out "hard to see". */
+    int s = (w * 9 / 10) / (maxlen * 4 + 10); if (s < 2) s = 2; if (s > 14) s = 14;
+    int pad = 4 * s, lh = 8 * s;
+    int x0 = w / 20, y0 = h / 10;             /* below the Dynamic Island */
+    au_dim(fb, w, h, x0, y0, pad * 2 + maxlen * 4 * s, pad * 2 + n * lh - 3 * s);
+    for (int i = 0; i < n; i++)
+        au_text(fb, w, h, x0 + pad, y0 + pad + i * lh, s, i == 0 ? 0xFFF2B34Au : 0xFFE6EDF3u, lines[i]);
 }
 
 /* One meter bar: sunken well, two-tone fill with a brighter cap, and a white
@@ -769,9 +834,20 @@ void jd_about_draw(uint32_t *fb, int w, int h)
         "DAZZLE.JELIA.NYC/TRIBUTE",
         "GITHUB.COM/LIBCSYS/JELLYDAZZLE",
         "",
+#if TARGET_OS_IPHONE
+        "TAP            COLOUR",
+        "TWO FINGERS    SHAPE",
+        "HOLD           ABOUT",
+        "THREE FINGERS  STATS",
+        "SWIPE UP       EXIT",
+        "",
+        "LITE ON BATTERY",
+        "FULL WHEN CHARGING",
+#else
         "C COLOUR       S SHAPE",
         "F FULLSCREEN   M METER",
         "A ABOUT        ESC QUIT",
+#endif
         "",
         "MIT LICENCE - JOHN ELIA",
     };
@@ -836,7 +912,11 @@ void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs)
      * au_skip only suppresses THIS CARD (compositor.c, the !au_skip test on
      * the draw call). The probe keeps running on spare frame time and folds
      * results into the scheduler as they arrive. Say what actually happens. */
+#if TARGET_OS_IPHONE
+    snprintf(L5, sizeof L5, "TAP & BE GONE!  IT KEEPS BUILDING");   /* J's words, 2026-10-08 */
+#else
     snprintf(L5, sizeof L5, "PRESS SPACE TO DISMISS - IT KEEPS BUILDING");
+#endif
     int w1 = (int)strlen(L1) * 4 * s, w2 = (int)strlen(L2) * 4 * s;
     int w3 = (int)strlen(L3) * 4 * s, w4 = (int)strlen(L4) * 4 * s;
     int w5 = (int)strlen(L5) * 4 * s;

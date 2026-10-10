@@ -38,10 +38,10 @@ codesign --force --options runtime --timestamp \
 # hardened runtime strips microphone access, so the app builds, ships, and
 # then silently fails to react to audio - the one thing it does.
 codesign --force --options runtime --timestamp \
-    --entitlements packaging/JellyDazzle.entitlements \
+    --entitlements packaging/JellyDazzle-direct.entitlements \
     --sign "$IDENTITY" "$APP/Contents/MacOS/JellyDazzle"
 codesign --force --options runtime --timestamp \
-    --entitlements packaging/JellyDazzle.entitlements \
+    --entitlements packaging/JellyDazzle-direct.entitlements \
     --sign "$IDENTITY" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 

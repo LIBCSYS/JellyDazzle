@@ -72,7 +72,49 @@ uint32_t g_mode = 0;                       /* read by draw.s mode select */
  * the 24 asm grounds would sit the jump out and only the overlays would
  * change, which is the half-feature a viewer reads as "it barely did
  * anything". */
-uint32_t g_pal_bias = 0;                   /* read by draw.s colour leg     */
+uint32_t g_pal_bias = 0;
+
+/* ---- STAGE 1: weight means OPACITY, not a visibility threshold ---------
+ * span_max/span_screen/span_add scaled the SOURCE by the layer weight and
+ * then blended. For a lighten-only kernel that makes w a THRESHOLD: an
+ * overlay had to be 256/w times brighter than the ground to mark it at all.
+ * At the measured peaks (mid 144, accent 112, spark 91) a spark was
+ * mathematically invisible over any ground brighter than luma 91, which is
+ * most of them. That is the "foggy clutter where the accent is barely
+ * visible".
+ *
+ * The correct form interpolates the RESULT:  out = lerp(d, blend(d,s), w).
+ * It preserves the invariant the span_max comment claims - where the overlay
+ * is darker the ground survives BIT-EXACT, because max(d,s)==d there - while
+ * letting a dimmer accent contribute proportionally instead of not at all.
+ * span_diff already did it this way; max/screen/add were the anomaly.
+ *
+ * JD_BLENDW=0 restores the old behaviour in the same binary, for A/B. */
+static int g_blendw = -1;
+static inline int blendw_on(void)
+{
+    if (g_blendw < 0) {
+        const char *e = getenv("JD_BLENDW");
+        g_blendw = (e && atoi(e) == 0) ? 0 : 1;   /* default ON */
+    }
+    return g_blendw;
+}
+
+/* ---- TELEMETRY (3.0.4 diversity work) ---------------------------------
+ * Off unless JD_TELEMETRY names a file, so a normal run pays nothing but a
+ * null check. Every scheduling decision the engine makes is written as one
+ * CSV row, because "it feels repetitive" cannot be argued with - a chi-
+ * squared statistic on 5,000 real spawns can. */
+static FILE *g_tel = NULL;
+static void tel_open(void)
+{
+    const char *path = getenv("JD_TELEMETRY");
+    if (!path || g_tel) return;
+    g_tel = fopen(path, "w");
+    if (g_tel)
+        fprintf(g_tel, "event,frame,slot,routine,name,role,cls,blend,peak,"
+                       "life,mood,span,off,wild,hrot,tz,tx,ty,tr,schemeA,schemeB,leg\n");
+}                   /* read by draw.s colour leg     */
 extern void draw_frame(uint32_t*, int, int, int);
 extern const uint32_t jd_palette[];        /* JD_NS*32768 ARGB, in draw.s */
 extern const jd_pattern_fn jd_patterns[];  /* registry.c, indexed 0..N-1 */
@@ -269,6 +311,75 @@ static int       g_cfade = 0;              /* frames left in that crossfade */
 static int    g_w = 0, g_h = 0;
 static int    g_ready = 0;
 static int    g_frame0 = 0;
+/* THE SIGNATURE CLOCK (3.4).  The opening mark — the shape that forms out of
+ * the ground's own pixels over the first ~2 s — used to be clocked from
+ * g_frame0, which only ever resets at init or on a black frame, so it played
+ * once per launch and never again.  J: "implicitly hit the shape build 1 second
+ * into it — that really seems to send the app into a good place."  It now has
+ * its own clock: the S key asks for it, and a ground handover grants it when
+ * asked or when at least JD_SIG_MIN frames have passed since the last one. */
+/* 3.5 (J 2026-10-06): the mark plays at launch and when S is pressed — never
+ * again on its own ("not over and over, let's wait and see").  The 3.4 90-second
+ * unasked-for replay (JD_SIG_MIN) is gone. */
+static int    g_sig0   = 0;
+static int    g_sig_req = 0;
+/* 3.5: J found one S press right after launch "makes a difference" — a fresh
+ * shape stack instead of the boot set.  Do it for him, once per launch, about a
+ * second in (JD_AUTO_S frames at 60 fps).  It does NOT re-request the mark: the
+ * opening signature is already playing, and two marks in four seconds read as a
+ * stutter. */
+#define JD_AUTO_S 60
+static int    g_auto_s_done = 0;
+/* PICTURE IMPORT (3.4): File > Open Picture… asks for the picture routine to
+ * take the mid slot on the next tick, so an import is seen, not scheduled. */
+int           jd_req_picture = 0;
+static int    g_picture_rt = -1;             /* registry index of 611, or -1  */
+static int    g_force_rt   = -1;             /* one-shot: next mid spawn is this */
+/* PICTURE ROTATION (3.5).  J: "point the app to various pictures to use as part
+ * of the kaleidoscope."  As one routine among 611 the picture turned up about
+ * once an hour, which is not "using" them.  With pictures on file it now comes
+ * back every JD_PIC_EVERY frames (2 min; the first ~45 s after launch), and each
+ * return asks the app layer for the NEXT picture, pre-decoded off-thread.
+ * Weak, so engine-only tools that do not link jd_image.m still build. */
+/* 3.5.1: pictures parked (611 -> src/patterns_hold, jd_image.m out of the build).
+ * ld64 will not link a weak reference with no definition anywhere, so the
+ * rotation hook is compiled out rather than left dangling. -DJD_PICTURES=1 restores it. */
+#if JD_PICTURES
+extern int  jd_img_ready __attribute__((weak));
+extern void jd_image_next(void) __attribute__((weak));
+#endif
+#define JD_PIC_EVERY  7200
+#define JD_PIC_FIRST  2700
+static int    g_pic_last = 0;
+/* FAMILY COOLDOWN (3.4).  Shape separation only ever refused a family that was
+ * ON SCREEN; the moment a lightning overlay faded the next spark draw could be
+ * lightning again.  A family that just left now waits JD_FAM_COOL frames. */
+#define JD_FAM_COOL 2700                    /* 3.5: 45 s (was 10 s — lightning still came back every ~36 s) */
+#define JD_NFAM 16
+static int    g_fam_cool[JD_NFAM];
+/* GROUND KIT ALTERNATION (3.4).  133 of the 200 pattern grounds come from one
+ * rendering kit (336-468: a 320x240 sine/fbm field upscaled) and 24 are asm;
+ * drawn uniformly that is ~70% of grounds wearing the same soft look, often
+ * back to back.  Consecutive grounds may not come from the same kit. */
+static int    g_last_kit = -1;               /* 0 asm, 1 gk336 kit, 2 other */
+/* GROUND FAMILY ALTERNATION (3.5).  Measured on 3.4 over 10 min: 47 of 99 spawns
+ * were grounds and 23 of those 47 were family 0 — the untagged soft fields, which
+ * share one look but were exempt from every variety rule as "a catch-all, not a
+ * look".  That background, returning every ~13 s, is the "same thing over and
+ * over".  The next ground may not share the last ground's family (0 included);
+ * refusals share the kit rule's JD_KIT_MAXREF budget, so a handover can never
+ * stall the way the 3.4 ground-family cooldown did. */
+static int    g_last_gfam = -1;
+/* ...and the soft fields, being most of the ground bag, may hold at most 2 of
+ * any 4 consecutive grounds (same refusal budget, so never a stall). */
+static int    g_gring[4] = {-1, -1, -1, -1};
+static int    g_gring_pos = 0;
+static int    g_kit_ref  = 0;                /* kit refusals in THIS draw — the
+                                              * bag is a permutation, so when a
+                                              * cycle's tail is all one kit the
+                                              * rule must yield or the ground
+                                              * stalls until g_force (5 s) */
+#define JD_KIT_MAXREF 24
 /* Per-RUN entropy.  main.c starts the frame counter at a random value each
  * launch, but the v2.1 scheduler draws from shuffled BAGS instead of hashing
  * the frame — so that randomness stopped reaching the deck order and every
@@ -291,12 +402,69 @@ static int    g_mood = M_RICH;
 static int    g_prev_mood = M_RICH;
 static double g_ewma_ms = 6.0;
 static int    g_hot = 0, g_cool = 0, g_jitter = 0;
+/* 3.5.3: frame-time budget scale. The gate thresholds below (13.5 / 10.5 / 26 / 12 ms)
+ * were tuned for a 60 fps Mac. iOS Lite draws at 30 fps, so it may be given more room;
+ * k = 1 keeps the Mac behaviour exactly. Set from main.c, read by the HUD. */
+static double g_budk = 1.0;
+void jd_set_frame_budget(double k) { if (k >= 0.5 && k <= 3.0) g_budk = k; }
+/* Above this the upper slots are refused outright rather than half-rated.
+ * 26 ms is ~38 fps: past it a half-rate overlay (5.9-17.7 ms) can no longer
+ * fit in the frame it is amortised over, so admitting one buys clutter at the
+ * price of judder.  Between the 13.5 ms g_hot threshold and here, the slot
+ * enters thinned — which is the band the whole Retina case lives in. */
+#define JD_GATE_REFUSE_MS 26.0
+/* Live-overlay count at or above which a pressured upper slot is refused as
+ * before.  Below it the stack has collapsed toward a bare ground and a thinned
+ * layer is admitted.  2 rather than 1 because a solo overlay is exactly the
+ * degenerate picture this is meant to prevent. */
+#define JD_GATE_STARVED 2
 static uint32_t g_sig[1024];
 static uint32_t g_lsig[JD_NBUF][512];      /* per-layer motion signature   */
 static uint8_t  g_lsig_ok[JD_NBUF];
 static int      g_sig_n = 0;
 static double   g_motion = 0.0;            /* EWMA composite delta        */
 static int      g_slot_cap = JD_NSLOT;
+/* 3.5.1: Lite mode (iPhone/iPad on battery) caps the layer stack at runtime.
+ * Only NEW spawns respect the cap — a layer already playing in a higher slot
+ * runs out its life — so switching Lite <-> Full never cuts a layer mid-show. */
+/* 3.5.3: live numbers for the iOS performance HUD (three-finger tap) */
+void jd_perf_get(double *ms, int *hot, int *live, int *cap, double *budk)
+{
+    int n = 0;
+    for (int s = 1; s < JD_NSLOT; s++) if (g_L[s].live) n++;
+    if (ms) *ms = g_ewma_ms;
+    if (hot) *hot = g_hot;
+    if (live) *live = n + (g_L[0].live ? 1 : 0);
+    if (cap) *cap = g_slot_cap;
+    if (budk) *budk = g_budk;
+}
+void jd_set_slot_cap(int n) { if (n >= 1 && n <= JD_NSLOT) g_slot_cap = n; }
+
+/* CONTRAST TAP (3.0.4).  Declared in jellydazzle.h; NULL unless a measurement
+ * tool installs one, so the shipping cost is three predictable branches per
+ * frame.  See the header for why the counterfactual is taken INSIDE the frame
+ * rather than by re-running the engine with the overlays suppressed. */
+void (*jd_tap)(int stage, int slot, int routine, int w_now, int blend,
+               const uint32_t *fb, int w, int h) = NULL;
+static double g_tap_ms = 0.0;      /* time spent INSIDE the tap this frame */
+
+/* Call the tap and give the time back.
+ *
+ * This matters more than it looks.  jd_frame times ITSELF (g_ewma_ms), and
+ * g_ewma_ms decides g_hot, which half-rates the top overlay, which changes
+ * the picture.  A measurement callback that walks the frame three times costs
+ * several milliseconds, so an instrumented run would silently push the engine
+ * into its thermal-throttle behaviour and then report on a show the user never
+ * sees.  Measured: an instrumented run scored accent visibility 0.31 where the
+ * same seed uninstrumented scored 0.62.  The observer has to pay its own bill. */
+static void tap(int stage, int slot, int routine, int w_now, int blend,
+                const uint32_t *fb, int w, int h)
+{
+    if (!jd_tap) return;
+    double t = now_ms();
+    jd_tap(stage, slot, routine, w_now, blend, fb, w, h);
+    g_tap_ms += now_ms() - t;
+}
 
 /* ============================================================
  * 1. statistics: probe every pattern at two resolutions
@@ -722,6 +890,10 @@ static const char *probe_cache_path(void)
     static char p[1024];
     const char *home = getenv("HOME");
     if (!home) return NULL;
+    /* iOS: the sandbox HOME starts with Library/ but NO Application Support/, and
+     * mkdir does not create parents — so make each level (all ok if present). */
+    snprintf(p, sizeof p, "%s/Library/Application Support", home);
+    mkdir(p, 0755);
     snprintf(p, sizeof p, "%s/Library/Application Support/JellyDazzle", home);
     mkdir(p, 0755);                       /* ok if it already exists */
     /* One file PER LIBRARY SIZE. A single shared name meant any build with a
@@ -1271,14 +1443,32 @@ static void span_lerp(uint32_t *dst, const uint32_t *a, const uint32_t *b,
  * bit-exact.  That is what keeps a stack readable instead of grey. */
 static void span_max(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
+    if (!blendw_on()) {                      /* JD_BLENDW=0: pre-3.0.4 behaviour */
+        for (int i = 0; i < n; i++) {
+            uint32_t d = dst[i], s = src[i];
+            uint32_t srb = (((s & 0x00FF00FFu) * w) >> 8) & 0x00FF00FFu;
+            uint32_t sg  = (((s & 0x0000FF00u) * w) >> 8) & 0x0000FF00u;
+            uint32_t dr = d & 0x00FF0000u, dg = d & 0x0000FF00u, db = d & 0xFFu;
+            uint32_t sr = srb & 0x00FF0000u, sb = srb & 0xFFu;
+            dst[i] = 0xFF000000u | (dr > sr ? dr : sr) | (dg > sg ? dg : sg)
+                                 | (db > sb ? db : sb);
+        }
+        return;
+    }
+    /* max FIRST, then interpolate the result toward it by w. Because
+     * max(d,s) >= d channel-wise, (m - d) can never go negative, so the
+     * packed two-at-a-time subtract cannot borrow across channel lanes. */
     for (int i = 0; i < n; i++) {
         uint32_t d = dst[i], s = src[i];
-        uint32_t srb = (((s & 0x00FF00FFu) * w) >> 8) & 0x00FF00FFu;
-        uint32_t sg  = (((s & 0x0000FF00u) * w) >> 8) & 0x0000FF00u;
-        uint32_t dr = d & 0x00FF0000u, dg = d & 0x0000FF00u, db = d & 0xFFu;
-        uint32_t sr = srb & 0x00FF0000u, sb = srb & 0xFFu;
-        dst[i] = 0xFF000000u | (dr > sr ? dr : sr) | (dg > sg ? dg : sg)
-                             | (db > sb ? db : sb);
+        uint32_t dr = (d >> 16) & 255, dg = (d >> 8) & 255, db = d & 255;
+        uint32_t sr = (s >> 16) & 255, sg = (s >> 8) & 255, sb = s & 255;
+        uint32_t mr = dr > sr ? dr : sr;
+        uint32_t mg = dg > sg ? dg : sg;
+        uint32_t mb = db > sb ? db : sb;
+        uint32_t r = dr + (((mr - dr) * w) >> 8);
+        uint32_t g = dg + (((mg - dg) * w) >> 8);
+        uint32_t b = db + (((mb - db) * w) >> 8);
+        dst[i] = 0xFF000000u | (r << 16) | (g << 8) | b;
     }
 }
 
@@ -1290,12 +1480,27 @@ static void span_screen(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     for (int i = 0; i < n; i++) {
         uint32_t d = dst[i], s = src[i];
         uint32_t dr = (d >> 16) & 255, dg = (d >> 8) & 255, db = d & 255;
-        uint32_t sr = (((s >> 16) & 255) * w) >> 8;
-        uint32_t sg = (((s >>  8) & 255) * w) >> 8;
-        uint32_t sb = (( s        & 255) * w) >> 8;
-        uint32_t r = dr + sr - ((dr * sr) >> 8);
-        uint32_t g = dg + sg - ((dg * sg) >> 8);
-        uint32_t b = db + sb - ((db * sb) >> 8);
+        uint32_t sr, sg, sb, r, g, b;
+        if (blendw_on()) {
+            /* screen at FULL source, then lerp the result toward it by w.
+             * Weighting the source first is what made this fog: it lifted
+             * every pixel a little instead of lifting the lit ones a lot. */
+            sr = (s >> 16) & 255; sg = (s >> 8) & 255; sb = s & 255;
+            uint32_t fr = dr + sr - ((dr * sr) >> 8);
+            uint32_t fg = dg + sg - ((dg * sg) >> 8);
+            uint32_t fb_ = db + sb - ((db * sb) >> 8);
+            if (fr > 255) fr = 255; if (fg > 255) fg = 255; if (fb_ > 255) fb_ = 255;
+            r = dr + (((fr - dr) * w) >> 8);
+            g = dg + (((fg - dg) * w) >> 8);
+            b = db + (((fb_ - db) * w) >> 8);
+        } else {
+            sr = (((s >> 16) & 255) * w) >> 8;
+            sg = (((s >>  8) & 255) * w) >> 8;
+            sb = (( s        & 255) * w) >> 8;
+            r = dr + sr - ((dr * sr) >> 8);
+            g = dg + sg - ((dg * sg) >> 8);
+            b = db + sb - ((db * sb) >> 8);
+        }
         dst[i] = 0xFF000000u | (r > 255 ? 255u : r) << 16
                              | (g > 255 ? 255u : g) << 8
                              | (b > 255 ? 255u : b);
@@ -1309,9 +1514,24 @@ static void span_add(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
     for (int i = 0; i < n; i++) {
         uint32_t d = dst[i], s = src[i];
-        uint32_t r = ((d >> 16) & 255) + ((((s >> 16) & 255) * w) >> 8);
-        uint32_t g = ((d >>  8) & 255) + ((((s >>  8) & 255) * w) >> 8);
-        uint32_t b = ( d        & 255) + (((  s        & 255) * w) >> 8);
+        /* ADD is unreachable today (pick_blend never returns B_ADD - 0 of
+         * 1,962 measured spawns) but is fixed for consistency: clamp the
+         * full-strength sum first, then lerp toward it. */
+        uint32_t dr = (d >> 16) & 255, dg2 = (d >> 8) & 255, db = d & 255;
+        uint32_t r, g, b;
+        if (blendw_on()) {
+            uint32_t ar = dr + ((s >> 16) & 255);
+            uint32_t ag = dg2 + ((s >> 8) & 255);
+            uint32_t ab = db + (s & 255);
+            if (ar > 255) ar = 255; if (ag > 255) ag = 255; if (ab > 255) ab = 255;
+            r = dr + (((ar - dr) * w) >> 8);
+            g = dg2 + (((ag - dg2) * w) >> 8);
+            b = db + (((ab - db) * w) >> 8);
+        } else {
+            r = dr + ((((s >> 16) & 255) * w) >> 8);
+            g = dg2 + ((((s >>  8) & 255) * w) >> 8);
+            b = db + (((  s        & 255) * w) >> 8);
+        }
         dst[i] = 0xFF000000u | (r > 255 ? 255u : r) << 16
                              | (g > 255 ? 255u : g) << 8
                              | (b > 255 ? 255u : b);
@@ -1355,6 +1575,69 @@ static inline int jd_mirror(int i, int n)
     return i < n ? i : p - i;
 }
 
+/* ---- MINIFICATION DILATE -----------------------------------------------
+ * layer_warp samples nearest-neighbour. When a layer is minified (tz < 1)
+ * the sampling step exceeds one pixel, so most source pixels are never read
+ * at all: a 1-pixel highlight survives with probability tz^2 - measured
+ * 15.9% at tz=0.40, and overlays spawn as low as 0.40. Worse, the transform
+ * drifts every frame, so only ~0.7% of the survivors persist into the next
+ * frame. That is temporal white noise, and the eye integrates temporal noise
+ * into flat haze. It is a mechanical explanation of "foggy clutter where the
+ * accent is barely visible".
+ *
+ * The fix is to DILATE BEFORE DECIMATING: build a half-size copy with a 2x2
+ * per-channel MAX, so a lone bright pixel is guaranteed to survive into the
+ * reduced image. It must be MAX, not an average - averaging divides a lone
+ * spark by four, which destroys exactly what we are trying to keep.
+ *
+ * It is also FASTER, not a cost: the half-size source is a quarter of the
+ * memory and becomes cache-resident, so the warp stops missing cache on
+ * every rotated step.
+ *
+ * JD_WARPFIX=0 restores the old sampling in the same binary. */
+static uint32_t *g_half = NULL;
+static int g_half_w = 0, g_half_h = 0;
+
+static int warpfix_on(void)
+{
+    static int on = -1;
+    if (on < 0) { const char *e = getenv("JD_WARPFIX"); on = (e && atoi(e) == 0) ? 0 : 1; }
+    return on;
+}
+
+/* 2x2 per-channel MAX into g_half. Odd sizes clamp, so the last row/column
+ * is compared against itself rather than read out of bounds. */
+static int half_max_build(const uint32_t *src, int w, int h)
+{
+    int hw = w >> 1, hh = h >> 1;
+    if (hw < 1 || hh < 1) return 0;
+    if (g_half_w != hw || g_half_h != hh) {
+        free(g_half);
+        g_half = (uint32_t *)malloc((size_t)hw * hh * 4);
+        if (!g_half) { g_half_w = g_half_h = 0; return 0; }
+        g_half_w = hw; g_half_h = hh;
+    }
+    for (int y = 0; y < hh; y++) {
+        const uint32_t *r0 = src + (size_t)(y * 2) * w;
+        const uint32_t *r1 = ((y * 2 + 1) < h) ? r0 + w : r0;
+        uint32_t *o = g_half + (size_t)y * hw;
+        for (int x = 0; x < hw; x++) {
+            int x0 = x * 2, x1 = (x0 + 1 < w) ? x0 + 1 : x0;
+            uint32_t a = r0[x0], b = r0[x1], c = r1[x0], e2 = r1[x1];
+            /* per-channel max of the four, two at a time */
+            uint32_t m1r = ((a >> 16) & 255) > ((b >> 16) & 255) ? a : b;
+            uint32_t m2r = ((c >> 16) & 255) > ((e2 >> 16) & 255) ? c : e2;
+            uint32_t R = ((m1r >> 16) & 255) > ((m2r >> 16) & 255) ? (m1r >> 16) & 255 : (m2r >> 16) & 255;
+            uint32_t G = (a >> 8) & 255, B = a & 255;
+            uint32_t gs[4] = { (b >> 8) & 255, (c >> 8) & 255, (e2 >> 8) & 255, G };
+            uint32_t bs[4] = { b & 255, c & 255, e2 & 255, B };
+            for (int k = 0; k < 4; k++) { if (gs[k] > G) G = gs[k]; if (bs[k] > B) B = bs[k]; }
+            o[x] = 0xFF000000u | (R << 16) | (G << 8) | B;
+        }
+    }
+    return 1;
+}
+
 static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
                        int w, int h)
 {
@@ -1367,6 +1650,15 @@ static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
     float sy0 = (0.5f - ox) * sn + (0.5f - oy) * cs + cy;
     int32_t dxx = (int32_t)(cs * 65536.0f), dxy = (int32_t)(sn * 65536.0f);
     int32_t dyx = (int32_t)(-sn * 65536.0f), dyy = (int32_t)(cs * 65536.0f);
+
+    /* Below this the sampling step is wide enough to walk over lone pixels.
+     * 0.80 rather than 1.00 leaves a margin so the switch never sits exactly
+     * on the boundary and flicker between the two paths. */
+    const uint32_t *S = src; int sw = w, sh = h, shift = 0;
+    if (warpfix_on() && L->tz < 0.80f && half_max_build(src, w, h)) {
+        S = g_half; sw = g_half_w; sh = g_half_h; shift = 1;
+    }
+
     for (int y = 0; y < h; y++) {
         int32_t sx = (int32_t)((sx0 + dyx * (float)y / 65536.0f) * 65536.0f);
         int32_t sy = (int32_t)((sy0 + dyy * (float)y / 65536.0f) * 65536.0f);
@@ -1384,10 +1676,14 @@ static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
              * would (tiling repeats the centre; reflection preserves the
              * symmetry). The in-bounds path is untouched, so the cost is
              * paid only by the pixels that were broken before. */
-            if ((unsigned)ix < (unsigned)w && (unsigned)iy < (unsigned)h)
-                d[x] = src[(size_t)iy * w + ix];
+            /* shift==1 means we are reading the dilated half-size copy, so
+             * the full-res source coordinate halves. Everything else about
+             * the transform is unchanged. */
+            int jx = ix >> shift, jy = iy >> shift;
+            if ((unsigned)jx < (unsigned)sw && (unsigned)jy < (unsigned)sh)
+                d[x] = S[(size_t)jy * sw + jx];
             else
-                d[x] = src[(size_t)jd_mirror(iy, h) * w + jd_mirror(ix, w)];
+                d[x] = S[(size_t)jd_mirror(jy, sh) * sw + jd_mirror(jx, sw)];
             sx += dxx; sy += dxy;
         }
     }
@@ -1477,6 +1773,16 @@ static int recent_in_role(int role)
     return n;
 }
 
+/* Which rendering kit a ground comes from: 0 = asm engine mode, 1 = the
+ * 336-468 ground kit (soft upscaled fields), 2 = anything else.  Registry
+ * index i is pattern file (i+1) because the library is contiguous 001..610. */
+static int ground_kit(uint16_t r)
+{
+    if (r < JD_NASM) return 0;
+    int num = (int)r - JD_NASM + 1;
+    return (num >= 336 && num <= 468) ? 1 : 2;
+}
+
 /* The admission test every candidate must pass to take a slot. Called through
  * bag_draw, so a refusal costs the candidate its place at the FRONT of the
  * cycle but never its place IN the cycle. Rules are ordered cheapest first. */
@@ -1515,6 +1821,28 @@ static int admissible(uint16_t r, int slot)
                 if (jd_pattern_family[g_L[i].routine - JD_NASM] == fam) { clash = 1; break; }
             }
             if (clash && g_bag[g_st[r].role].n > 12) return 0;
+        }
+        /* 3.4: an overlay family that only just left the screen waits (overlay
+         * slots only — the ground must always find a successor).  3.5: family 0
+         * waits too; only the on-screen clash test above still exempts it. */
+        if (slot != 0 && slot != JD_SHADOW && fam < JD_NFAM && g_now < g_fam_cool[fam]
+            && g_bag[g_st[r].role].n > 12) return 0;
+    }
+    /* 3.4 ground-kit alternation: back-to-back grounds from the same kit are
+     * the single biggest "it all looks the same" source.  Taste, not
+     * correctness, so it sits above the g_force line and only binds while the
+     * ground bag is deep enough that refusing a kit can never starve it. */
+    if ((slot == 0 || slot == JD_SHADOW) && g_last_kit >= 0 && g_last_kit != 2
+        && ground_kit(r) == g_last_kit && g_bag[R_GROUND].n > 40 && !g_force
+        && g_kit_ref < JD_KIT_MAXREF) { g_kit_ref++; return 0; }
+    if ((slot == 0 || slot == JD_SHADOW) && g_last_gfam >= 0 && !g_force
+        && g_bag[R_GROUND].n > 40 && g_kit_ref < JD_KIT_MAXREF) {
+        int gf = r >= JD_NASM ? (int)jd_pattern_family[r - JD_NASM] : 100;   /* asm = its own family */
+        if (gf == g_last_gfam) { g_kit_ref++; return 0; }
+        if (gf == 0) {
+            int soft = 0;
+            for (int i = 0; i < 4; i++) soft += g_gring[i] == 0;
+            if (soft >= 2) { g_kit_ref++; return 0; }
         }
     }
     /* 1. a routine may never be live twice — patterns hold file-static state */
@@ -1665,8 +1993,16 @@ static int try_spawn(int slot, int frame)
     g_exclude = (slot == JD_SHADOW && g_L[0].live && frame >= g_L[0].t_out - 180) ? 0 : -1;
     uint32_t r = mix32((uint32_t)frame * 2654435761u + (uint32_t)slot * 7919u);
     cand_slot = slot;
+    g_kit_ref = 0;
     int role = pick_role(sidx, r);
-    uint16_t v = bag_draw(&g_bag[role], admissible_cb, slot);
+    uint16_t v;
+    if (sidx == 1 && g_force_rt >= 0) {        /* 3.4: a reserved mid spawn */
+        v = (uint16_t)g_force_rt; g_force_rt = -1;
+        for (int i = 0; i < JD_NBUF; i++)      /* never live twice, even forced */
+            if (g_L[i].live && g_L[i].routine == (int)v) v = 0xFFFF;
+        if (v == 0xFFFF) v = bag_draw(&g_bag[role], admissible_cb, slot);
+    } else
+        v = bag_draw(&g_bag[role], admissible_cb, slot);
     if (v == 0xFFFF) {
         /* try the other roles this slot may host before giving up */
         /* a slot may only ever host its own two roles — a FIELD routine in
@@ -1712,7 +2048,11 @@ static int try_spawn(int slot, int frame)
      * pattern's frame-to-frame delta goes from 0.34 at frame 3 000 to 19.1
      * at frame 100 000 — the engine's single largest source of jitter, and
      * it has been there since v2.0.  Give every layer its own small clock. */
-    L->fbase   = 300 + (int)(L->seed % 2500u);
+    /* 3.4: 2500 frames of window meant every tenancy replayed the same ~40 s
+     * stretch of a pattern's life; slow evolutions past that never appeared.
+     * 9000 keeps the quantisation jitter small (measured 0.34 at 3k, 19.1 at
+     * 100k) while giving each visit a genuinely different page of the pattern. */
+    L->fbase   = 300 + (int)(L->seed % 9000u);
     L->live    = 1;
     L->sl      = 0;
     L->cls     = st->cls;
@@ -1725,6 +2065,9 @@ static int try_spawn(int slot, int frame)
     if (sidx == 0) {
         L->blend  = B_MIX;
         L->w_peak = 256;
+        g_last_kit = ground_kit(v);          /* 3.4: the next ground must differ */
+        g_last_gfam = v >= JD_NASM ? (int)jd_pattern_family[v - JD_NASM] : 100;   /* 3.5 */
+        g_gring[g_gring_pos++ & 3] = g_last_gfam;
         /* a new ground picks the mood for everything spawned under it */
         int m = (int)((r >> 8) % M_N);
         if (m == g_prev_mood && m == M_STARK) m = M_RICH;
@@ -1920,6 +2263,20 @@ static int try_spawn(int slot, int frame)
     g_gap = 30 + (int)(mix32(r ^ 0x6A9F00Du) % 211u);       /* 0.5..4 s, never the same twice */
     TR("SPAWN f=%d slot=%d rt=%d role=%d blend=%d peak=%d life=%d mood=%d span=%u\n",
        frame, slot, (int)v, g_st[v].role, L->blend, L->w_peak, hold, g_mood, L->span);
+    if (g_tel) {
+        uint32_t pf  = (uint32_t)frame + g_pal_bias;
+        uint32_t leg = pf >> 10;
+        fprintf(g_tel,
+            "spawn,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%u,%u,%d,%d,"
+            "%.4f,%.4f,%.4f,%.4f,%d,%d,%u\n",
+            frame, slot, (int)v,
+            (v < JD_NASM ? "asm" : jd_pattern_names[v - JD_NASM]),
+            g_st[v].role, g_st[v].cls, L->blend, L->w_peak, hold, g_mood,
+            L->span, L->off, (int)L->wild, (int)L->hrot,
+            (double)L->tz, (double)L->tx, (double)L->ty, (double)L->tr,
+            scheme_at(leg), scheme_at(leg + 1), leg);
+        fflush(g_tel);
+    }
     recent_note((uint16_t)v);          /* every spawn joins the ring */
     if (g_opening) {
         g_opening = 0;
@@ -2009,6 +2366,9 @@ static void shape_kick(int frame)
      * minimum gap between entries so the new stack is not rationed. */
     g_skick_until = frame + JD_SBACK;
     g_last_change = -100000;
+    /* 3.4 replayed the JD mark on every S. 3.5.6 (J, after the S button made S an
+     * everyday tap): "I only want that once per launch" — the launch mark (g_sig0
+     * at init) is the only one; S changes shapes and nothing else. */
     TR("SKICK f=%d handover=%d\n", frame, handover);
 }
 
@@ -2017,6 +2377,39 @@ static void sched_tick(int frame)
     /* consume the S request before the retire pass reads the timings it is
      * about to change */
     if (jd_req_shape) { jd_req_shape = 0; shape_kick(frame); }
+    else if (!g_auto_s_done && frame - g_frame0 >= JD_AUTO_S) {
+        g_auto_s_done = 1;
+        shape_kick(frame);
+        g_sig_req = 0;                     /* fresh shapes, not a second mark */
+        TR("AUTO-S f=%d\n", frame);
+    }
+    /* 3.4 picture import: clear the mid slot the way S does and reserve its
+     * next spawn for the picture routine, so an imported photo is on screen
+     * within a couple of seconds instead of whenever the bag gets to it */
+#if JD_PICTURES
+    if (!jd_req_picture && &jd_img_ready && jd_img_ready && g_picture_rt >= 0
+        && frame - g_pic_last >= JD_PIC_EVERY) {
+        if (jd_image_next) jd_image_next();
+        jd_req_picture = 1;
+        TR("PICTURE-ROTATE f=%d\n", frame);
+    }
+#endif
+    if (jd_req_picture) {
+        jd_req_picture = 0;
+        g_pic_last = frame;
+        if (g_picture_rt >= 0 && g_slot_cap > 1) {
+            jd_layer *L = &g_L[1];
+            if (L->live) {
+                int out = frame + JD_SKICK;
+                if (out < L->t_full) out = L->t_full;
+                if (out < L->t_out) { L->t_out = out; L->t_end = out + FADE_OUT[1] / 2; }
+            }
+            g_force_rt = g_picture_rt;
+            g_rest[1] = frame + (L->live ? JD_SKICK + FADE_OUT[1] / 2 + 6 : 6);
+            g_last_change = -100000;
+            TR("PICTURE f=%d rt=%d\n", frame, g_picture_rt);
+        }
+    }
 
     /* retire */
     for (int s = 0; s < JD_NBUF; s++) {
@@ -2035,9 +2428,24 @@ static void sched_tick(int frame)
             uint32_t k = (rr >> 24) & 15u;
             if (k < 2)       rest = rest * 5 / 2;   /* 1 in 8: a real gap, the stack thins */
             else if (k == 2) rest = lo / 2;         /* 1 in 16: straight back — a double  */
-            /* 3.0: a layer the S key retired comes straight back, or the key
-             * would read as "clear the screen" rather than "change it" */
-            if (frame < g_skick_until) rest = 6 + (int)(rr % 40u);
+            /* 3.0 brought a layer the S key retired straight back (6..45
+             * frames).  3.4 replays the LAUNCH cascade instead — a clean
+             * ground with the mark forming over it, then mid, accent and
+             * spark arriving in order — because that opening is the state J
+             * asked to get back to.  Still well short of the 3..18 s rest a
+             * natural retirement draws, so the key never reads as "clear". */
+            if (frame < g_skick_until)
+                rest = s == 1 ?  60 + (int)(rr % 121u)    /* 1..3 s  */
+                     : s == 2 ? 180 + (int)(rr % 181u)    /* 3..6 s  */
+                     :          360 + (int)(rr % 241u);   /* 6..10 s */
+            /* 3.4 family cooldown: an OVERLAY family that just left waits its
+             * turn.  Grounds are excluded on purpose: a ground's family
+             * covers a third of the ground bag, and cooling it stalled every
+             * handover (measured: 829 refusals in 4 min against 0 before). */
+            if (L->routine >= JD_NASM && s != 0) {
+                unsigned fam = jd_pattern_family[L->routine - JD_NASM];
+                if (fam < JD_NFAM) g_fam_cool[fam] = frame + JD_FAM_COOL;   /* 3.5: family 0 too */
+            }
             g_rest[s] = frame + rest;
         }
     }
@@ -2065,6 +2473,11 @@ static void sched_tick(int frame)
           g_lsig_ok[0] = g_lsig_ok[JD_SHADOW]; g_lsig_ok[JD_SHADOW] = t2; }
         g_L[JD_SHADOW].live = 0;
         g_gpostponed = 0; g_audition = 0;
+        /* a fresh ground is where the mark belongs — 3.5: only when S asked */
+        if (g_sig_req) {
+            TR("SIG f=%d asked\n", frame);
+            g_sig0 = frame; g_sig_req = 0;
+        }
         /* review 05: overlays whose rest expired DURING the handover would all
          * release on this exact frame (measured: 25% of overlay arrivals landed
          * 0-2 s after a promotion, 11% on the promotion frame itself), which
@@ -2109,9 +2522,14 @@ static void sched_tick(int frame)
         }
     }
 
+    /* How thin is the stack right now?  Only a COLLAPSED stack earns the
+     * relaxed gate below — see the starvation note there. */
+    int nlive = 0;
+    for (int s = 1; s < JD_NSLOT; s++) if (g_L[s].live) nlive++;
+
     /* overlays */
     for (int s = 1; s < JD_NSLOT; s++) {
-        if (s >= g_slot_cap) { continue; }
+        if (s >= g_slot_cap) { continue; }   /* spawn gate only: live layers retire in the draw pass */
         jd_layer *L = &g_L[s];
         /* AUDIO: a downbeat pulls the next layer forward (never later), so
          * new material arrives ON the music instead of on a blind clock.
@@ -2125,8 +2543,39 @@ static void sched_tick(int frame)
          * and nothing enters while the ground is being handed over */
         /* under load, thin the stack to base+mid — but never to a bare
          * ground: a solo layer has nothing to dilute its motion */
-        if (handover || (g_hot && s >= 2) || frame - g_last_change < g_gap) continue;
-        if (!try_spawn(s, frame)) g_rest[s] = frame + 120;
+        if (handover || frame - g_last_change < g_gap) continue;
+        /* Under load, THIN the stack; do not amputate it.
+         *
+         * This used to read `(g_hot && s >= 2) continue`, which is a cliff and
+         * not a ramp.  g_hot latches above 13.5 ms and clears only after 120
+         * CONSECUTIVE frames under 10.5 ms, so at 3456x2160 — measured duty
+         * 87-100%, mean frame 11.5-43.9 ms — one early crossing removed slots
+         * 2 and 3 for the rest of the run.  The instrumented spawn rate for
+         * both was 0.0%: the accent and spark layers were not dim, they were
+         * NEVER DRAWN.  Every theory about blend modes and bright grounds was
+         * explaining the invisibility of something that did not exist.
+         *
+         * Half rate costs 5.9-17.7 ms against 11.8-35.4 ms at full, so a
+         * pressured slot can enter thinned rather than not at all.  Refusal
+         * survives as the last step, for genuine overload only. */
+        /* STARVATION ONLY.  Relaxing the refusal whenever g_hot is set was
+         * measured at 1920x1080 to make things WORSE, not better: the spark
+         * slot joined an already-populated stack and the extra coat of
+         * translucency collapsed dynamic range 226.9 -> 81.7 and local RMS
+         * contrast 0.3116 -> 0.0475, with fog up 0.056 -> 0.125.  That is the
+         * "foggy clutter" failure, arrived at from the other direction.
+         *
+         * So the relaxation is conditioned on the stack having actually
+         * COLLAPSED, which is the 3456x2160 case (measured mean overlays live
+         * 0.00-1.00) and not the 1080p case (0.72-1.77).  A thin stack gets
+         * help; a populated one is left alone. */
+        int pressured = (g_hot && s >= 2);
+        if (pressured && (nlive >= JD_GATE_STARVED || g_ewma_ms > JD_GATE_REFUSE_MS * g_budk)) continue;
+        if (!try_spawn(s, frame)) { g_rest[s] = frame + 120; continue; }
+        if (pressured) {            /* admitted, but at half rate */
+            g_L[s].half   = 1;
+            g_L[s].parity = (uint8_t)(frame & 1);
+        }
     }
 }
 
@@ -2137,7 +2586,11 @@ static void sched_tick(int frame)
 static void engine_init(uint32_t *fb, int w, int h, int frame)
 {
     (void)fb;
-    g_w = w; g_h = h; g_frame0 = frame;
+    g_w = w; g_h = h; g_frame0 = frame; g_sig0 = frame; g_sig_req = 0; g_auto_s_done = 0; g_pic_last = frame - JD_PIC_EVERY + JD_PIC_FIRST;
+    for (int i = 0; i < JD_NFAM; i++) g_fam_cool[i] = 0;
+    g_last_kit = -1; g_force_rt = -1; g_last_gfam = -1;
+    for (int i = 0; i < 4; i++) g_gring[i] = -1; g_gring_pos = 0;
+    tel_open();
     g_run = mix32((uint32_t)frame * 2654435761u + 0x1D0F1E55u); g_gpostponed = 0;
     g_nr = JD_NASM + jd_pattern_count;
     if (g_nr > JD_MAXR) g_nr = JD_MAXR;
@@ -2172,6 +2625,10 @@ static void engine_init(uint32_t *fb, int w, int h, int frame)
     g_rest[1] = frame + 120 + (int)(mix32(g_run ^ 1u) % 241u);   /* 2..6 s  */
     g_rest[2] = frame + 240 + (int)(mix32(g_run ^ 2u) % 421u);   /* 4..11 s */
     g_rest[3] = frame + 480 + (int)(mix32(g_run ^ 3u) % 601u);   /* 8..18 s */
+    /* the picture routine, if this build has one (611_picture_kaleido) */
+    g_picture_rt = -1;
+    for (int i = 0; i < jd_pattern_count; i++)
+        if (strstr(jd_pattern_names[i], "picture kaleido")) { g_picture_rt = JD_NASM + i; break; }
     g_ready = 1;
 }
 
@@ -2347,6 +2804,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     if (mode_override(fb, w, h, frame)) return;
 
     double t_frame = now_ms();
+    g_tap_ms = 0.0;                 /* measurement time, refunded below */
     int npix = w * h;
 
     /* Finish measuring the library in the background of the first seconds,
@@ -2354,7 +2812,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
      * early on the stack is one or two layers and there are 8 ms going
      * spare, and that is exactly when the sweep most needs to finish. */
     if (!g_probe_done) {
-        double spare = 12.0 - g_ewma_ms;
+        double spare = 12.0 * g_budk - g_ewma_ms;
         if (spare < 0.5) spare = 0.5;
         if (spare > 6.0) spare = 6.0;
         if (probe_step(spare)) bags_init();
@@ -2422,7 +2880,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
          * first ground is late the ramp is already 85% open when the
          * picture arrives and the arrival is a cut, not a fade (measured
          * delta 160.6).  Restart it from the first frame that has one. */
-        g_frame0 = frame;
+        g_frame0 = frame; g_sig0 = frame;
         memset(fb, 0, (size_t)npix * 4);
         return;
     }
@@ -2563,6 +3021,8 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     } else {
         memcpy(fb, g_L[gnd[0]].buf, (size_t)npix * 4);
     }
+    tap(JD_TAP_GROUND, gnd[0], g_L[gnd[0]].routine,
+        g_L[gnd[0]].w_now, B_MIX, fb, w, h);
 
     /* ---- overlays, bottom up ---- */
     for (int k = 0; k < no; k++) {
@@ -2578,6 +3038,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             }
             blend_span(fb, srcp, npix, L->w_now, L->blend);
         }
+        tap(JD_TAP_OVERLAY, ov[k], L->routine, L->w_now, L->blend, fb, w, h);
     }
 
     /* ---- boot: ease up over the first 2 s, FROM A FLOOR ----
@@ -2667,7 +3128,7 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
      * Rises over 0.4 s, holds 1.4 s, dissolves over 1.4 s, then never again.
      * (DAZZLE.EXE signed off on exit; this signs on.) */
     {
-        int age = frame - g_frame0;
+        int age = frame - g_sig0;            /* 3.4: its own clock, replayable */
         if (age >= 0 && age < 194) {
             float e;
             if      (age <  24) e = (float)age / 24.0f;
@@ -2754,22 +3215,24 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
      * gain and after the health probes, so it is never brightened, never
      * counted as motion, and always legible. */
     jd_audio_meter_draw(fb, w, h); jd_about_draw(fb, w, h);
+    tap(JD_TAP_FINAL, -1, -1, 0, 0, fb, w, h);
 
     TRF("F %d n=%d/%d w=%d,%d,%d,%d,%d A=%d key=%d p0=%08x b0=%08x sl0=%d rt0=%d\n",
         frame, ng, no,
         g_L[0].w_now, g_L[1].w_now, g_L[2].w_now, g_L[3].w_now, g_L[4].w_now,
         g_blend_key >> 17, g_blend_key, g_pal[0][1000], g_blend[1000],
         g_L[0].sl, g_L[0].routine);
-    double ms = now_ms() - t_frame;
+    double ms = now_ms() - t_frame - g_tap_ms;   /* the tap does not get to
+                                                   change what it measures */
     g_ewma_ms = g_ewma_ms * 0.92 + ms * 0.08;
-    if (!g_hot && g_ewma_ms > 13.5) {
+    if (!g_hot && g_ewma_ms > 13.5 * g_budk) {
         g_hot = 1; g_cool = 0;
         if (no) {                                  /* half-rate the top layer */
             g_L[ov[no - 1]].half = 1;
             g_L[ov[no - 1]].parity = (uint8_t)(frame & 1);
         }
     } else if (g_hot) {
-        if (g_ewma_ms < 10.5) { if (++g_cool > 120) {
+        if (g_ewma_ms < 10.5 * g_budk) { if (++g_cool > 120) {
             g_hot = 0;
             for (int s = 1; s < JD_NSLOT; s++) g_L[s].half = 0;
         } } else g_cool = 0;

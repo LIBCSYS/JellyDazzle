@@ -44,6 +44,7 @@ AUDIOLIB = -framework CoreAudio -framework Foundation -lobjc
 # -framework Cocoa on the vendored-SDL branch; the sdl2-config fallback does not,
 # so link it explicitly here rather than depending on which branch fired.
 UI       = src/app/menu_mac.m
+# 3.5.1: jd_image.m (picture import) left out of the build; file kept for history
 UILIB    = -framework Cocoa
 APP      = src/app/main.c
 PATTERNS = $(filter-out src/patterns/_harness.c,$(wildcard src/patterns/[0-9]*.c)) src/patterns/_registry.c

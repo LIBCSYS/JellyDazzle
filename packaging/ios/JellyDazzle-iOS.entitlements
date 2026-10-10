@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- iOS App Store signing. Exactly what the profile (BQ67WPK447, "JellyDazzle iOS
+     App Store", created by API 2026-10-08) grants and nothing more: no capabilities,
+     no app groups, no network. beta-reports-active lets TestFlight take the build. -->
+<plist version="1.0">
+<dict>
+  <key>application-identifier</key><string>46AXDWA6F8.nyc.jelia.jellydazzle</string>
+  <key>com.apple.developer.team-identifier</key><string>46AXDWA6F8</string>
+  <key>get-task-allow</key><false/>
+  <key>beta-reports-active</key><true/>
+</dict>
+</plist>

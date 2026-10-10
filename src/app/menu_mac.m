@@ -26,6 +26,7 @@
 /* Raised here, consumed by the engine — the same contract as jd_req_palette. */
 extern void jd_about_toggle(void);
 extern int  jd_about_is_on(void);
+/* 3.5.1: File > Open Pictures / Show Pictures Folder removed (J: phones over pictures). */
 
 @interface JDMenuTarget : NSObject
 @end

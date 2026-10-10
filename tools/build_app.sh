@@ -3,6 +3,15 @@
 set -e
 cd "$(dirname "$0")/.."
 VER=$(cat VERSION)
+# App Store Connect burns every CFBundleVersion it has ever SEEN, including
+# rejected deliveries — a failed upload still consumes its build number. BUILD
+# lets a re-delivery bump the build number without touching the marketing
+# version (CFBundleShortVersionString stays $VER).
+BUILD=${BUILD:-$VER}
+# ITMS-90257: macOS CFBundleVersion is AT MOST three period-separated integers.
+case "$BUILD" in
+  *[!0-9.]*|*.*.*.*|.*|*.) echo "ERROR: BUILD '$BUILD' must be 1-3 dot-separated integers (ITMS-90257)." >&2; exit 1;;
+esac
 # Read MACMIN from the Makefile rather than repeating it. These two disagreeing
 # is exactly how a build ships claiming macOS 11 while refusing to launch on it.
 # Environment wins. The App Store build passes MACMIN=12.0 because Apple
@@ -46,7 +55,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>JellyDazzle</string>
   <key>CFBundleExecutable</key><string>JellyDazzle</string>
   <key>CFBundleIdentifier</key><string>nyc.jelia.jellydazzle</string>
-  <key>CFBundleVersion</key><string>${VER}</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
+  <!-- 3.5.9: answers App Store export compliance in the build itself. Without it the
+       Mac build blocked submission (409 'usesNonExemptEncryption required'). No crypto,
+       no network: exempt. iOS already declares this. -->
+  <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>CFBundleShortVersionString</key><string>${VER}</string>
   <key>CFBundleIconFile</key><string>JellyDazzle</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -81,7 +94,7 @@ if [ -n "$ID" ]; then
     # --options runtime is the hardened runtime, which notarisation REQUIRES.
     # Under it, microphone access needs the entitlement declared - the Info.plist
     # usage string alone is not enough.
-    ENT="--entitlements packaging/JellyDazzle.entitlements"
+    ENT="--entitlements packaging/JellyDazzle-direct.entitlements"  # 3.5.9: App Store keys killed the direct build (AMFI SIGKILL, no profile)
 else
     echo "WARNING: no Developer ID Application certificate found - signing ad-hoc."
     echo "         Gatekeeper will reject the result. Fine for local testing only."

@@ -43,6 +43,28 @@ files=$(ls [0-9][0-9][0-9]_*.c [0-9][0-9][0-9].c 2>/dev/null | sort)
       *lightning*|*bolt*|*tesla*|*elmo*|*filament*) fam=6;;
       *tunnel*|*corridor*|*wormhole*|*pillar*|*hall*|*warp*|*droste*|*tesseract*|*relief*) fam=7;;
     esac
+    # 3.4: BLOCK RANGES beat keywords.  The library was written in themed runs
+    # and the keywords only caught 29 of the 72 lightning files (ground_strike,
+    # jacobs_ladder, corona_disc, upward_streamers… all read as 'other'), which
+    # is why the spark slot kept handing back a bolt.  The same for the matrix
+    # rain (572-581), the gear train (557-571), the particle run (582-601) and
+    # the 336-468 ground kit, whose unmatched members default to field/flow.
+    #   9 matrix/code-rain   10 gears/mechanical   11 creatures
+    n=$((10#${f:0:3}))
+    if   [ $n -ge 469 ] && [ $n -le 540 ]; then fam=6
+    elif [ $n -ge 572 ] && [ $n -le 581 ]; then fam=9
+    elif [ $n -ge 557 ] && [ $n -le 571 ]; then fam=10
+    elif [ $n -ge 582 ] && [ $n -le 601 ]; then fam=5
+    # 3.5.9: two new blocks. CREATURES (611-628) are their own family because
+    # they share an unmistakable look — a recognisable animal in motion — and
+    # two of them on screen at once reads as a menagerie rather than variety.
+    # The new FRACTALS (629-638) join the existing fractal family 8 so they
+    # inherit its no-two-together rule and its cost separation.
+    elif [ $n -ge 611 ] && [ $n -le 628 ]; then fam=11
+    elif [ $n -ge 629 ] && [ $n -le 638 ]; then fam=8
+    fi
+    # (the 336-468 ground kit keeps its keyword families only: those are
+    #  grounds, and the compositor's kit-alternation rule handles their look)
     echo "    $fam,"
   done
   echo '};'

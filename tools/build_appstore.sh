@@ -35,7 +35,25 @@ ENTITLEMENTS=packaging/JellyDazzle.entitlements
 # Match by SHA-1 HASH, not by name. Three Apple Distribution certs can share
 # one display name (Xcode downloads copies), and codesign refuses a name that
 # matches more than one: "ambiguous (matches ... and ...)". The hash is unique.
-APP_ID=$(security find-identity -v -p codesigning \
+#
+# When a provisioning profile exists, the HASH IS NOT OURS TO CHOOSE: the
+# profile seals exactly one Distribution cert, and signing with a same-named
+# sibling is ITMS-90284 at upload — the coin-flip that cost the 2026-10-02
+# delivery. Read the cert out of the profile and demand that identity.
+PROFILE=packaging/JellyDazzle_MacAppStore.provisionprofile
+APP_ID=""
+if [ -f "$PROFILE" ]; then
+  APP_ID=$(security cms -D -i "$PROFILE" 2>/dev/null \
+           | plutil -extract DeveloperCertificates.0 raw -o - - \
+           | base64 -d | shasum -a 1 | awk '{print toupper($1)}')
+  if ! security find-identity -v -p codesigning | grep -q "$APP_ID"; then
+    echo "ERROR: the cert inside $PROFILE ($APP_ID) is not in this keychain." >&2
+    echo "  Regenerate the profile against a cert you hold, or import that cert." >&2
+    exit 1
+  fi
+  echo "profile cert: $APP_ID (selection pinned by the provisioning profile)"
+fi
+[ -n "$APP_ID" ] || APP_ID=$(security find-identity -v -p codesigning \
          | grep -E 'Apple Distribution|3rd Party Mac Developer Application' \
          | tail -1 | awk '{print $2}' || true)
 PKG_ID=$(security find-identity -v \
@@ -59,14 +77,25 @@ echo "pkg signing : $PKG_ID"
 # --- build the bundle exactly as the normal path does ----------------------
 # Reusing build_app.sh keeps the Info.plist, icon and SDL2 vendoring in ONE
 # place. It ad-hoc signs; everything below re-signs properly over the top.
-tools/build_app.sh >/dev/null
+# MACMIN=12.0 is Apple's floor for an arm64-only bundle (ITMS-90869) — the
+# Makefile's stamp notices the change and recompiles, and build_app.sh writes
+# the matching LSMinimumSystemVersion.
+MACMIN=12.0 tools/build_app.sh >/dev/null
+
+# The vendored SDL2 was compiled against macOS 11 and its LC_BUILD_VERSION
+# says so; Apple reads every Mach-O in the bundle. Raising the declared floor
+# on a binary built FOR a lower OS is safe (the opposite is not), so retag
+# rather than rebuild SDL. Must happen before signing — vtool rewrites load
+# commands and would break a seal.
+for DYLIB in "$APP"/Contents/Frameworks/*.dylib; do
+  vtool -set-build-version macos 12.0 12.0 -replace -output "$DYLIB" "$DYLIB"
+done
 
 # --- embed the provisioning profile ------------------------------------------
 # ITMS-90889: without Contents/embedded.provisionprofile the upload still lands,
 # but the build is not eligible for TestFlight and Apple emails a warning.
 # It has to be in place BEFORE signing — the signature seals the bundle, so
 # dropping the file in afterwards invalidates it.
-PROFILE=packaging/JellyDazzle_MacAppStore.provisionprofile
 if [ -f "$PROFILE" ]; then
     cp "$PROFILE" "$APP/Contents/embedded.provisionprofile"
     echo "embedded provisioning profile: $PROFILE"
@@ -105,6 +134,12 @@ codesign --verify --strict --verbose=2 "$APP"
 echo "--- entitlements actually embedded ---"
 codesign -d --entitlements - "$APP" 2>/dev/null | grep -E 'app-sandbox|audio-input' \
   || { echo "ERROR: sandbox entitlement did not embed - the store will reject this." >&2; exit 1; }
+# With a profile embedded, the identifiers must be sealed into the signature
+# too, or the store answers ITMS-90886 (and 90284 piles on behind it).
+if [ -f "$PROFILE" ]; then
+  codesign -d --entitlements - "$APP" 2>/dev/null | grep -q 'com.apple.application-identifier' \
+    || { echo "ERROR: application-identifier entitlement did not embed (ITMS-90886)." >&2; exit 1; }
+fi
 
 # --- build the installer package ------------------------------------------
 rm -f "$PKG"

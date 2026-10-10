@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>JellyDazzle &mdash; audio-reactive ARM64 screensaver for Apple Silicon</title>
+<title>JellyDazzle &mdash; audio-reactive music visualizer for Apple Silicon</title>
 <link rel="icon" type="image/png" href="/brand/favicon-64.png">
 <link rel="apple-touch-icon" href="/brand/emblem.png">
 <meta property="og:title" content="JellyDazzle">
-<meta property="og:description" content="A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A assembly for Apple Silicon and beyond.">
+<meta property="og:description" content="A DAZZLE.EXE homage for Apple Silicon, built with AI-guided coding: 24 engine modes in hand-written ARM64 assembly and 610 patterns in C.">
 <meta property="og:image" content="https://dazzle.jelia.nyc/brand/social-1280x640.png">
 <meta property="og:url" content="https://dazzle.jelia.nyc/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A assembly for Apple Silicon and beyond.">
+<meta name="description" content="A DAZZLE.EXE homage for Apple Silicon, built with AI-guided coding: 24 engine modes in hand-written ARM64 assembly and 610 patterns in C.">
 <style>
 :root{--ink:#07080d;--panel:#10141c;--line:#1e2735;--cy:#22d3ee;--gold:#e9b65a;--tx:#dde7f0;--dim:#8296aa}
 *{box-sizing:border-box}
@@ -73,13 +73,15 @@ header{padding-top:34px!important}
 <header>
   <img class="hero" src="/brand/jellydazzle-logo.jpg" alt="JellyDazzle">
   <h1 class="sr">Jelly<span>Dazzle</span></h1>
-  <div class="tag">A DAZZLE.EXE homage, built with AI-guided coding in ARMv9.2-A
-  assembly for Apple Silicon &mdash; and beyond. It listens to whatever your Mac is
-  playing and paints to it: never the same pattern, never the same colours.</div>
-  <div class="ver">version 2.5.4 &middot; macOS &middot; Apple Silicon &middot; MIT</div>
-  <div class="cta">
-    <a class="btn p" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest">Download for macOS</a>
-    <a class="btn s" href="/library/">Browse all 626 routines</a>
+  <div class="tag">A DAZZLE.EXE homage for Apple Silicon, built with AI-guided coding &mdash;
+  24 engine modes in hand-written ARM64 assembly, 610 patterns in C. It listens to whatever is playing &mdash;
+  on your Mac, iPhone or iPad &mdash; and paints to it: never the same pattern, never the same colours.</div>
+  <div class="ver">3.5.8 on the App Store &mdash; Mac, iPhone &amp; iPad &middot; Apple Silicon &middot; MIT</div>
+  <div class="cta" style="align-items:center">
+    <a href="https://apps.apple.com/us/app/jellydazzle/id6808884433" aria-label="Download JellyDazzle on the Mac App Store" style="display:inline-block;line-height:0;padding:12px;margin:-12px 0"><img src="/brand/download-on-the-mac-app-store.svg" alt="Download on the Mac App Store" style="height:44px;width:auto;display:block"></a>
+    <a href="https://apps.apple.com/us/app/jellydazzle/id6808884433?platform=iphone" aria-label="Download JellyDazzle on the App Store for iPhone and iPad" style="display:inline-block;line-height:0;padding:12px;margin:-12px 0"><img src="/brand/download-on-the-app-store.svg" alt="Download on the App Store" style="height:44px;width:auto;display:block"></a>
+    <a class="btn p" href="https://github.com/LIBCSYS/JellyDazzle/releases/latest/download/JellyDazzle-macOS-arm64.zip">Download for macOS (3.5.8)</a>
+    <a class="btn s" href="/library/">Browse all 634 routines</a>
     <a class="btn" href="https://github.com/LIBCSYS/JellyDazzle">Source on GitHub</a>
   </div>
 </header>
@@ -94,6 +96,40 @@ header{padding-top:34px!important}
     <figure><img loading="lazy" src="/library/anim/019.gif" alt="moire silk"><figcaption>019 &mdash; moir&eacute; silk</figcaption></figure>
     <figure><img loading="lazy" src="/library/anim/480.gif" alt="tesla coil"><figcaption>480 &mdash; tesla coil</figcaption></figure>
   </div>
+  <div style="margin:22px 0 4px;padding:16px 20px;border:1px solid #e9b65a;border-radius:10px;background:rgba(233,182,90,.08)">
+    <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#e9b65a;margin-bottom:7px">Play music first</div>
+    <div style="font-size:16px;line-height:1.55;color:#dde7f0"><b>JellyDazzle is audio-reactive &mdash; put something on before you watch it.</b>
+    Anything playing on your Mac will do: a record, a film, a livestream. On macOS&nbsp;14.2+ it listens to the
+    system output, so it follows whatever app is making the sound. In silence it still runs, but on internal
+    clocks &mdash; and you are seeing maybe half of what it does.</div>
+
+    <div style="margin-top:16px;padding-top:15px;border-top:1px solid rgba(233,182,90,.3)">
+      <div style="font-size:14.5px;color:#dde7f0;margin-bottom:11px">
+        <b>Nothing on hand? Play this.</b> &ldquo;And I Need Ur Love&rdquo; by
+        <a href="https://theratsasses.com/" style="color:#e9b65a">The Rat&rsquo;s Asses</a>,
+        featuring the man who wrote JellyDazzle. Free, no account &mdash; press play, then open the app.
+      </div>
+      <div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000">
+<iframe src="https://www.youtube-nocookie.com/embed/u5IyinH_3s4" loading="lazy"
+  title="And I Need Ur Love &mdash; The Rat&rsquo;s Asses"
+  style="position:absolute;inset:0;width:100%;height:100%;border:0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+  allowfullscreen></iframe>
+</div>
+      <div style="font-size:13px;margin-top:9px;color:#8fa3b8">
+        Also on <a href="https://open.spotify.com/track/3wRjyj2LlYPMx3cziUhb9y" style="color:#22d3ee">Spotify</a>
+        &mdash; free accounts only get a 30-second preview there, so the video is the whole song.
+      </div>
+    </div>
+  </div>
+  <div style="margin:22px 0 4px;padding:16px 20px;border:1px solid #22d3ee;border-radius:10px;background:rgba(34,211,238,.07)">
+    <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee;margin-bottom:7px">Signed by Apple</div>
+    <div style="font-size:16px;line-height:1.55;color:#dde7f0">This download is <b>code-signed as Developer ID Application: LIBCSYSTEMS LLC</b>
+    and <b>notarised by Apple</b>, with the ticket stapled so it verifies offline.
+    <b>It installs and opens with no warnings</b> &mdash; no &ldquo;cannot verify&rdquo;, no right-click trick.
+    <span style="color:#8296aa">On the Mac App Store since October 8, 2026.</span></div>
+  </div>
+  
 </section>
 
 <section>
@@ -110,16 +146,128 @@ header{padding-top:34px!important}
       of the screen it actually covers.</p>
     </div>
     <div>
-      <div class="stat">24</div><div>ARMv9.2-A assembly engine modes</div>
-      <div class="stat" style="margin-top:18px">201</div><div>C pattern plug-ins in the shipping build</div>
+      <div class="stat">24</div><div>engine modes in hand-written ARM64 assembly</div>
+      <div class="stat" style="margin-top:18px">610</div><div>C pattern plug-ins in the shipping build</div>
       <div class="stat" style="margin-top:18px">180</div><div>palette schemes, interpolated in OKLab</div>
     </div>
   </div>
 </section>
 
 <section>
+  <h2>Where things stand</h2>
+  <p style="margin-top:0">A few people hit real problems with the earlier downloads. They are
+  fixed, and it is worth being straight about what they were.</p>
+  <ul>
+    <li><b>It would not open on older Macs.</b> The build inherited the macOS version of the
+    machine that compiled it, so a copy built on the newest system simply refused to launch on
+    anything earlier &mdash; which meant the download only worked for people already running the
+    latest OS. The floor is now <b>macOS 11</b>, set explicitly and pinned in the bundled SDL2 as
+    well, so what you download runs on hardware older than the machine that built it.
+    <b>Resolved in 2.7.</b></li>
+
+    <li><b>It looked frozen when you first opened it.</b> On first run JellyDazzle measures every
+    routine in the library and probes the available audio devices before it draws anything, which
+    on some Macs takes 30&ndash;60 seconds with nothing on screen. It was working, not hung. Those
+    measurements are now cached and there is a count-up clock and a cancel, so it says what it is
+    doing and every later launch is immediate. <b>Resolved in 2.7.</b></li>
+
+    <li><b>Patterns repeated themselves.</b> Two routines from the same shape family could end up
+    on screen together, which made a library of hundreds feel smaller than it was. Families are
+    now tracked and never share the screen. <b>Resolved in 2.7.</b></li>
+
+    <li><b>macOS said it &ldquo;cannot verify&rdquo; the app. <span style="color:var(--cy)">Fixed in
+    3.0.2.</span></b> Every earlier download was signed only ad-hoc, so Gatekeeper could not check
+    who made it and warned you. The current release is signed as <b>Developer ID Application:
+    LIBCSYSTEMS LLC</b> and <b>notarised by Apple</b>, with the ticket stapled so it works offline.
+    Download it, open it, done &mdash; no warning, no right-click trick.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Now on iPhone and iPad</h2>
+  <p style="margin-top:0">The same engine &mdash; the same assembly core and all 634 routines &mdash; runs on
+  <b>iPhone and iPad</b>. Version 3.5.8 is <b>on the App Store now</b>. Put a song on in Spotify or Apple
+  Music, open JellyDazzle and set the phone down: <b>your music keeps playing at full volume</b>
+  while JellyDazzle listens through the microphone and paints to it.</p>
+  <ul>
+    <li><b>Lite on battery, Full when charging.</b> On battery, in Low Power Mode, or when the
+    phone is warm it draws a softer picture at 30 frames a second; plug it in and it becomes full
+    JellyDazzle &mdash; 60 frames, every layer. It switches on its own, mid-show.</li>
+    <li><b>C, S and ? buttons</b> in the corner for colours, shapes and help. They brighten when you
+    touch the screen and fade while you watch. A tap gives new colours, two fingers new shapes,
+    press and hold shows what is playing.</li>
+  </ul>
+  <p style="color:var(--dim);font-size:14px;margin-bottom:0">Your own pictures, the feature announced
+  here before, is on hold &mdash; the phones came first. Get it on the
+  <a href="https://apps.apple.com/us/app/jellydazzle/id6808884433?platform=iphone">App Store</a>, or follow along at
+  <a href="https://github.com/LIBCSYS/JellyDazzle">github.com/LIBCSYS/JellyDazzle</a>.</p>
+</section>
+
+<section>
   <h2>What's new</h2>
   <ul>
+    <li><b>3.5.8 &mdash; iPhone and iPad, and buttons.</b> <span style="color:var(--cy)">Released Oct 9, 2026 &mdash;
+    Mac, iPhone and iPad.</span> The whole engine now runs on iOS, with Lite and Full
+    power modes so it is kind to a battery, and your music keeps playing while it listens. New
+    <b>C, S and ?</b> buttons sit in the corner (and <b>X</b> on the Mac) so nobody has to know the
+    keys. The background now rotates through far more variety &mdash; the same family of pattern
+    never plays twice in a row &mdash; and the JD mark appears once, when JellyDazzle opens, instead of
+    with every new set of shapes. Getting it onto a phone meant adopting iOS 27&rsquo;s new app lifecycle,
+    which the first test build did not survive: it closed before it drew a frame. The crash report
+    came back through TestFlight within minutes, and build 7 fixed it.</li>
+
+    <li><b>3.0.4 &mdash; the accent layers were never being drawn.</b> On a Retina
+    display you were seeing a background and, at most, one layer on top of it. The
+    small bright accent and spark layers &mdash; the ones that give the picture its
+    snap &mdash; <b>never appeared at all.</b> Not dim, not washed out: never drawn.
+    A load valve that thins the stack when frames get expensive was latching the
+    first time a frame ran long and then never releasing, because releasing needed
+    120 fast frames in a row and at full Retina resolution that never happens. One
+    early hiccup removed half the layer stack for the rest of the session. Measured
+    on the headless harness at 3456&times;2160, the accent layer was present in
+    <b>0.0%</b> of frames before this build. Layers now enter at half rate under
+    load instead of being refused outright. The contrast and fog tuning behind this
+    is still being measured rather than guessed &mdash; that part is not finished.</li>
+
+    <li><b>3.0.3 &mdash; patterns keep going past their own edge.</b> A pattern that
+    zoomed out or drifted across the screen used to tow a hard black rectangle behind
+    it &mdash; you could see the box it was drawn in. Everything outside the pattern was
+    being filled with solid black. It now mirrors instead, so the pattern reflects at
+    its own edge and carries on, and the box is gone. The first-run notice is also
+    honest now: it used to say &ldquo;press space to continue anyway&rdquo;, which
+    suggested skipping it stopped the database build. It never did.</li>
+
+    <li><b>3.0.2 &mdash; signed, and two keys that drive the show.</b> The download is now
+    <b>signed and notarised by Apple</b>, so it opens with no warning at all. <b>C</b> changes the
+    colour and <b>S</b> changes the shapes &mdash; neither cuts, both fade, because nothing here
+    strobes. C used to pick the single most-distant scheme, which sounds right but is
+    deterministic and symmetric: it toggled between two palettes and the other 178 never appeared.
+    It now chooses at random among the most distant, never repeating the one it just left. There
+    is also a real Mac menu bar &mdash; Help on <b>&#8984;?</b>, with the site and support contact,
+    because macOS has no F1.</li>
+    <li><b>2.8.0 &mdash; fractals.</b> Seven new routines, each a different visual
+    language: <b>604 Mandel Deep</b>, <b>605 Julia Morph</b> &mdash; a Julia set that
+    genuinely <i>changes shape while you watch</i>, its constant walking through ten
+    curated values while the plane is re-swept fourteen scanlines a frame, forever &mdash;
+    <b>606 Burning Ship</b>, <b>607 Newton Basins</b>, <b>608 Lyapunov</b>,
+    <b>609 Buddhabrot</b>, which exposes over about a minute like a photographic plate
+    rather than arriving finished, and <b>610 Flame IFS</b>, whose attractor is drawn
+    from the seed so every instance is one that has probably never been rendered before.
+    None of them paint anything black: interiors are coloured by orbit trap and exteriors
+    by trap-folded escape, so the whole frame is live colour. They share a shape family,
+    so two never run at once.</li>
+
+    <li><b>2.7 &mdash; the whole library.</b> All 400 held candidate patterns promoted
+    into the shipping build &mdash; no work discarded &mdash; taking it from 201 plug-ins
+    to 610. Shape repetition fixed: two routines of the same family can no longer share
+    the screen. The startup database is genuinely built once, with a count-up clock and a
+    cancel. The macOS floor dropped from 26 to 11, so the download runs on hardware older
+    than the machine that built it.</li>
+
+    <li><b>2.6 &mdash; the mark, and movement.</b> Adaptive mobility: the engine measures
+    how much each routine moves on its own and gives the stillest ones the most transform,
+    so nothing sits static.</li>
+
     <li><b>2.5.4 &mdash; surprise.</b> Every layer used to take a window into <i>one
     shared palette ramp</i>, blended from just two curated schemes &mdash; so every colour
     on screen came from the same two palettes, and the engine was architecturally
@@ -191,9 +339,14 @@ cd JellyDazzle
 make          # build
 make run      # build and launch
 make app      # signed self-contained .app</pre>
-  <p style="color:var(--dim);font-size:14px">Needs SDL2 (<code>brew install sdl2</code>) and the
-  Xcode command line tools. macOS will ask for microphone permission on first launch; the
-  visuals run on internal clocks without it.</p>
+  <p style="color:var(--dim);font-size:14px">Needs only the Xcode command line tools
+  (<code>xcode-select --install</code>). SDL2 ships in the repository, built against the
+  minimum supported macOS &mdash; deliberately, because a Homebrew SDL is compiled for whichever
+  macOS the build machine happens to run and silently pins the finished app to it. Apple Silicon
+  only; the 24 engine modes are hand-written ARM64 assembly (the 610 patterns and the compositor are C). macOS asks for microphone permission on
+  first launch so the visuals can move with your music &mdash; they run on internal clocks without
+  it. First launch can take 30&ndash;60&nbsp;seconds while it probes audio devices; it is working,
+  not hung.</p>
 </section>
 
 <section>
@@ -226,6 +379,8 @@ make app      # signed self-contained .app</pre>
 <footer class="wrap" style="padding-left:0;padding-right:0">
   <a href="https://github.com/LIBCSYS/JellyDazzle">github.com/LIBCSYS/JellyDazzle</a> &middot;
   <a href="/library/">the full library</a> &middot;
+  <a href="/support/">support</a> &middot;
+  <a href="/privacy/">privacy</a> &middot;
   MIT licensed &middot; built by John Elia
   <br><span style="opacity:.7">An homage to DAZZLE.EXE. Not affiliated with the original.</span>
 </footer>

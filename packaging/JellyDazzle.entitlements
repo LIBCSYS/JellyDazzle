@@ -11,6 +11,17 @@
        NSAudioCaptureUsageDescription strings already in Info.plist. -->
   <key>com.apple.security.device.audio-input</key>
   <true/>
+  <!-- 3.5.1: files.user-selected.read-only dropped with Open Pictures — back to asking for nothing it cannot justify -->
+
+  <!-- Required the moment an embedded.provisionprofile ships in the bundle:
+       the store compares the signature's identifiers against the profile's
+       and rejects on absence (ITMS-90886) or mismatch (ITMS-90284). Without
+       a profile these were optional — which is why 3.0.2 uploaded clean
+       without them and the 2026-10-02 delivery did not. -->
+  <key>com.apple.application-identifier</key>
+  <string>46AXDWA6F8.nyc.jelia.jellydazzle</string>
+  <key>com.apple.developer.team-identifier</key>
+  <string>46AXDWA6F8</string>
 
   <!-- Deliberately NOT requested, and each omission is a question Apple will
        not have to ask:

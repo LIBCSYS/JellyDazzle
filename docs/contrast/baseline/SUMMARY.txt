@@ -1,0 +1,27 @@
+# baseline captured 2026-09-07T22:08:07Z
+# commit: 55e4de6bf2e2e95c9facc047a6cc82b15745c904
+# 640x360, 18000 frames, EVERY=5, warm frozen probe cache, 8 seeds per arm
+
+## JD_BLENDW=0 (pre-3.0.4 blend weight)
+CONTRAST seed=1700000 meas=3480 ten=46 acc_present=0.6954 acc_visible=0.4149 acc_v50=1.2176 all_visible=0.6279 fog=0.2104 lrms=0.2937 dr=142.2 gluma=68.5 finluma=78.8
+CONTRAST seed=2300000 meas=3480 ten=43 acc_present=0.8445 acc_visible=0.5759 acc_v50=1.3524 all_visible=0.6390 fog=0.1299 lrms=0.2504 dr=119.8 gluma=70.5 finluma=82.4
+CONTRAST seed=4700000 meas=3480 ten=49 acc_present=0.7641 acc_visible=0.2709 acc_v50=0.8580 all_visible=0.5113 fog=0.3240 lrms=0.1847 dr=112.9 gluma=81.5 finluma=91.8
+CONTRAST seed=3100000 meas=3480 ten=53 acc_present=0.7872 acc_visible=0.5692 acc_v50=1.3267 all_visible=0.5962 fog=0.3560 lrms=0.1440 dr=98.4 gluma=82.5 finluma=86.2
+CONTRAST seed=5900000 meas=3480 ten=53 acc_present=0.7528 acc_visible=0.5873 acc_v50=1.5251 all_visible=0.6391 fog=0.3361 lrms=0.1727 dr=112.5 gluma=75.5 finluma=90.0
+CONTRAST seed=7300000 meas=3480 ten=47 acc_present=0.7699 acc_visible=0.5280 acc_v50=1.1903 all_visible=0.4786 fog=0.3507 lrms=0.1259 dr=78.1 gluma=78.5 finluma=89.7
+CONTRAST seed=8100000 meas=3480 ten=46 acc_present=0.7478 acc_visible=0.6032 acc_v50=1.4569 all_visible=0.6115 fog=0.3833 lrms=0.1365 dr=100.9 gluma=89.5 finluma=92.2
+CONTRAST seed=6700000 meas=3480 ten=47 acc_present=0.8671 acc_visible=0.4615 acc_v50=1.5110 all_visible=0.7245 fog=0.3031 lrms=0.2672 dr=144.5 gluma=75.5 finluma=89.7
+
+## JD_BLENDW=1 (default)
+CONTRAST seed=4700000 meas=3480 ten=49 acc_present=0.8235 acc_visible=0.5574 acc_v50=1.0895 all_visible=0.6124 fog=0.2850 lrms=0.2302 dr=115.7 gluma=64.5 finluma=78.7
+CONTRAST seed=3100000 meas=3480 ten=51 acc_present=0.9655 acc_visible=0.5110 acc_v50=1.2139 all_visible=0.6702 fog=0.2447 lrms=0.2036 dr=96.0 gluma=71.5 finluma=79.5
+CONTRAST seed=1700000 meas=3480 ten=49 acc_present=0.8898 acc_visible=0.6210 acc_v50=1.8423 all_visible=0.7521 fog=0.1919 lrms=0.2649 dr=133.1 gluma=67.5 finluma=81.5
+CONTRAST seed=2300000 meas=3480 ten=43 acc_present=0.8859 acc_visible=0.5798 acc_v50=1.5734 all_visible=0.6533 fog=0.1458 lrms=0.2531 dr=126.3 gluma=70.5 finluma=84.7
+CONTRAST seed=8100000 meas=3480 ten=45 acc_present=0.8998 acc_visible=0.4182 acc_v50=1.6054 all_visible=0.7015 fog=0.3896 lrms=0.1601 dr=103.8 gluma=83.5 finluma=96.2
+CONTRAST seed=5900000 meas=3480 ten=56 acc_present=0.9278 acc_visible=0.7519 acc_v50=2.2718 all_visible=0.7007 fog=0.2728 lrms=0.2503 dr=127.3 gluma=67.5 finluma=78.9
+CONTRAST seed=7300000 meas=3480 ten=44 acc_present=0.7741 acc_visible=0.6156 acc_v50=1.5212 all_visible=0.5692 fog=0.2770 lrms=0.1549 dr=96.7 gluma=73.5 finluma=86.9
+CONTRAST seed=6700000 meas=3480 ten=48 acc_present=0.8617 acc_visible=0.3008 acc_v50=1.1405 all_visible=0.5048 fog=0.2992 lrms=0.2242 dr=134.0 gluma=81.5 finluma=96.1
+
+## guardrails (uninstrumented, seed 1700000)
+MAXDELTA 7.35@1701771 ge8=0 ge4=393 mean=1.63
+FPS 295.4
