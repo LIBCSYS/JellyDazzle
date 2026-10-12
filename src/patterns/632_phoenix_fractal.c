@@ -28,12 +28,14 @@
  * completed sweep, not per frame.
  */
 #include "_spark572.h"
+#include "_xfade.h"
 
 #define PX632_CELL 5.0f
 #define PX632_BAND 14
 #define PX632_IT   36
 
 static gk       g632;
+static gk_xf xf632;              /* 3.6.1: crossfade of finished sweeps */
 static uint32_t bs632 = 0xFFFFFFFFu;
 static int      base632;
 static int      row632;
@@ -48,7 +50,9 @@ void pattern_632(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     int gx, gy, i;
     gk_setup(&g632, w, h);
-    gk_decay_snap(&g632, 0.90f);
+    /* 3.6.1: no per-frame decay. Each sweep builds a clean picture and the
+     * screen crossfades finished pictures (_xfade.h) - no rolling band. */
+    if (row632 == 0) gk_clear(&g632);
 
     float cw = (float)g632.cw, ch = (float)g632.ch, sc = g632.sc;
 
@@ -62,6 +66,7 @@ void pattern_632(uint32_t *fb, int w, int h, int frame, int sl,
         pmid632 =  0.5667f + 0.07f * (gk_hash(seed + 44u) - 0.5f);
         row632  = 0;
         gk_clear(&g632);
+        gk_xf_reset(&xf632);
         bs632 = seed;
     }
 
@@ -128,9 +133,11 @@ void pattern_632(uint32_t *fb, int w, int h, int frame, int sl,
     row632 = ylast;
     if (row632 >= grows) {
         row632 = 0;
+        gk_xf_commit(&xf632, &g632, (grows + PX632_BAND - 1) / PX632_BAND);
         phi632 += 0.031f;                   /* full parameter loop ~34 s   */
-        if (phi632 > GK_TAU) phi632 -= GK_TAU;
+        /* 3.6.1: no wrap. sin(phi*0.73) etc. do not repeat at 2pi, so wrapping
+         * snapped the zoom/shape every loop. Float precision is ample for a tenancy. */
     }
 
-    gk_present(&g632, fb, w, h);
+    gk_xf_present(&xf632, &g632, fb, w, h);
 }

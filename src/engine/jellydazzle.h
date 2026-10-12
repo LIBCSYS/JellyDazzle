@@ -50,6 +50,8 @@ const uint32_t *jd_blend_ramp(void);   /* shared ramp, read-only (gate) */
  * C asks for a different colour set, S for a different set of shapes. */
 extern int jd_req_palette;
 extern int jd_req_shape;
+void jd_depth_toggle(void);      /* D: depth on/off (3.6.1) */
+int  jd_depth_enabled(void);
 
 /* ---- CONTRAST TAP (3.0.4, measurement only) --------------------------
  * A hook into the composite, for tools/gate_harness.c `contrast`.  NULL in

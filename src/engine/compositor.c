@@ -123,7 +123,8 @@ extern const int jd_pattern_count;
 /* ---------------- knobs ---------------- */
 #define JD_NASM        24                  /* asm modes 0..23             */
 #define JD_ASM_ACC0    15                  /* asm 15..23 own their canvas */
-#define JD_MAXR        640                 /* routine table capacity      */
+#define JD_MAXR        800                 /* routine table capacity — was 640, which
+                                              silently dropped patterns 617-638 (3.6.1) */
 #define JD_NSLOT        4                  /* base, mid, accent, spark    */
 #define JD_LUMA_FLOOR   30                 /* dead-air only, not 'dim'    */
 #define JD_LUMA_MAXGAIN 384                /* <= 1.5x: 2.7x clamped the
@@ -145,6 +146,8 @@ extern const int jd_pattern_count;
 
 enum { R_GROUND = 0, R_FIELD, R_FIGURE, R_SPARK, R_NROLE };
 enum { C_PURE = 0, C_CANVAS };             /* canvas-owning = asm 15..23  */
+/* B_ADD keeps its slot so B_DIFF stays 4 in traces/CSVs; the mode itself was
+ * removed in 3.6 — pick_blend never produced it (0 of 1,962 measured spawns). */
 enum { B_MIX = 0, B_MAX, B_SCREEN, B_ADD, B_DIFF };
 enum { M_STARK = 0, M_RICH, M_BLAZE, M_N };
 
@@ -185,6 +188,14 @@ static double now_ms(void) {
 static uint16_t g_recent[JD_RECENT];
 static int      g_recent_n;
 static int      g_opening = 1;         /* cleared once slot 0 has spawned */
+/* 3.6.2 OPENING COLOURS. J: every launch should start as if S and C had just
+ * been pressed. Shapes already refuse the last JD_RECENT openers (above);
+ * colours were random per launch with no memory, so one launch in ~30 opened
+ * on the scheme the last one did. Remember the opening scheme of the last
+ * JD_PRECENT launches, in the same cache file, and step past them. */
+#define JD_PRECENT 8
+static uint8_t  g_precent[JD_PRECENT];
+static int      g_precent_n;
 
 static int recent_has(uint16_t rt)
 {
@@ -388,9 +399,10 @@ static int    g_kit_ref  = 0;                /* kit refusals in THIS draw — th
 static uint32_t g_run = 0;
 static uint32_t g_gain = 256;              /* dead-air lift, Q8            */
 static uint32_t g_prot = 0;       /* audio palette rotation, 0..PAL_N-1 */
+static uint32_t g_prot_calm = 0;  /* 3.6.1: same idle drift, 1/4 of the beat push - fractals */
 void jd_audio_meter_draw(uint32_t *fb, int w, int h);   /* AUDIO: HUD, src/audio/listen.c */
 void jd_about_draw(uint32_t *fb, int w, int h);         /* ABOUT card (key A), src/audio/listen.c */
-void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs);  /* first-run notice */
+void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs, int resumed);  /* first-run notice */
 extern int au_skip;                                     /* SPACE dismissed it */
 /* LIVE CONTROL (3.0).  Raised by the keyboard poll in listen.c, cleared here.
  * The compositor is the only thing allowed to touch the palette walk or the
@@ -701,6 +713,7 @@ static uint32_t *g_pa = NULL, *g_pb = NULL;
 static uint16_t  g_pdefer[JD_MAXR];        /* live routines the sweep skipped */
 static int       g_pdefer_n = 0;
 static int       g_probe_i = 0, g_probe_done = 0, g_probe_pix = 0;
+static int       g_probe_resumed = 0;     /* routines a PARTIAL cache already held at launch */
 static double    g_probe_ms = 0.0;
 
 static void probe_begin(int fullpix)
@@ -942,6 +955,10 @@ static int probe_cache_load(void)
         if (fread(&rn, 4, 1, f) == 1 && rn > 0 && rn <= JD_RECENT) {
             if ((int)fread(g_recent, sizeof(uint16_t), (size_t)rn, f) == rn)
                 g_recent_n = rn;
+            int32_t pn = 0;              /* 3.6.2 tail: recent opening schemes */
+            if (fread(&pn, 4, 1, f) == 1 && pn > 0 && pn <= JD_PRECENT
+                && (int)fread(g_precent, 1, (size_t)pn, f) == pn)
+                g_precent_n = pn;
         }
     }
     fclose(f);
@@ -950,6 +967,7 @@ static int probe_cache_load(void)
     TR("PROBE cache %s (%d/%d already measured)\n",
        ok ? "hit" : "miss", done, g_nr);
     /* Only claim the sweep is finished if it really is. A partial file resumes. */
+    if (ok && done < g_nr) g_probe_resumed = done;
     return ok && done >= g_nr;
 }
 
@@ -966,6 +984,9 @@ static void probe_cache_save(void)
     { int32_t rn = g_recent_n;         /* which routines opened recent runs */
       fwrite(&rn, 4, 1, f);
       fwrite(g_recent, sizeof(uint16_t), (size_t)g_recent_n, f); }
+    { int32_t pn = g_precent_n;        /* 3.6.2: recent opening colour schemes */
+      fwrite(&pn, 4, 1, f);
+      fwrite(g_precent, 1, (size_t)g_precent_n, f); }
     fclose(f);
     TR("PROBE cache written: %s\n", p);
 }
@@ -1217,6 +1238,25 @@ static void palette_jump(int frame)
  * per-frame path whenever nothing has actually moved. */
 static void palette_update(int frame)
 {
+    /* 3.6.2: the first frame of a run opens on a scheme none of the last
+     * JD_PRECENT launches opened on - step the walk forward a whole leg at a
+     * time until it does. Before anything is on screen, so no fade needed. */
+    static int opened;
+    if (!opened && g_ns > JD_PRECENT) {
+        opened = 1;
+        for (int tries = 0; tries < g_ns; tries++) {
+            int sch = scheme_at(((uint32_t)frame + g_pal_bias) >> 10), seen = 0;
+            for (int i = 0; i < g_precent_n; i++) if (g_precent[i] == (uint8_t)sch) seen = 1;
+            if (!seen) break;
+            g_pal_bias += JD_LEG;
+        }
+        int sch = scheme_at(((uint32_t)frame + g_pal_bias) >> 10);
+        if (g_precent_n < JD_PRECENT) g_precent[g_precent_n++] = (uint8_t)sch;
+        else { memmove(g_precent, g_precent + 1, JD_PRECENT - 1); g_precent[JD_PRECENT - 1] = (uint8_t)sch; }
+        TR("OPEN colours: scheme %d (avoiding last %d openings)\n", sch, g_precent_n - 1);
+        probe_cache_save();
+    }
+
     /* consume the C request first: everything below reads the walk */
     if (jd_req_palette) { jd_req_palette = 0; palette_jump(frame); }
 
@@ -1507,37 +1547,6 @@ static void span_screen(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
     }
 }
 
-/* ADD with a hard per-channel clamp — the brightest and least forgiving of
- * the blends: where two lit layers overlap it saturates to white rather than
- * to a colour. */
-static void span_add(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
-{
-    for (int i = 0; i < n; i++) {
-        uint32_t d = dst[i], s = src[i];
-        /* ADD is unreachable today (pick_blend never returns B_ADD - 0 of
-         * 1,962 measured spawns) but is fixed for consistency: clamp the
-         * full-strength sum first, then lerp toward it. */
-        uint32_t dr = (d >> 16) & 255, dg2 = (d >> 8) & 255, db = d & 255;
-        uint32_t r, g, b;
-        if (blendw_on()) {
-            uint32_t ar = dr + ((s >> 16) & 255);
-            uint32_t ag = dg2 + ((s >> 8) & 255);
-            uint32_t ab = db + (s & 255);
-            if (ar > 255) ar = 255; if (ag > 255) ag = 255; if (ab > 255) ab = 255;
-            r = dr + (((ar - dr) * w) >> 8);
-            g = dg2 + (((ag - dg2) * w) >> 8);
-            b = db + (((ab - db) * w) >> 8);
-        } else {
-            r = dr + ((((s >> 16) & 255) * w) >> 8);
-            g = dg2 + ((((s >>  8) & 255) * w) >> 8);
-            b = db + (((  s        & 255) * w) >> 8);
-        }
-        dst[i] = 0xFF000000u | (r > 255 ? 255u : r) << 16
-                             | (g > 255 ? 255u : g) << 8
-                             | (b > 255 ? 255u : b);
-    }
-}
-
 /* difference, weight-limited — the stark end of the range without the strobe */
 static void span_diff(uint32_t *dst, const uint32_t *src, int n, uint32_t w)
 {
@@ -1689,6 +1698,119 @@ static void layer_warp(const jd_layer *L, const uint32_t *src, uint32_t *dst,
     }
 }
 
+/* ============================================================
+ * DEPTH (3.6.1) — "looking into, living in the kaleidoscope" (J, 2026-10-12)
+ *
+ * The stack was flat because nothing in it agreed on where the viewer is.
+ * Every overlay drifted toward OR away at random, all layers moved
+ * independently, and a layer shrunk to a speck was as bright as one filling
+ * the screen. The eye reads depth from consistent cues, so this adds five,
+ * each cheap and each a straight line through code that already exists:
+ *
+ *   1. FLY-THROUGH  overlays are born distant (small) and only ever approach.
+ *   2. PARALLAX     a slow camera sway; nearer slots shift and turn more, the
+ *                   ground (infinitely far) not at all.
+ *   3. FOG          a layer still far away is dimmer, and brightens as it nears.
+ *   4. ECHO         last frame, pushed outward and decayed, sits behind this
+ *                   one wherever it is brighter: the "flying in" trail.
+ *   5. TUBE         the rim darkens like the barrel of a real kaleidoscope.
+ *
+ * Always on. The 3.6.1 D toggle was removed in 3.6.2 (J: "doesn't do anything
+ * very visible"); JD_DEPTH=0 still disables it for measurement. */
+static int g_depth = -1;
+static int depth_on(void)
+{
+    if (g_depth < 0) { const char *e = getenv("JD_DEPTH"); g_depth = e ? (atoi(e) != 0) : 1; }
+    return g_depth;
+}
+void jd_depth_toggle(void) { depth_on(); g_depth ^= 1; }
+int  jd_depth_enabled(void) { return depth_on(); }
+
+/* parallax weight per slot: ground, mid, accent, spark (near) */
+static const float DEPTH_PAR[JD_NSLOT] = { 0.0f, 0.40f, 0.72f, 1.0f };
+
+/* Camera sway: two incommensurate sines per axis so it never visibly loops.
+ * Amplitudes are a few percent of the frame; it should be felt, not seen. */
+static float g_cam_x, g_cam_y, g_cam_r;
+static void depth_camera(int frame)
+{
+    float t = (float)frame;
+    g_cam_x = 0.034f * sinf(t * 0.00071f) + 0.018f * sinf(t * 0.00173f + 0.7f);
+    g_cam_y = 0.028f * sinf(t * 0.00089f + 1.3f) + 0.014f * sinf(t * 0.00211f);
+    g_cam_r = 0.060f * sinf(t * 0.00053f + 2.1f);
+}
+
+/* Fog: below tz 1.0 the layer is "far". 0.42 brightness at the most distant
+ * spawn (0.40), full by the time it fills the frame. Smooth, so a layer
+ * approaching never steps in brightness. */
+static uint32_t depth_fog(float tz, uint32_t w)
+{
+    float f = (tz - 0.40f) / 0.75f;
+    if (f < 0.0f) f = 0.0f; else if (f > 1.0f) f = 1.0f;
+    f = f * f * (3.0f - 2.0f * f);
+    return (uint32_t)((float)w * (0.42f + 0.58f * f));
+}
+
+/* Tube: per-pixel brightness, built once per resolution. Flat (255) across
+ * the middle ~60% of the half-diagonal, easing to 70% at the corners. */
+static uint8_t *g_tube; static int g_tube_w, g_tube_h;
+static void depth_tube(uint32_t *fb, int w, int h)
+{
+    if (g_tube_w != w || g_tube_h != h) {
+        free(g_tube);
+        g_tube = (uint8_t *)malloc((size_t)w * h);
+        if (!g_tube) { g_tube_w = g_tube_h = 0; return; }
+        g_tube_w = w; g_tube_h = h;
+        float cx = w * 0.5f, cy = h * 0.5f, rd = sqrtf(cx * cx + cy * cy);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                float dx = (x + 0.5f - cx) / rd, dy = (y + 0.5f - cy) / rd;
+                float r = sqrtf(dx * dx + dy * dy);
+                float s = (r - 0.58f) / 0.42f;
+                if (s < 0.0f) s = 0.0f; else if (s > 1.0f) s = 1.0f;
+                s = s * s * (3.0f - 2.0f * s);
+                g_tube[(size_t)y * w + x] = (uint8_t)(255.0f - 77.0f * s);
+            }
+    }
+    int n = w * h;
+    for (int i = 0; i < n; i++) {
+        uint32_t k = g_tube[i];
+        if (k == 255) continue;                 /* the whole middle: untouched */
+        uint32_t c = fb[i];
+        uint32_t rb = ((c & 0xFF00FFu) * k >> 8) & 0xFF00FFu;
+        uint32_t g  = ((c & 0x00FF00u) * k >> 8) & 0x00FF00u;
+        fb[i] = 0xFF000000u | rb | g;
+    }
+}
+
+/* Echo: the previous composite, zoomed 1.1% about the centre (content moves
+ * OUTWARD = forward motion), scaled to 70%, then MAX'd under the new frame.
+ * MAX means it only ever shows where it is brighter than what is there, so
+ * it trails light into the dark instead of fogging the picture, and the 70%
+ * per frame makes each echo fade in about a quarter second. */
+static uint32_t *g_echo, *g_echo_tmp; static int g_echo_n, g_echo_live;
+static void depth_echo(uint32_t *fb, int w, int h)
+{
+    int n = w * h;
+    if (g_echo_n != n) {
+        free(g_echo); free(g_echo_tmp);
+        g_echo = (uint32_t *)malloc((size_t)n * 4);
+        g_echo_tmp = (uint32_t *)malloc((size_t)n * 4);
+        g_echo_n = (g_echo && g_echo_tmp) ? n : 0;
+        g_echo_live = 0;
+        if (!g_echo_n) return;
+    }
+    if (g_echo_live) {
+        jd_layer E; memset(&E, 0, sizeof E);
+        E.tz = 1.011f; E.tr = 0.0012f;         /* a hair of spin: a turning tube */
+        layer_warp(&E, g_echo, g_echo_tmp, w, h);
+        span_scale(g_echo_tmp, g_echo_tmp, n, 179);
+        span_max(fb, g_echo_tmp, n, 256);
+    }
+    memcpy(g_echo, fb, (size_t)n * 4);
+    g_echo_live = 1;
+}
+
 static void blend_span(uint32_t *dst, const uint32_t *src, int n,
                        uint32_t w, int mode)
 {
@@ -1696,7 +1818,6 @@ static void blend_span(uint32_t *dst, const uint32_t *src, int n,
     switch (mode) {
         case B_MAX:    span_max(dst, src, n, w);    break;
         case B_SCREEN: span_screen(dst, src, n, w); break;
-        case B_ADD:    span_add(dst, src, n, w);    break;
         case B_DIFF:   span_diff(dst, src, n, w);   break;
         default:       span_lerp(dst, dst, src, n, w); break;
     }
@@ -1839,6 +1960,16 @@ static int admissible(uint16_t r, int slot)
         && g_bag[R_GROUND].n > 40 && g_kit_ref < JD_KIT_MAXREF) {
         int gf = r >= JD_NASM ? (int)jd_pattern_family[r - JD_NASM] : 100;   /* asm = its own family */
         if (gf == g_last_gfam) { g_kit_ref++; return 0; }
+        /* 3.6: remember the last FOUR grounds, not one. Grounds turn over about
+         * every 13 s, so "not the same family as the last ground" still let
+         * field / radial / field / radial run all minute — measured on 3.6 before
+         * this rule: 21 of 44 same-family repeats inside 60 s were ground->ground.
+         * Same refusal budget as the kit rule, so a deep-family tail can never
+         * stall the ground. */
+        if (gf != 0 && gf != 100) {
+            for (int i = 0; i < 4; i++)
+                if (g_gring[i] == gf) { g_kit_ref++; return 0; }
+        }
         if (gf == 0) {
             int soft = 0;
             for (int i = 0; i < 4; i++) soft += g_gring[i] == 0;
@@ -2229,6 +2360,10 @@ static int try_spawn(int slot, int frame)
             L->tx_v = L->ty_v = 0.0f;
             L->tr_v = ((float)((d >> 8) & 255) / 255.0f - 0.5f) * 0.00030f * mob;
             L->moving = 1;
+            if (depth_on()) {             /* 3.6.2: the far wall drifts toward you too */
+                float a = L->tz_v < 0.0f ? -L->tz_v : L->tz_v;
+                L->tz_v = 0.00012f + a;
+            }
         } else {
             /* OVERLAYS: the full range. Layers genuinely recede and loom,
              * travel across the frame, and spin perceptibly over a tenancy. */
@@ -2242,6 +2377,16 @@ static int try_spawn(int slot, int frame)
             L->ty_v = ((float)((d >> 16) & 255) / 255.0f - 0.5f) * 0.00105f * mob;
             L->tr_v = ((float)((d >> 24) & 255) / 255.0f - 0.5f) * 0.00240f * mob;
             L->moving = 1;
+            if (depth_on()) {
+                /* FLY-THROUGH: born between far (0.40) and frame-filling
+                 * (1.10), then only ever approach. The approach rate grows
+                 * with the slot's nearness, which is the parallax of depth:
+                 * near things close distance faster than far ones. Over an
+                 * average tenancy a layer roughly doubles in size. */
+                L->tz   = 0.40f + (float)(m & 1023) / 1023.0f * 0.70f;
+                L->tz_v = (0.00040f + 0.00055f * DEPTH_PAR[slot < JD_NSLOT ? slot : 1])
+                        * (0.75f + 0.5f * (float)(d & 255) / 255.0f);
+            }
         }
     }
     L->wild = 0; L->hrot = 0;
@@ -2254,6 +2399,15 @@ static int try_spawn(int slot, int frame)
         } else if ((w & 255) < 116) {
             L->hrot = ((w >> 16) & 1) ? 1 : 2;      /* ~12%: rotate only */
         }
+    } else {
+        /* 3.6: the GROUND may surprise too. It is the largest area on screen and
+         * used to be locked to the shared two-scheme ramp for every leg — the
+         * likeliest source of J's "same pattern with the same color". About 15%
+         * of grounds now take a scheme of their own. No hue rotation here: the
+         * schemes are curated, a rotated full-screen ground can turn garish. */
+        uint32_t w = mix32(L->seed ^ 0x6A0D5EEDu);
+        if ((w & 255) < 38)                         /* ~15% of grounds */
+            L->wild = (uint16_t)(1 + (w >> 8) % (uint32_t)g_ns);
     }
     if (L->wild || L->hrot)
         TR("WILD slot=%d rt=%d scheme=%d hrot=%d\n", slot, (int)v,
@@ -2593,7 +2747,11 @@ static void engine_init(uint32_t *fb, int w, int h, int frame)
     tel_open();
     g_run = mix32((uint32_t)frame * 2654435761u + 0x1D0F1E55u); g_gpostponed = 0;
     g_nr = JD_NASM + jd_pattern_count;
-    if (g_nr > JD_MAXR) g_nr = JD_MAXR;
+    if (g_nr > JD_MAXR) {
+        /* Never again silently: 3.5.9 shipped 22 patterns nobody could see. */
+        fprintf(stderr, "JellyDazzle: %d routines exceed JD_MAXR %d - raise it\n", g_nr, JD_MAXR);
+        g_nr = JD_MAXR;
+    }
     g_ns = JD_NS;
     { const char *e = getenv("JD_NS"); if (e) { int v = atoi(e); if (v > 0 && v < 256) g_ns = v; } }
     { const char *e = getenv("JD_LAYERS");
@@ -2674,6 +2832,16 @@ static void audio_rotate(void)
     }
     rot += vel >> 3;
     g_prot = rot & (PAL_N - 1);
+    /* 3.6.1 CALM TRACK for fractals (family 8). Their colour index changes
+     * steeply across fine filaments, so a beat that speeds the ramp 10x makes
+     * every filament strobe — part of "flashing instead of flowing". They keep
+     * the full idle drift but only a quarter of the audio push. A separate
+     * accumulator, never a scaled g_prot: dividing a wrapping position would
+     * jump at every wrap. */
+    static uint32_t rot_calm;
+    uint32_t vc = IDLE_VEL + ((vel > IDLE_VEL ? vel - IDLE_VEL : 0) >> 2);
+    rot_calm += vc >> 3;
+    g_prot_calm = rot_calm & (PAL_N - 1);
 }
 
 /* ---- AUDIO -> WEIGHT.  Overlays surge with the low end: 0.45x in a
@@ -2899,12 +3067,15 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             draw_frame(L->buf, w, h, frame);
         } else {
             jd_patterns[L->routine - JD_NASM](L->buf, w, h, L->fbase + L->sl,
-                                              L->sl, L->seed, L->pal + g_prot);
+                                              L->sl, L->seed, L->pal
+                                              + (jd_pattern_family[L->routine - JD_NASM] == 8
+                                                 ? g_prot_calm : g_prot));
             if (L->moving) {                     /* advance the tenancy's drift */
                 L->tz += L->tz_v; L->tx += L->tx_v;
                 L->ty += L->ty_v; L->tr += L->tr_v;
                 if (L->tz < 0.34f) { L->tz = 0.34f; L->tz_v = -L->tz_v; }
-                if (L->tz > 2.90f) { L->tz = 2.90f; L->tz_v = -L->tz_v; }
+                if ((s == 0 || s == JD_SHADOW) && L->tz < 1.02f) { L->tz = 1.02f; L->tz_v = -L->tz_v; }
+                if (L->tz > 2.90f) { L->tz = 2.90f; L->tz_v = depth_on() ? 0.0f : -L->tz_v; }
                 if (L->tx < -0.42f || L->tx > 0.42f) L->tx_v = -L->tx_v;
                 if (L->ty < -0.42f || L->ty > 0.42f) L->ty_v = -L->ty_v;
             }
@@ -3008,21 +3179,42 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
             ng = 1; g_audition++;
         }
     }
-    /* ---- ground: normalized, so the frame never pulses ---- */
+    /* ---- ground: normalized, so the frame never pulses ----
+     * 3.6.2 GROUND MOTION. Spawn has always given every ground a slow zoom
+     * and turn (tz 1.02-1.44 in, tr drift, up to 2.6x for still routines -
+     * "the transform is the only life a frozen routine has"), and the drift
+     * was advanced every frame - but this path memcpy'd L->buf, so no ground
+     * ever moved. A still ground (terrazzo, plates, quilts) sat frozen for
+     * its whole 20-25 s tenancy: J's "same thing, no wave or change". */
+    const uint32_t *g0 = g_L[gnd[0]].buf, *g1 = ng == 2 ? g_L[gnd[1]].buf : NULL;
+    {
+        static uint32_t *gw[2]; static int gw_n;
+        if (gw_n < npix) {
+            free(gw[0]); free(gw[1]);
+            gw[0] = malloc((size_t)npix * 4); gw[1] = malloc((size_t)npix * 4);
+            gw_n = (gw[0] && gw[1]) ? npix : 0;
+        }
+        if (gw_n) {
+            if (g_L[gnd[0]].moving) { layer_warp(&g_L[gnd[0]], g0, gw[0], w, h); g0 = gw[0]; }
+            if (g1 && g_L[gnd[1]].moving) { layer_warp(&g_L[gnd[1]], g1, gw[1], w, h); g1 = gw[1]; }
+        }
+    }
     if (ng == 2) {
         uint64_t a = g_L[gnd[0]].w16, b = g_L[gnd[1]].w16;
         /* both envelopes can round to zero on a handover's first frames; the
          * incumbent holds the screen until one of them has any weight */
-        if (!(a + b)) memcpy(fb, g_L[gnd[0]].buf, (size_t)npix * 4);
+        if (!(a + b)) memcpy(fb, g0, (size_t)npix * 4);
         else {
             uint32_t wb = (uint32_t)(b * 256 / (a + b));
-            span_lerp(fb, g_L[gnd[0]].buf, g_L[gnd[1]].buf, npix, wb);
+            span_lerp(fb, g0, g1, npix, wb);
         }
     } else {
-        memcpy(fb, g_L[gnd[0]].buf, (size_t)npix * 4);
+        memcpy(fb, g0, (size_t)npix * 4);
     }
     tap(JD_TAP_GROUND, gnd[0], g_L[gnd[0]].routine,
         g_L[gnd[0]].w_now, B_MIX, fb, w, h);
+
+    if (depth_on()) depth_camera(frame);
 
     /* ---- overlays, bottom up ---- */
     for (int k = 0; k < no; k++) {
@@ -3031,15 +3223,33 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
              * buffer is used rather than warping in place, because L->buf must
              * survive for accumulators and for the next frame's motion probe. */
             const uint32_t *srcp = L->buf;
-            if (L->moving) {
+            uint32_t wt = L->w_now;
+            int dep = depth_on() && ov[k] < JD_NSLOT;
+            if (L->moving || dep) {
                 static uint32_t *warp; static int warp_n;
                 if (warp_n < npix) { free(warp); warp = malloc((size_t)npix * 4); warp_n = warp ? npix : 0; }
-                if (warp) { layer_warp(L, L->buf, warp, w, h); srcp = warp; }
+                if (warp) {
+                    if (dep) {
+                        /* PARALLAX: the camera's sway, scaled by how near this
+                         * slot is. A copy, so the tenancy's own drift is untouched. */
+                        jd_layer P = *L;
+                        float pk = DEPTH_PAR[ov[k]];
+                        P.tx += g_cam_x * pk; P.ty += g_cam_y * pk; P.tr += g_cam_r * pk;
+                        if (!L->moving) P.tz = 1.0f;
+                        layer_warp(&P, L->buf, warp, w, h);
+                        wt = depth_fog(P.tz, wt);
+                    } else layer_warp(L, L->buf, warp, w, h);
+                    srcp = warp;
+                }
             }
-            blend_span(fb, srcp, npix, L->w_now, L->blend);
+            blend_span(fb, srcp, npix, wt, L->blend);
         }
         tap(JD_TAP_OVERLAY, ov[k], L->routine, L->w_now, L->blend, fb, w, h);
     }
+
+    /* ---- depth echo: after the whole stack, before boot/gain touch it ---- */
+    if (depth_on()) depth_echo(fb, w, h);
+    else g_echo_live = 0;            /* toggled off: start clean when it comes back */
 
     /* ---- boot: ease up over the first 2 s, FROM A FLOOR ----
      * A 3 s smootherstep from zero spends its first second under 10% — the
@@ -3120,6 +3330,10 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
         if (g_gain > 260) span_gain(fb, fb, npix, g_gain);
     }
 
+    /* ---- depth tube: last on the picture (after the beat bloom), before the
+     * signature and any UI so the mark and the cards stay full brightness ---- */
+    if (depth_on()) depth_tube(fb, w, h);
+
     /* ---- OPENING SIGNATURE ------------------------------------------
      * The mark, for the first ~3 seconds of a run, over whatever the engine
      * opened with. It is NOT drawn over the picture: it lifts the luminance
@@ -3169,8 +3383,16 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
     if (!g_probe_done && g_nr > 0 && !au_skip) {
         static double t_first = 0.0;
         if (t_first == 0.0) t_first = now_ms();
-        jd_status_draw(fb, w, h, (int)((long)g_probe_i * 100 / g_nr),
-                       (int)((now_ms() - t_first) / 1000.0));
+        /* Progress is what has been MEASURED, not how far g_probe_i has walked.
+         * The walk restarts at 0 every launch, in a per-launch rotated order,
+         * so on a resumed build it read 0% and climbed again — on iPhone, where
+         * Lite mode leaves the sweep about half a millisecond a frame, that looked
+         * like the database rebuilding from scratch on every launch (J,
+         * 2026-10-12, 3.5.9).  The saved work was never lost; the card lied. */
+        int done = 0;
+        for (int i = 0; i < g_nr; i++) done += g_st[i].probed != 0;
+        jd_status_draw(fb, w, h, (int)((long)done * 100 / g_nr),
+                       (int)((now_ms() - t_first) / 1000.0), g_probe_resumed > 0);
     }
 
     /* ---- health: frame time and composite motion ---- */

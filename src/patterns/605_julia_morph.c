@@ -25,11 +25,13 @@
 #include <string.h>
 #include <math.h>
 #include <stddef.h>
+#include "_xfade.h"
 
 #define J605_BG 0
 #define J605_ROWS 14              /* scanlines recomputed per frame */
 
 static uint8_t *pl605;
+static jx_xf    xf605;            /* 3.6.1: crossfade of finished sweeps */
 static int      pw605, ph605;
 static uint32_t seed605 = 0xFFFFFFFFu;
 static int      row605;
@@ -93,6 +95,7 @@ static void plan605(int w, int h, uint32_t seed)
     if (!pl605) return;
     memset(pl605, J605_BG, need);
     row605 = 0;
+    jx_reset(&xf605);
 
     uint32_t s = seed ? seed : 0x9E3779B9u;
     ang605   = (double)f605(&s) * (double)J605_NC;
@@ -177,8 +180,10 @@ static void slice605(int w, int h, int rows)
     row605 = yend;
     if (row605 >= h) {              /* sweep finished: advance c, start again */
         row605 = 0;
+        jx_commit(&xf605, pl605, (size_t)w * h, (h + J605_ROWS - 1) / J605_ROWS);
         ang605 += p605[5] * 22.0;     /* one c-to-c morph ~20 s at 60fps */
-        if (ang605 >= (double)J605_NC) ang605 -= (double)J605_NC;
+        /* 3.6.1: no wrap - zoom and pan read this through sines whose periods
+         * do not repeat at the wrap, so wrapping snapped the framing. */
     }
 }
 
@@ -201,5 +206,5 @@ void pattern_605(uint32_t *fb, int w, int h, int frame, int sl,
         lut[i] = pal[((uint32_t)i * 128u + rot) & JD_PAL_MASK];
     const uint8_t *src = pl605;
     size_t n = (size_t)w * h;
-    for (size_t i = 0; i < n; i++) fb[i] = lut[src[i]];
+    jx_present(&xf605, src, fb, n, lut);   /* 3.6.1: never show a half-swept plane */
 }

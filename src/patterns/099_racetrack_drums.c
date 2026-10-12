@@ -15,23 +15,36 @@ static uint32_t p99_low[P99_N];
 static uint16_t p99_dist[P99_N];        /* stadium distance, 1/8 px units */
 static float    p99_sin[2048];
 static int      p99_ready;
+/* 3.6.3 (J: "I see this shape over and over… no new colors"). It ignored its
+ * seed, so every appearance was the same track, and its colours were a fixed
+ * rainbow table only lightly tinted by the palette, so C barely touched it.
+ * Now each appearance gets its own track (straight half-length, band width,
+ * march direction) and every colour comes from the live palette. */
+static uint32_t p99_seed = 0xFFFFFFFFu;
+static float    p99_S = 64.0f;          /* straight half-length (0 = round) */
+static float    p99_bw = 11.0f;         /* band width                       */
+static float    p99_dir = 1.0f;         /* march outward (+1) or inward (-1) */
+static uint32_t p99_base;               /* where on the ramp this run starts */
 
-static const float p99_band[8][3] = {
-    { 150.0f, 240.0f,  30.0f }, { 240.0f, 230.0f,  40.0f },
-    {  30.0f,  90.0f, 220.0f }, { 200.0f,  40.0f,  60.0f },
-    {  60.0f, 200.0f, 180.0f }, { 240.0f, 130.0f,  30.0f },
-    {  40.0f,  40.0f, 160.0f }, { 120.0f, 230.0f,  90.0f },
-};
-static const float p99_drum[8][3] = {
-    {  40.0f, 220.0f,  60.0f }, { 170.0f, 240.0f,  50.0f },
-    { 250.0f, 210.0f,  40.0f }, { 250.0f, 120.0f,  40.0f },
-    { 230.0f,  40.0f,  50.0f }, { 250.0f, 120.0f,  40.0f },
-    { 250.0f, 210.0f,  40.0f }, { 170.0f, 240.0f,  50.0f },
-};
 static const float p99_blob[8][2] = {
     { 110.0f, 62.0f }, { -110.0f, 62.0f }, { 110.0f, -62.0f }, { -110.0f, -62.0f },
     { 0.0f, 96.0f }, { 0.0f, -96.0f }, { 140.0f, 0.0f }, { -140.0f, 0.0f },
 };
+
+static uint32_t p99_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+/* Drums and blobs are accents: a dark stretch of the ramp would draw them
+ * nearly black (seen in testing). Keep the hue, lift the brightest channel
+ * to at least 190. */
+static uint32_t p99_lift(uint32_t u)
+{
+    uint32_t r = (u >> 16) & 255, g = (u >> 8) & 255, b = u & 255;
+    uint32_t mx = r > g ? r : g; if (b > mx) mx = b;
+    if (mx >= 190) return u & 0xFFFFFFu;
+    if (mx < 8) return 0xC0C0C0u;
+    r = r * 190 / mx; g = g * 190 / mx; b = b * 190 / mx;
+    return (r << 16) | (g << 8) | b;
+}
 
 static void p99_init(void)
 {
@@ -44,7 +57,7 @@ static void p99_init(void)
         for (x = 0; x < P99_LW; x++) {
             float lx = ((float)x + 0.5f) * (320.0f / (float)P99_LW);
             float dx = lx - 160.0f, ax = dx < 0.0f ? -dx : dx;
-            float dxs = ax - 64.0f; if (dxs < 0.0f) dxs = 0.0f;
+            float dxs = ax - p99_S; if (dxs < 0.0f) dxs = 0.0f;
             p99_dist[y * P99_LW + x] = (uint16_t)(sqrtf(dxs * dxs + dy * dy) * 8.0f);
         }
     }
@@ -131,11 +144,22 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
     float march, droll, tn[3], hroll;
     uint32_t bcol[8], scol[8], court, dedge;
     int i, x, y;
-    (void)sl; (void)seed;
+    (void)sl;
 
-    if (!p99_ready) p99_init();
+    if (seed != p99_seed || !p99_ready) {
+        uint32_t a = p99_h(seed ^ 0x9917u), b = p99_h(a), c = p99_h(b);
+        p99_S    = 24.0f + (float)(a % 1000u) * 0.080f;          /* 24..104: near-round to long */
+        p99_bw   = 8.0f + (float)(b % 1000u) * 0.006f;           /* 8..14                       */
+        p99_dir  = (c & 1u) ? 1.0f : -1.0f;
+        p99_base = p99_h(c) & JD_PAL_MASK;
+        p99_seed = seed;
+        p99_init();                                             /* distance map for this track */
+    }
     p99_tint(pal, tn);
-    march = t * 0.18f; march -= 88.0f * floorf(march / 88.0f);
+    {   /* march = band phase; one full cycle is 8 bands of this run's width */
+        float cyc = 8.0f * p99_bw;
+        march = p99_dir * t * 0.18f; march -= cyc * floorf(march / cyc);
+    }
     droll = t * 0.55f; droll -= 48.0f * floorf(droll / 48.0f);
     /* The hue roll advances one band every 50 frames.  It used to be taken
      * as an integer added to the band INDEX, which re-coloured all eight
@@ -154,13 +178,20 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
     hroll = t * 0.02f;
     hroll -= 8.0f * floorf(hroll * 0.125f);
 
+    /* 8 band colours sampled evenly round the live ramp from this run's
+     * start: C (a new scheme) repaints every band, and no two appearances
+     * share a colour layout. The dark separator is the same hue at 35%. */
     for (i = 0; i < 8; i++) {
-        bcol[i] = p99_pack(p99_band[i][0], p99_band[i][1], p99_band[i][2], tn);
-        scol[i] = p99_pack(p99_band[i][0] * 0.35f, p99_band[i][1] * 0.35f,
-                           p99_band[i][2] * 0.35f, tn);
+        uint32_t u = pal[(p99_base + (uint32_t)i * 4096u) & JD_PAL_MASK];
+        bcol[i] = u & 0xFFFFFFu;
+        scol[i] = p99_pack((float)((u >> 16) & 255) * 0.35f, (float)((u >> 8) & 255) * 0.35f,
+                           (float)(u & 255) * 0.35f, tn);
     }
-    court = p99_pack(14.0f, 24.0f, 90.0f, tn);
-    dedge = p99_pack(10.0f, 10.0f, 40.0f, tn);
+    {   uint32_t u = pal[(p99_base + 2048u) & JD_PAL_MASK];      /* court: the ramp, very dark */
+        court = p99_pack((float)((u >> 16) & 255) * 0.16f, (float)((u >> 8) & 255) * 0.16f,
+                         (float)(u & 255) * 0.16f, tn);
+        dedge = p99_pack((float)((u >> 16) & 255) * 0.08f, (float)((u >> 8) & 255) * 0.08f,
+                         (float)(u & 255) * 0.08f, tn); }
 
     for (y = 0; y < P99_LH; y++) {
         float ly = ((float)y + 0.5f) * (240.0f / (float)P99_LH);
@@ -169,7 +200,7 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
         uint32_t *out = p99_low + (long)y * P99_LW;
         for (x = 0; x < P99_LW; x++) {
             float d = (float)dr[x] * 0.125f;
-            float v = (d - march + 352.0f) * (1.0f / 11.0f) + hroll;
+            float v = (d - march + 32.0f * p99_bw) * (1.0f / p99_bw) + hroll;
             int bi = (int)v;
             float fr = v - (float)bi;
             /* TEMPORAL REVIEW 2.4.0 (docs/review/04_pattern_temporal.md,
@@ -180,7 +211,7 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
              * linear blend at each band edge lets every ring glide through
              * the boundary instead of snapping. */
             {
-                const float aaw = 0.0164f;   /* one frame of march, in v */
+                const float aaw = 0.18f / p99_bw;   /* one frame of march, in v */
                 uint32_t c;
                 if (fr < aaw)
                     c = p99_mix(bcol[(bi + 7) & 7], scol[bi & 7], fr * (1.0f / aaw));
@@ -201,9 +232,15 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
             uint32_t dc;
             int k;
             di = ((di % 8) + 8) % 8;
-            dc = p99_pack(p99_drum[di][0], p99_drum[di][1], p99_drum[di][2], tn);
+            {   /* drum stripes walk a short stretch of the ramp, out and back */
+                static const uint32_t step[8] = { 0, 1, 2, 3, 4, 3, 2, 1 };
+                uint32_t u = pal[(p99_base + 16384u + step[di] * 1400u) & JD_PAL_MASK];
+                dc = p99_lift(u);
+            }
+            if (p99_S < 30.0f) goto no_drums;      /* near-round track: no room inside */
             for (k = 0; k < 2; k++) {
-                float x0 = k ? 8.0f : -56.0f, x1 = k ? 56.0f : -8.0f;
+                float ks = p99_S / 64.0f;
+                float x0 = (k ? 8.0f : -56.0f) * ks, x1 = (k ? 56.0f : -8.0f) * ks;
                 int xa = (int)((160.0f + x0) * 2.0f), xb = (int)((160.0f + x1) * 2.0f);
                 if (xa < 0) xa = 0; if (xb > P99_LW) xb = P99_LW;
                 for (x = xa; x < xb; x++) {
@@ -213,10 +250,11 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
                     out[x] = (e0 < 1.5f || e1 < 1.5f) ? dedge : dc;
                 }
             }
+            no_drums: ;
         }
         /* hot pink perimeter blobs */
         for (i = 0; i < 8; i++) {
-            float by = p99_blob[i][1], bx = p99_blob[i][0];
+            float by = p99_blob[i][1], bx = p99_blob[i][0] * ((p99_S + 76.0f) / 140.0f);
             float ey = dy - by, q;
             uint32_t bc;
             int xa, xb;
@@ -225,7 +263,9 @@ void pattern_099(uint32_t *fb, int w, int h, int frame, int sl,
             {
                 float pl = 0.7f + 0.3f * p99_lsin(t * 0.02f - 2.0f * P99_PI
                            * floorf(t * 0.02f / (2.0f * P99_PI)) + bx * 0.05f + by * 0.03f);
-                bc = p99_pack(240.0f * pl, 60.0f * pl, 170.0f * pl, tn);
+                uint32_t u = p99_lift(pal[(p99_base + 18432u) & JD_PAL_MASK]);
+                bc = p99_pack((float)((u >> 16) & 255) * pl, (float)((u >> 8) & 255) * pl,
+                              (float)(u & 255) * pl, tn);
             }
             xa = (int)((160.0f + bx - q) * 2.0f); xb = (int)((160.0f + bx + q) * 2.0f);
             if (xa < 0) xa = 0; if (xb > P99_LW) xb = P99_LW;

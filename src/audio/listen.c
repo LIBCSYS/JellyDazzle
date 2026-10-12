@@ -835,11 +835,13 @@ void jd_about_draw(uint32_t *fb, int w, int h)
         "GITHUB.COM/LIBCSYS/JELLYDAZZLE",
         "",
 #if TARGET_OS_IPHONE
-        "TAP            COLOUR",
-        "TWO FINGERS    SHAPE",
-        "HOLD           ABOUT",
-        "THREE FINGERS  STATS",
-        "SWIPE UP       EXIT",
+        /* 3.6.2 (J): name the C and S buttons beside the gesture, so the
+         * card matches the bar at the bottom of the screen */
+        "C  TAP            COLOUR",
+        "S  TWO FINGERS    SHAPE",
+        "?  HOLD           ABOUT",
+        "   THREE FINGERS  STATS",
+        "   SWIPE UP       EXIT",
         "",
         "LITE ON BATTERY",
         "FULL WHEN CHARGING",
@@ -898,14 +900,16 @@ void jd_about_draw(uint32_t *fb, int w, int h)
  * that is roughly half a minute. Without a word on screen it reads as "the
  * app is broken", so say what is happening and how far along it is. Drawn
  * bottom-left, small, and it disappears the moment measuring finishes. */
-void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs)
+void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs, int resumed)
 {
     if (!fb || w < 240 || h < 180) return;
     if (pct < 0) pct = 0; if (pct > 100) pct = 100;
     int s = h / 200; if (s < 2) s = 2; if (s > 9) s = 9;   /* big: this matters */
-    static const char *L1 = "FIRST RUN";
+    /* A launch that picks up a partial database must not claim to be the
+     * first run — "THIS HAPPENS ONCE" on the third launch reads as a bug. */
+    const char *L1 = resumed ? "PICKING UP WHERE IT LEFT OFF" : "FIRST RUN";
     static const char *L2 = "BUILDING THE PATTERN DATABASE";
-    static const char *L3 = "THIS HAPPENS ONCE";
+    const char *L3 = resumed ? "EARLIER PROGRESS IS SAVED" : "THIS HAPPENS ONCE";
     char L4[64], L5[64];
     snprintf(L4, sizeof L4, "%d%%   %d:%02d ELAPSED", pct, secs / 60, secs % 60);
     /* "CONTINUE ANYWAY" implied the build stops if you skip it. It does not:
@@ -920,7 +924,7 @@ void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs)
     int w1 = (int)strlen(L1) * 4 * s, w2 = (int)strlen(L2) * 4 * s;
     int w3 = (int)strlen(L3) * 4 * s, w4 = (int)strlen(L4) * 4 * s;
     int w5 = (int)strlen(L5) * 4 * s;
-    int tw = w2; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
+    int tw = w2; if (w1 > tw) tw = w1; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
     /* Scale is picked from HEIGHT, so a tall narrow window can size the text
      * wider than the window itself and run the card off the edge. The longest
      * line grew from 30 to 41 characters, which made that reachable. Shrink
@@ -930,7 +934,7 @@ void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs)
         w1 = (int)strlen(L1) * 4 * s; w2 = (int)strlen(L2) * 4 * s;
         w3 = (int)strlen(L3) * 4 * s; w4 = (int)strlen(L4) * 4 * s;
         w5 = (int)strlen(L5) * 4 * s;
-        tw = w2; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
+        tw = w2; if (w1 > tw) tw = w1; if (w3 > tw) tw = w3; if (w4 > tw) tw = w4; if (w5 > tw) tw = w5;
     }
     int pad = 10 * s, lh = 9 * s;
     int panel_w = tw + 2 * pad, panel_h = pad + lh * 5 + 8 * s + pad;

@@ -146,25 +146,28 @@ void pattern_613(uint32_t *fb, int w, int h, int frame, int sl,
         float nxp = -sa, nyp = ca;
         float beat = sinf(t * 0.42f + (float)i * 1.7f);
 
-        float hx = fx613[i] + ca * 4.2f * S, hy = fy613[i] + sa * 4.2f * S;
-        float bx = fx613[i] - ca * 3.4f * S, by = fy613[i] - sa * 3.4f * S;
+        /* 3.6: bodies 40% longer and lit at rest, not only on the turn. Measured in
+         * the 3.5.9 mix the school read 0% visible — thin dashes at amp 0.55
+         * vanished on any busy ground and only flashed when the school turned. */
+        float hx = fx613[i] + ca * 5.9f * S, hy = fy613[i] + sa * 5.9f * S;
+        float bx = fx613[i] - ca * 4.8f * S, by = fy613[i] - sa * 4.8f * S;
         float tailoff = beat * 2.1f * S;
         float tx = bx - ca * 2.2f * S + nxp * tailoff;
         float ty = by - sa * 2.2f * S + nyp * tailoff;
 
         sk_col(pal, sk_hidx(base613, fhue613[i] + 0.02f * fsh613[i]),
                0.18f + 0.62f * fsh613[i], 0.45f,
-               0.55f + 0.75f * fsh613[i], col);
-        gk_seg(&g613, bx, by, hx, hy, col, 1.05f * S, 3.0f * S, 0.22f);
+               0.90f + 0.60f * fsh613[i], col);
+        gk_seg(&g613, bx, by, hx, hy, col, 1.55f * S, 4.2f * S, 0.32f);
 
         /* tail fork, dimmer — it is a hint, not a feature */
         sk_col(pal, sk_hidx(base613, fhue613[i] + 0.05f),
                0.12f + 0.40f * fsh613[i], 0.45f,
-               0.32f + 0.45f * fsh613[i], col);
+               0.55f + 0.40f * fsh613[i], col);
         gk_seg(&g613, bx, by, tx + nxp * 1.6f * S, ty + nyp * 1.6f * S,
-               col, 0.55f * S, 1.8f * S, 0.12f);
+               col, 0.85f * S, 2.4f * S, 0.18f);
         gk_seg(&g613, bx, by, tx - nxp * 1.6f * S, ty - nyp * 1.6f * S,
-               col, 0.55f * S, 1.8f * S, 0.12f);
+               col, 0.85f * S, 2.4f * S, 0.18f);
     }
 
     gk_present(&g613, fb, w, h);

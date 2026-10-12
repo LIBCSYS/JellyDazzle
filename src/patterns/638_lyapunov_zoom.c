@@ -31,6 +31,7 @@
  * infinity.
  */
 #include "_spark572.h"
+#include "_xfade.h"
 
 #define LY638_CELL  6.5f
 #define LY638_BAND  8
@@ -39,6 +40,7 @@
 #define LY638_BATCH 8             /* steps per logf                       */
 
 static gk       g638;
+static gk_xf xf638;              /* 3.6.1: crossfade of finished sweeps */
 static uint32_t bs638 = 0xFFFFFFFFu;
 static int      base638;
 static int      row638;
@@ -69,7 +71,9 @@ void pattern_638(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     int gx, gy, i;
     gk_setup(&g638, w, h);
-    gk_decay_snap(&g638, 0.90f);
+    /* 3.6.1: no per-frame decay. Each sweep builds a clean picture and the
+     * screen crossfades finished pictures (_xfade.h) - no rolling band. */
+    if (row638 == 0) gk_clear(&g638);
 
     float cw = (float)g638.cw, ch = (float)g638.ch, sc = g638.sc;
 
@@ -90,6 +94,7 @@ void pattern_638(uint32_t *fb, int w, int h, int frame, int sl,
         dir638  = 1;
         row638  = 0;
         gk_clear(&g638);
+        gk_xf_reset(&xf638);
         bs638 = seed;
     }
 
@@ -183,6 +188,7 @@ void pattern_638(uint32_t *fb, int w, int h, int frame, int sl,
     row638 = ylast;
     if (row638 >= grows) {              /* sweep done: move the view        */
         row638 = 0;
+        gk_xf_commit(&xf638, &g638, (grows + LY638_BAND - 1) / LY638_BAND);
         if (dir638 > 0) {
             zoom638 *= 0.966f;
             if (zoom638 < 0.012f) dir638 = -1;
@@ -198,5 +204,5 @@ void pattern_638(uint32_t *fb, int w, int h, int frame, int sl,
         }
     }
 
-    gk_present(&g638, fb, w, h);
+    gk_xf_present(&xf638, &g638, fb, w, h);
 }

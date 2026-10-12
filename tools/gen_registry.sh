@@ -50,6 +50,7 @@ files=$(ls [0-9][0-9][0-9]_*.c [0-9][0-9][0-9].c 2>/dev/null | sort)
     # rain (572-581), the gear train (557-571), the particle run (582-601) and
     # the 336-468 ground kit, whose unmatched members default to field/flow.
     #   9 matrix/code-rain   10 gears/mechanical   11 creatures
+  #  12 rings   13 sky/space   14 material/textile/paint   15 nature/land/water
     n=$((10#${f:0:3}))
     if   [ $n -ge 469 ] && [ $n -le 540 ]; then fam=6
     elif [ $n -ge 572 ] && [ $n -le 581 ]; then fam=9
@@ -65,6 +66,26 @@ files=$(ls [0-9][0-9][0-9]_*.c [0-9][0-9][0-9].c 2>/dev/null | sort)
     fi
     # (the 336-468 ground kit keeps its keyword families only: those are
     #  grounds, and the compositor's kit-alternation rule handles their look)
+    # 3.6: FAMILY 0 WAS A THIRD OF THE LIBRARY. 200 of 638 patterns fell through
+    # every rule above into "other" — and the compositor exempts family 0 from
+    # the on-screen clash test, so look-alikes inside it could share the screen.
+    # J's 2026-10-10 screenshot was exactly that: 099 racetrack drums, with
+    # 089 oval drums / 418 breathing rings / 420 elliptic rings / 544 nested
+    # rings all sitting untagged beside it. These rules only touch patterns
+    # still at 0, so every existing assignment above is unchanged.
+    #   11 creatures (pre-3.5.9 animals join the new ones)
+    #   12 rings / concentric   13 sky, weather, space
+    #   14 material, textile, stone, paint   15 nature, land, water
+    if [ $fam -eq 0 ]; then
+      case "$nm" in
+        *turing*|*physarum*|*reiter*) fam=15;;   # reaction-diffusion / growth: organic, and "tuRING" must not match rings
+        *hummingbird*|*koi*|*crane*|*jelly_bell*|*comb_jelly*|*anemone*) fam=11;;
+        *_ring*|*rings*|ring_*|*drum*|*target*|*bullseye*|*nested*|*orbit*|*rounded_square*|*harmonic_orb*|*harmonic_shell*|*lobes*) fam=12;;
+        *cloud*|*fog*|*mist*|*storm*|*sunset*|*twilight*|*overcast*|*shimmer*|*god_ray*|*halo*|*dapple*|*cirrus*|*nebula*|*supernova*|*milky*|*stellar*|*light_leak*|*bokeh*|*wisp*|*dawn*) fam=13;;
+        *velvet*|*metal*|*steel*|*glass*|*terrazzo*|*tesserae*|*plates*|*agate*|*malachite*|*onyx*|*lace*|*gauze*|*tulle*|*tapestry*|*woven*|*rope*|*chain_mail*|*drape*|*dye*|*shibori*|*wash*|*gouache*|*granulation*|*suminagashi*|*brush*|*paisley*|*argyle*|*eyelet*|*doily*|*sheen*|*scales*|*feathers*|*peacock*|*cathedral_panes*|*gradient_mesh*|*prism*) fam=14;;
+        *coral*|*kelp*|*moss*|*fern*|*frost*|*ice*|*vine*|*root*|*pine*|*wisteria*|*lotus*|*lily*|*fungal*|*sponge*|*membrane*|*cell_tissue*|*sinew*|*worm*|*dune*|*canyon*|*river*|*lakebed*|*raked*|*terraced*|*topo*|*bathymetry*|*isobar*|*contours*|*sand*|*water*|*tide*|*foam*|*bubble*|*soap*|*lava*|*oil*|*grass*|*wing_veins*|*moth_wing*|*phyllotaxis*|*honeycomb*|*plume*|*strata*) fam=15;;
+      esac
+    fi
     echo "    $fam,"
   done
   echo '};'

@@ -25,12 +25,14 @@
  * escape-time pattern at the same grid pitch.
  */
 #include "_spark572.h"
+#include "_xfade.h"
 
 #define TC633_CELL 5.0f
 #define TC633_BAND 10             /* grid rows per frame, upper half only */
 #define TC633_IT   44
 
 static gk       g633;
+static gk_xf xf633;              /* 3.6.1: crossfade of finished sweeps */
 static uint32_t bs633 = 0xFFFFFFFFu;
 static int      base633;
 static int      row633;
@@ -44,7 +46,9 @@ void pattern_633(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     int gx, gy, i;
     gk_setup(&g633, w, h);
-    gk_decay_snap(&g633, 0.90f);
+    /* 3.6.1: no per-frame decay. Each sweep builds a clean picture and the
+     * screen crossfades finished pictures (_xfade.h) - no rolling band. */
+    if (row633 == 0) gk_clear(&g633);
 
     float cw = (float)g633.cw, ch = (float)g633.ch, sc = g633.sc;
 
@@ -55,6 +59,7 @@ void pattern_633(uint32_t *fb, int w, int h, int frame, int sl,
         pan633  = -0.35f + 0.30f * (gk_hash(seed + 53u) - 0.5f);
         row633  = 0;
         gk_clear(&g633);
+        gk_xf_reset(&xf633);
         bs633 = seed;
     }
 
@@ -118,9 +123,11 @@ void pattern_633(uint32_t *fb, int w, int h, int frame, int sl,
     row633 = ylast;
     if (row633 >= ghalf) {
         row633 = 0;
+        gk_xf_commit(&xf633, &g633, (ghalf + TC633_BAND - 1) / TC633_BAND);
         phi633 += 0.019f;                  /* zoom/pan loop about 55 s    */
-        if (phi633 > GK_TAU) phi633 -= GK_TAU;
+        /* 3.6.1: no wrap. sin(phi*0.73) etc. do not repeat at 2pi, so wrapping
+         * snapped the zoom/shape every loop. Float precision is ample for a tenancy. */
     }
 
-    gk_present(&g633, fb, w, h);
+    gk_xf_present(&xf633, &g633, fb, w, h);
 }

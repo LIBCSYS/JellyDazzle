@@ -30,11 +30,13 @@
 #include <string.h>
 #include <math.h>
 #include <stddef.h>
+#include "_xfade.h"
 
 #define N607_ROWS 9               /* scanlines re-swept per frame */
 #define N607_MAXIT 32
 
 static uint8_t *pl607;
+static jx_xf    xf607;            /* 3.6.1: crossfade of finished sweeps */
 static int      pw607, ph607;
 static uint32_t seed607 = 0xFFFFFFFFu;
 static int      row607;
@@ -59,6 +61,7 @@ static void plan607(int w, int h, uint32_t seed)
     if (!pl607) return;
     memset(pl607, 0, need);
     row607 = 0;
+    jx_reset(&xf607);
 
     uint32_t s = seed ? seed : 0x1879CA1Eu;
     deg607   = 3 + (int)(f607(&s) * 6.0f);          /* z^3..z^8 = 3..8 basins */
@@ -163,8 +166,10 @@ static void slice607(int w, int h, int rows)
     row607 = yend;
     if (row607 >= h) {
         row607 = 0;
+        jx_commit(&xf607, pl607, (size_t)w * h, (h + N607_ROWS - 1) / N607_ROWS);
         ph607a += p607[3] * 20.0;
-        if (ph607a > 6.28318530718) ph607a -= 6.28318530718;
+        /* 3.6.1: no wrap - zoom and pan read this through sines whose periods
+         * do not repeat at the wrap, so wrapping snapped the framing. */
     }
 }
 
@@ -185,5 +190,5 @@ void pattern_607(uint32_t *fb, int w, int h, int frame, int sl,
         lut[i] = pal[((uint32_t)i * 128u + rot) & JD_PAL_MASK];
     const uint8_t *src = pl607;
     size_t n = (size_t)w * h;
-    for (size_t i = 0; i < n; i++) fb[i] = lut[src[i]];
+    jx_present(&xf607, src, fb, n, lut);   /* 3.6.1: never show a half-swept plane */
 }

@@ -13,6 +13,13 @@ static float p89_ptab[1024][3];
 static float p89_sin[2048];
 static uint8_t p89_ring[1024][3];
 static int p89_inited;
+/* 3.6.3: 099's twin - same stadium, two drums, perimeter blobs - and, like it,
+ * it ignored its seed, so the two together read as one shape "over and over"
+ * (J). Each appearance now gets its own track length, ring width, ring
+ * direction and starting hue, so neither repeats itself or the other. */
+static uint32_t p89_seed = 0xFFFFFFFFu;
+static float p89_S = 70.0f, p89_rw = 15.0f, p89_dir = 1.0f, p89_h0 = 0.0f;
+static uint32_t p89_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
 
 static const float p89_bx[3] = { 122.0f,  0.0f, 42.0f };
 static const float p89_by[3] = {   0.0f, 58.0f, 52.0f };
@@ -50,17 +57,26 @@ void pattern_089(uint32_t *fb, int w, int h, int frame, int sl,
     float isx = 1.0f / sx, isy = 1.0f / sy;
     float rsh = t * 0.008f, hdrift = t * 0.0012f;
     int i, x, y, s1, s2;
-    (void)sl; (void)seed;
+    (void)sl;
 
     if (!p89_inited) p89_init();
+    if (seed != p89_seed) {
+        uint32_t a = p89_h(seed ^ 0x8989u), b = p89_h(a), c = p89_h(b);
+        p89_S   = 30.0f + (float)(a % 1000u) * 0.075f;      /* 30..105 */
+        p89_rw  = 10.0f + (float)(b % 1000u) * 0.010f;      /* 10..20  */
+        p89_dir = (c & 1u) ? 1.0f : -1.0f;
+        p89_h0  = (float)(p89_h(c) % 1000u) * 0.001f;       /* where on the ramp it starts */
+        p89_seed = seed;
+    }
+    rsh *= p89_dir;
     p89_buildpal(pal);
 
     /* ---- stadium ring LUT over d in [0,256) ---- */
     for (i = 0; i < 1024; i++) {
         float d = (float)i * 0.25f;
-        float ph = d * (1.0f / 15.0f) - rsh;
+        float ph = d * (1.0f / p89_rw) - rsh;
         float fl = floorf(ph), fr = ph - fl;
-        float hue = fl * 0.13f + hdrift;
+        float hue = fl * 0.13f + hdrift + p89_h0;
         float bri = 0.35f + 0.60f * p89_lsin(fr * 3.14159265f);
         const float *c = p89_ptab[(int)(hue * P89_HSPAN + 65536.0f) & 1023];
         int k;
@@ -75,7 +91,7 @@ void pattern_089(uint32_t *fb, int w, int h, int frame, int sl,
         float qy = py * py;
         uint32_t *row = fb + (long)y * w;
         for (x = 0; x < w; x++) {
-            float ax = fabsf(((float)x + 0.5f) * isx - 160.0f) - 70.0f;
+            float ax = fabsf(((float)x + 0.5f) * isx - 160.0f) - p89_S;
             float d;
             int k;
             if (ax < 0.0f) ax = 0.0f;
@@ -95,7 +111,7 @@ void pattern_089(uint32_t *fb, int w, int h, int frame, int sl,
                 float ccx, ccy;
                 int x0, x1, y0, y1;
                 if (p89_by[i] == 0.0f && s2 > 0) continue;
-                ccx = 160.0f + (float)s1 * p89_bx[i];
+                ccx = 160.0f + (float)s1 * p89_bx[i] * ((p89_S + 52.0f) / 122.0f);
                 ccy = 120.0f + (float)s2 * p89_by[i];
                 x0 = (int)((ccx - 10.0f) * sx); x1 = (int)((ccx + 10.0f) * sx) + 1;
                 y0 = (int)((ccy - 10.0f) * sy); y1 = (int)((ccy + 10.0f) * sy) + 1;
@@ -128,7 +144,8 @@ void pattern_089(uint32_t *fb, int w, int h, int frame, int sl,
 
     /* ---- two striped drums with warm-white outlines ---- */
     for (s1 = -1; s1 <= 1; s1 += 2) {
-        float dcx = 160.0f + (float)s1 * 38.0f;
+        if (p89_S < 45.0f) break;              /* short track: the drums would collide */
+        float dcx = 160.0f + (float)s1 * 38.0f * (p89_S / 70.0f);
         int x0 = (int)((dcx - 33.0f) * sx), x1 = (int)((dcx + 33.0f) * sx) + 1;
         int y0 = (int)((120.0f - 23.5f) * sy), y1 = (int)((120.0f + 23.5f) * sy) + 1;
         if (x0 < 0) x0 = 0; if (x1 > w) x1 = w;
@@ -142,7 +159,7 @@ void pattern_089(uint32_t *fb, int w, int h, int frame, int sl,
             uint32_t *row = fb + (long)y * w;
             int oy = (fabsf(ay - 21.0f) < 1.8f);
             g -= floorf(g);
-            dh = 0.32f - 0.30f * g + hdrift;
+            dh = 0.32f - 0.30f * g + hdrift + p89_h0;
             bri = 0.35f + 0.65f * (0.5f + 0.5f * p89_lsin(g * P89_TAU));
             c = p89_ptab[(int)(dh * P89_HSPAN + 65536.0f) & 1023];
             dr = c[0] * bri; dg = c[1] * bri; db = c[2] * bri;

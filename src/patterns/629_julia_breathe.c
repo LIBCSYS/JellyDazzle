@@ -24,12 +24,14 @@
  * shapes, with the palette walking underneath it.
  */
 #include "_spark572.h"
+#include "_xfade.h"
 
 #define JB629_CELL 5.0f           /* grid pitch, canvas px before scale   */
 #define JB629_BAND 14             /* grid rows recomputed per frame       */
 #define JB629_IT   40             /* iteration cap — modest on purpose    */
 
 static gk       g629;
+static gk_xf xf629;              /* 3.6.1: crossfade of finished sweeps */
 static uint32_t bs629 = 0xFFFFFFFFu;
 static int      base629;
 static int      row629;           /* sweep position, in grid rows         */
@@ -69,7 +71,9 @@ void pattern_629(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     int gx, gy, i;
     gk_setup(&g629, w, h);
-    gk_decay_snap(&g629, 0.90f);          /* holds the untouched rows      */
+    /* 3.6.1: no per-frame decay. Each sweep builds a clean picture and the
+     * screen crossfades finished pictures (_xfade.h) - no rolling band. */
+    if (row629 == 0) gk_clear(&g629);
 
     float cw = (float)g629.cw, ch = (float)g629.ch, sc = g629.sc;
 
@@ -81,6 +85,7 @@ void pattern_629(uint32_t *fb, int w, int h, int frame, int sl,
         zrate629 = 0.0017f + 0.0022f * gk_hash(seed + 14u);
         row629   = 0;
         gk_clear(&g629);
+        gk_xf_reset(&xf629);
         bs629 = seed;
     }
 
@@ -159,9 +164,10 @@ void pattern_629(uint32_t *fb, int w, int h, int frame, int sl,
     row629 = ylast;
     if (row629 >= grows) {                 /* sweep done: advance c, repeat */
         row629 = 0;
+        gk_xf_commit(&xf629, &g629, (grows + JB629_BAND - 1) / JB629_BAND);
         ang629 += 0.0215f;                 /* one waypoint hop about 6 s    */
         if (ang629 >= (float)JB629_NC) ang629 -= (float)JB629_NC;
     }
 
-    gk_present(&g629, fb, w, h);
+    gk_xf_present(&xf629, &g629, fb, w, h);
 }

@@ -24,6 +24,7 @@
  * as a wipe rather than a tear.
  */
 #include "_spark572.h"
+#include "_xfade.h"
 
 #define BS630_CELL 5.0f
 #define BS630_BAND 12
@@ -31,6 +32,7 @@
 #define BS630_ITMAX 64
 
 static gk       g630;
+static gk_xf xf630;              /* 3.6.1: crossfade of finished sweeps */
 static uint32_t bs630 = 0xFFFFFFFFu;
 static int      base630;
 static int      row630;
@@ -57,7 +59,9 @@ void pattern_630(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     int gx, gy, i;
     gk_setup(&g630, w, h);
-    gk_decay_snap(&g630, 0.90f);
+    /* 3.6.1: no per-frame decay. Each sweep builds a clean picture and the
+     * screen crossfades finished pictures (_xfade.h) - no rolling band. */
+    if (row630 == 0) gk_clear(&g630);
 
     float cw = (float)g630.cw, ch = (float)g630.ch, sc = g630.sc;
 
@@ -68,6 +72,7 @@ void pattern_630(uint32_t *fb, int w, int h, int frame, int sl,
         hue630  = gk_hash(seed + 22u);
         row630  = 0;
         gk_clear(&g630);
+        gk_xf_reset(&xf630);
         bs630 = seed;
     }
 
@@ -93,6 +98,12 @@ void pattern_630(uint32_t *fb, int w, int h, int frame, int sl,
     float close = half630 / BS630_HMIN;                      /* 1 at bottom  */
     float gate  = close < 3.0f ? (close - 1.0f) * 0.5f : 1.0f;
     if (gate < 0.0f) gate = 0.0f;
+    /* 3.6.1: ...and fade back IN after surfacing. The reset used to land on
+     * the wide view at full brightness with a new hue: a pop. Ramp up over the
+     * first 3x of zoom (about 6 s) so the dive dissolves in as it dissolved out. */
+    float open = BS630_H0 / half630;                         /* 1 at the top */
+    float gin  = open < 3.0f ? 0.12f + 0.44f * (open - 1.0f) : 1.0f;   /* never fully black: the engine reads a black layer as dead */
+    if (gin < gate) gate = gin;
 
     int ylast = row630 + BS630_BAND;
     if (ylast > grows) ylast = grows;
@@ -141,6 +152,7 @@ void pattern_630(uint32_t *fb, int w, int h, int frame, int sl,
     row630 = ylast;
     if (row630 >= grows) {
         row630 = 0;
+        gk_xf_commit(&xf630, &g630, (grows + BS630_BAND - 1) / BS630_BAND);
         half630 *= 0.972f;                /* about 28 s from wide to bottom */
         if (half630 < BS630_HMIN) {       /* surface and pick a new ship    */
             half630 = BS630_H0;
@@ -149,5 +161,5 @@ void pattern_630(uint32_t *fb, int w, int h, int frame, int sl,
         }
     }
 
-    gk_present(&g630, fb, w, h);
+    gk_xf_present(&xf630, &g630, fb, w, h);
 }

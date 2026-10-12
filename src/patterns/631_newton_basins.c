@@ -26,12 +26,14 @@
  * loop.  Iteration cap 24, early exit when the step gets small.
  */
 #include "_spark572.h"
+#include "_xfade.h"
 
 #define NB631_CELL 5.0f
 #define NB631_BAND 18
 #define NB631_IT   24
 
 static gk       g631;
+static gk_xf xf631;              /* 3.6.1: crossfade of finished sweeps */
 static uint32_t bs631 = 0xFFFFFFFFu;
 static int      base631;
 static int      row631;
@@ -46,7 +48,9 @@ void pattern_631(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
     int gx, gy, it;
     gk_setup(&g631, w, h);
-    gk_decay_snap(&g631, 0.88f);
+    /* 3.6.1: no per-frame decay. Each sweep builds a clean picture and the
+     * screen crossfades finished pictures (_xfade.h) - no rolling band. */
+    if (row631 == 0) gk_clear(&g631);
 
     float cw = (float)g631.cw, ch = (float)g631.ch, sc = g631.sc;
 
@@ -58,6 +62,7 @@ void pattern_631(uint32_t *fb, int w, int h, int frame, int sl,
         wand631 = 0.16f + 0.34f * gk_hash(seed + 34u);
         row631  = 0;
         gk_clear(&g631);
+        gk_xf_reset(&xf631);
         bs631 = seed;
     }
 
@@ -144,9 +149,11 @@ void pattern_631(uint32_t *fb, int w, int h, int frame, int sl,
     row631 = ylast;
     if (row631 >= grows) {
         row631 = 0;
+        gk_xf_commit(&xf631, &g631, (grows + NB631_BAND - 1) / NB631_BAND);
         phi631 += 0.052f;                  /* full loop of `a` about 20 s  */
-        if (phi631 > GK_TAU) phi631 -= GK_TAU;
+        /* 3.6.1: no wrap. sin(phi*0.73) etc. do not repeat at 2pi, so wrapping
+         * snapped the zoom/shape every loop. Float precision is ample for a tenancy. */
     }
 
-    gk_present(&g631, fb, w, h);
+    gk_xf_present(&xf631, &g631, fb, w, h);
 }
