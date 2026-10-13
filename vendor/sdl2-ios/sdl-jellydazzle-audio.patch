@@ -1,0 +1,18 @@
+--- src/audio/coreaudio/SDL_coreaudio.m.orig	2026-10-08 18:44:09
++++ src/audio/coreaudio/SDL_coreaudio.m	2026-10-08 18:44:09
+@@ -425,6 +425,15 @@
+             options |= AVAudioSessionCategoryOptionDuckOthers;
+         }
+ 
++        /* JellyDazzle patch (2026-10-08): the app only LISTENS — the mic hears whatever music
++           app is playing through the speaker. Stock SDL ducks other audio and allows Bluetooth
++           HFP for PlayAndRecord, which turns the music down and drops AirPods to call quality.
++           Keep it mixing at full volume over A2DP/AirPlay instead. */
++        if (hint && SDL_strcasecmp(hint, "playandrecord") == 0 && category == AVAudioSessionCategoryPlayAndRecord) {
++            options = AVAudioSessionCategoryOptionMixWithOthers | AVAudioSessionCategoryOptionDefaultToSpeaker |
++                      AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionAllowAirPlay;
++        }
++
+         if ([session respondsToSelector:@selector(setCategory:mode:options:error:)]) {
+             if (![session.category isEqualToString:category] || session.categoryOptions != options) {
+                 /* Stop the current session so we don't interrupt other application audio */

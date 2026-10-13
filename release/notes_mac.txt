@@ -1,0 +1,12 @@
+Four new fractals — and see the beat.
+
+• Neon Mandelbrot: the edge of the Mandelbrot set drawn as glowing filaments — snowflakes, seahorse spirals and minibrot chains, diving and drifting.
+• Nova: spiral basins where Newton meets Mandelbrot, with island chains of fine filigree.
+• Multibrot bloom: the Mandelbrot set grows extra folds and back again — a flower opening and closing.
+• Clifford silk: strange attractors woven like silk, every strand coloured by the way it moves.
+• New M button: the beat meter on screen — bass, mid, treble and a dot that flashes on every beat.
+• The on-screen bar is now C · S · M · ? — colour, shape, meter, about. Keys still work: C, S, M, A.
+• Depth: layers drift in from the distance and float toward you, with gentle parallax.
+• Every background now slowly zooms and turns; fractals evolve continuously instead of flickering.
+• Less repetition: fresh shapes and colours every launch, and the same kind of shape no longer comes straight back.
+• 22 creatures and fractals that 3.5.9 left out now appear, and 60+ patterns that looked identical each time now vary and follow your colours.

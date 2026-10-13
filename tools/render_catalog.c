@@ -11,7 +11,7 @@
  *
  * This mirrors layer_pal_build() in src/engine/compositor.c.
  *
- *   anim2 <schemeA> <schemeB> <span> <off> <outdir>
+ *   anim2 <schemeA> <schemeB> <span> <off> <outdir> [seed]
  */
 #include <stdio.h>
 #include <stdint.h>
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
     fseek(f, (long)sa * PAL_N * 4, SEEK_SET); fread(pa, 4, PAL_N, f);
     fseek(f, (long)sb * PAL_N * 4, SEEK_SET); fread(pb, 4, PAL_N, f);
     fclose(f);
-    uint32_t seed = 0xC0FFEE11u;
+    uint32_t seed = argc > 6 ? (uint32_t)strtoul(argv[6], NULL, 0) : 0xC0FFEE11u;   /* 3.6.6: pick a representative seed */
     for (int i = 0; i < PAL_N; i++) blend[i] = pa[i];
     window_and_reshape(span, off);
     for (int fr = 0; fr < WARM; fr++) PATTERN(fb, W, H, fr, fr & 2047, seed, pal);

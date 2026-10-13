@@ -1,0 +1,84 @@
+--- src/video/uikit/SDL_uikitappdelegate.m.orig	2026-10-08 20:04:23
++++ src/video/uikit/SDL_uikitappdelegate.m	2026-10-08 20:04:23
+@@ -340,7 +340,41 @@
+     return UIInterfaceOrientationMaskAll;
+ }
+ #endif /* !TARGET_OS_TV */
++
++@end
++
++/* JellyDazzle patch (2026-10-08): UIScene lifecycle.
++ * iOS 27 terminates apps that have not adopted UIScene at launch
++ * (_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption, SIGTRAP).
++ * SDL 2.30 predates that, so: Info.plist names this class as the scene
++ * delegate; it remembers the window scene; postFinishLaunch waits for it; and
++ * every UIWindow SDL makes is created inside it. App-level notifications
++ * (UIApplicationDidEnterBackground etc.) are still posted with one scene, so
++ * SDL's event code needs no change. */
++static UIWindowScene *sdl_scene API_AVAILABLE(ios(13.0));
+ 
++UIWindowScene *SDL_UIKitActiveScene(void) API_AVAILABLE(ios(13.0)) { return sdl_scene; }
++
++API_AVAILABLE(ios(13.0))
++@interface SDLUIKitSceneDelegate : UIResponder <UIWindowSceneDelegate>
++@property (nonatomic, strong) UIWindow *window;
++@end
++
++@implementation SDLUIKitSceneDelegate
++- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)options
++{
++    if ([scene isKindOfClass:[UIWindowScene class]]) {
++        sdl_scene = (UIWindowScene *)scene;
++        /* windows created before the scene existed (the launch window) join it now */
++        for (UIWindow *w in [UIApplication sharedApplication].windows) {
++            if (w.windowScene == nil) w.windowScene = sdl_scene;
++        }
++    }
++}
++- (void)sceneDidDisconnect:(UIScene *)scene
++{
++    if (scene == sdl_scene) sdl_scene = nil;
++}
+ @end
+ 
+ @implementation SDLUIKitDelegate {
+@@ -388,6 +422,16 @@
+      * have a chance to load resources while the launch screen is still up. */
+     [self performSelector:@selector(hideLaunchScreen) withObject:nil afterDelay:0.0];
+ 
++    /* JellyDazzle patch: the scene connects a run-loop turn or two after
++     * didFinishLaunching. SDL_main creates its window straight away, so wait
++     * (bounded) until there is a scene to put it in. */
++    if (@available(iOS 13.0, *)) {
++        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:5.0];
++        while (sdl_scene == nil && [deadline timeIntervalSinceNow] > 0) {
++            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
++        }
++    }
++
+     /* run the user's application, passing argc and argv */
+     SDL_iPhoneSetEventPump(SDL_TRUE);
+     exit_status = forward_main(forward_argc, forward_argv);
+--- src/video/uikit/SDL_uikitwindow.m.orig	2026-10-08 20:04:23
++++ src/video/uikit/SDL_uikitwindow.m	2026-10-08 20:04:23
+@@ -204,7 +204,19 @@
+ 
+         /* ignore the size user requested, and make a fullscreen window */
+         /* !!! FIXME: can we have a smaller view? */
+-        UIWindow *uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        UIWindow *uiwindow = nil;
++        /* JellyDazzle patch: with the UIScene lifecycle a window outside a scene is never shown */
++        if (@available(iOS 13.0, *)) {
++            extern UIWindowScene *SDL_UIKitActiveScene(void);
++            UIWindowScene *scene = SDL_UIKitActiveScene();
++            if (scene && data.uiscreen == [UIScreen mainScreen]) {
++                uiwindow = [[SDL_uikitwindow alloc] initWithWindowScene:scene];
++                uiwindow.frame = data.uiscreen.bounds;
++            }
++        }
++        if (uiwindow == nil) {
++            uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        }
+ 
+         /* put the window on an external display if appropriate. */
+         if (data.uiscreen != [UIScreen mainScreen]) {

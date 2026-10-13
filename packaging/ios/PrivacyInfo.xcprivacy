@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- JellyDazzle iOS privacy manifest (3.5.1). No tracking, no data collected:
+     the microphone feeds the beat detector in memory and nothing leaves the device.
+     The required-reason APIs below are what SDL and the engine's timing/cache code use. -->
+<plist version="1.0">
+<dict>
+  <key>NSPrivacyTracking</key><false/>
+  <key>NSPrivacyTrackingDomains</key><array/>
+  <key>NSPrivacyCollectedDataTypes</key><array/>
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+    <dict> <!-- frame timing (SDL_GetTicks / mach_absolute_time): elapsed time inside the app -->
+      <key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key><array><string>35F9.1</string></array></dict>
+    <dict> <!-- the pattern-measurement cache in the app's own container -->
+      <key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key><array><string>C617.1</string></array></dict>
+    <dict> <!-- SDL hint storage, app-only -->
+      <key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key><array><string>CA92.1</string></array></dict>
+  </array>
+</dict>
+</plist>

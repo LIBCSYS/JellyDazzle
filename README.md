@@ -3,7 +3,7 @@
 **An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever is playing —
 on your Mac, iPhone or iPad — and paints to it, never the same pattern, never the same colours.
 
-### 🎉 Version 3.6.6 — **four new fractals, and see the beat** · in App Review
+### 🎉 Version 3.6.6 — **four new fractals, and see the beat**
 
 - **Four new fractals:** a neon Mandelbrot drawn as glowing filaments, Nova spiral basins, a
   Multibrot that blooms from one fold to five and back, and Clifford attractors woven like silk.
@@ -13,10 +13,10 @@ on your Mac, iPhone or iPad — and paints to it, never the same pattern, never 
   shape no longer comes straight back.
 - **All 666 routines play**, and 60+ patterns that looked identical each time now vary.
 
-Submitted October 12, 2026. The
-**[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** carries 3.6.4 (depth, and
-fractals that flow) on [iPhone and iPad](#iphone-and-ipad); 3.6.6 is in App Review for Mac, iPhone and iPad. The direct
-Mac download below is **3.6.6 now**.
+**3.6.6 is the current release; all earlier versions are deprecated.** It is on the
+**[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** for
+[iPhone and iPad](#iphone-and-ipad) now, the Mac App Store copy is in review, and the direct Mac
+download below is 3.6.6.
 
 An homage to **DAZZLE.EXE**, rebuilt from scratch — mostly C, with an ARM64 assembly core:
 24 engine modes hand-written in ARM64 assembly under a library of 642 C pattern plug-ins,
@@ -26,7 +26,7 @@ layered by a compositor written in C.
 
 ### **[Get JellyDazzle on the App Store — Mac, iPhone and iPad](https://apps.apple.com/us/app/jellydazzle/id6808884433)**
 
-Free, and it updates itself — to 3.6.6 as soon as Apple approves it.
+Free, and it updates itself.
 
 **Not using the App Store?** Signed, notarised direct download — always the latest version:
 [Download JellyDazzle for macOS · Apple Silicon (.zip)](https://github.com/LIBCSYS/JellyDazzle/releases/latest/download/JellyDazzle-macOS-arm64.zip)
@@ -42,7 +42,7 @@ trick — download it and open it.
 **macOS 11 or later · Apple Silicon (M1+) · MIT**
 
 > **Which one do I want?** The **App Store** is for Mac, iPhone and iPad and updates itself
-> (3.6.4 on iPhone and iPad today, 3.6.6 once approved). The direct download above is **3.6.6** for the Mac, signed and
+> The direct download above is **3.6.6** for the Mac, signed and
 > notarised, for Macs that do not use the App Store.
 
 > ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
@@ -66,8 +66,8 @@ More at [dazzle.jelia.nyc](https://dazzle.jelia.nyc/) ·
 
 ## iPhone and iPad
 
-**Version 3.6.4 is on the App Store now, and 3.6.6 is in App Review.** It is the same engine — the
-same ARM64 assembly core and, from 3.6.6, all 666 routines, the new fractals included — running
+**Version 3.6.6 is on the App Store now.** It is the same engine — the
+same ARM64 assembly core and all 666 routines — running
 on iOS and iPadOS 15 or later.
 
 - **Your music keeps playing.** iOS does not let one app hear another, so on a phone
@@ -76,11 +76,11 @@ on iOS and iPadOS 15 or later.
 - **Lite on battery, Full when charging.** On battery, in Low Power Mode, or when the device
   is warm it draws a softer picture at 30 frames a second; plugged in it runs at 60 with every
   layer. It switches on its own, mid-show.
-- **Buttons.** **C**, **S** and **?** sit in the corner for colours, shapes and help, brighten
+- **Buttons.** **C**, **S**, **M** and **?** sit in the corner for colours, shapes, the beat meter and help, brighten
   when you touch the screen and fade while you watch. Tap = colours, two fingers = shapes,
   press and hold = help, three fingers = a performance readout.
 
-The iOS port and the 3.5 changes land in this repository with the release.
+The iOS build (`tools/build_ios.sh`, with SDL patched in `vendor/sdl2-ios`) is in this repository.
 
 ---
 
@@ -107,12 +107,12 @@ screen.
 | **C** | **new colours.** The whole palette cycles to a different scheme — not the next one, the one furthest from what is on screen. |
 | **S** | **new shapes.** Every routine currently drawing is retired and the stack fills again from the library. Colour is left alone. |
 | **A** · **?** · **H** | help / about card — version, links, what is playing right now. Also **Help ▸ JellyDazzle Help (⌘?)** in the menu bar. |
-| **M** | audio meter |
+| **M** | beat meter — bass, mid, treble, level and a dot that flashes on the beat |
 | **F** | full screen |
 | **ESC** | quit |
-| buttons | from 3.5.8, **C · S · ? · X** in the bottom-right corner do the same with a click |
+| buttons | **C · S · M · ?** in the bottom-right corner do the same with a click |
 
-**C** and **S** are the 3.0 feature and they split the show in two: one key changes what
+**C** and **S** split the show in two: one key changes what
 it looks like, the other changes what it is doing. Either can be pressed at any time.
 
 **C picks at random inside the extreme band.** It scores every scheme in the 180-strong
