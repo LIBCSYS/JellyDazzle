@@ -15,7 +15,7 @@ on your Mac, iPhone or iPad — and paints to it, never the same pattern, never 
 
 Submitted October 12, 2026. The
 **[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** carries 3.6.4 (depth, and
-fractals that flow) on [iPhone and iPad](#iphone-and-ipad); the Mac App Store follows. The direct
+fractals that flow) on [iPhone and iPad](#iphone-and-ipad); 3.6.6 is in App Review for Mac, iPhone and iPad. The direct
 Mac download below is **3.6.6 now**.
 
 An homage to **DAZZLE.EXE**, rebuilt from scratch — mostly C, with an ARM64 assembly core:
