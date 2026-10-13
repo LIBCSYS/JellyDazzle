@@ -44,6 +44,21 @@ typedef struct { float b[4], x[4], y[4]; int skip, d; } p123_quad;
 
 static p123_quad p123_q[P123_MAXC + 8];
 
+/* 3.6.5: it ignored its seed, so every appearance was the same three-fold
+ * gasket at the same angle in the same hues. The seed now picks the packing
+ * itself — the classic three equal circles, or two unequal circles on a
+ * diameter (ra = 0.5 is the (-1,2,2,3) gasket; larger ra gives a lopsided
+ * one) — plus the starting angle, the turning direction, the ramp start and
+ * the hue step per depth (variety audit). */
+static uint32_t p123_seed = 0xFFFFFFFFu;
+static float    p123_ra = 0.0f;         /* 0 = three equal circles          */
+static float    p123_rot0 = 0.0f;       /* starting angle                   */
+static float    p123_dir = 1.0f;        /* turning direction                */
+static int      p123_pbase = 0;         /* ramp start                       */
+static int      p123_dstep = 2900;      /* ramp step per depth              */
+
+static uint32_t p123_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
 static void p123_init(void)
 {
     float r0 = 2.0f * 1.7320508f - 3.0f, dd, bb;
@@ -54,12 +69,32 @@ static void p123_init(void)
     bb = 1.0f / r0;
     q0->b[0] = -1.0f; q0->x[0] = 0.0f; q0->y[0] = 0.0f;
     p123_add(-1.0f, 0.0f, 0.0f, 0);                    /* the enclosing rim */
-    for (i = 0; i < 3; i++) {
-        float a = 1.5707963f + (float)i * (P123_TAU / 3.0f);
-        q0->b[i + 1] = bb;
-        q0->x[i + 1] = dd * cosf(a);
-        q0->y[i + 1] = dd * sinf(a);
-        p123_add(bb, q0->x[i + 1], q0->y[i + 1], 1);
+    if (p123_ra <= 0.0f) {
+        for (i = 0; i < 3; i++) {
+            float a = 1.5707963f + (float)i * (P123_TAU / 3.0f);
+            q0->b[i + 1] = bb;
+            q0->x[i + 1] = dd * cosf(a);
+            q0->y[i + 1] = dd * sinf(a);
+            p123_add(bb, q0->x[i + 1], q0->y[i + 1], 1);
+        }
+    } else {
+        /* A and B sit on the x axis, tangent to the rim and to each other;
+         * D is the Descartes partner of (rim, A, B) above the axis. Its
+         * radius comes from the theorem, its centre from tangency to the rim
+         * (|c| = 1 - r4) and to A (|c - ca| = ra + r4). */
+        float ra = p123_ra, rb = 1.0f - ra;
+        float b1 = 1.0f / ra, b2 = 1.0f / rb, s, b4, r4, ax, x4, y4;
+        s  = -1.0f * b1 + b1 * b2 - 1.0f * b2;
+        b4 = -1.0f + b1 + b2 + 2.0f * sqrtf(s > 0.0f ? s : 0.0f);
+        r4 = 1.0f / b4;
+        ax = ra - 1.0f;                                 /* A's centre x      */
+        x4 = (ax * ax - (ra + r4) * (ra + r4) + (1.0f - r4) * (1.0f - r4)) / (2.0f * ax);
+        y4 = (1.0f - r4) * (1.0f - r4) - x4 * x4;
+        y4 = sqrtf(y4 > 0.0f ? y4 : 0.0f);
+        q0->b[1] = b1; q0->x[1] = ax;         q0->y[1] = 0.0f;
+        q0->b[2] = b2; q0->x[2] = 1.0f - rb;  q0->y[2] = 0.0f;
+        q0->b[3] = b4; q0->x[3] = x4;         q0->y[3] = y4;
+        for (i = 1; i < 4; i++) p123_add(q0->b[i], q0->x[i], q0->y[i], 1);
     }
     q0->skip = -1; q0->d = 2;
     tail = 1;
@@ -150,16 +185,25 @@ void pattern_123(uint32_t *fb, int w, int h, int frame, int sl,
     float t = (float)(frame & 0xFFFFF);
     float spin, ca, sa, scale;
     int i, k, j, pb;
-    (void)sl; (void)seed;
+    (void)sl;
 
-    if (!p123_ready) p123_init();
+    if (seed != p123_seed || !p123_ready) {
+        uint32_t a = p123_h(seed ^ 0x1230u), b = p123_h(a), c = p123_h(b);
+        p123_ra    = (a % 3u) == 0u ? 0.0f : 0.5f + (float)((a >> 4) % 1000u) * 0.00026f;
+        p123_rot0  = (float)(b & 1023u) * (P123_TAU / 1024.0f);
+        p123_dir   = (b & 0x400u) ? 1.0f : -1.0f;
+        p123_pbase = (int)(c & JD_PAL_MASK);
+        p123_dstep = 1600 + (int)((c >> 16) % 3200u);
+        p123_seed  = seed;
+        p123_init();
+    }
 
     for (i = 0; i < P123_N; i++) p123_low[i] = 0xFF000000u;
 
-    spin  = t * 0.00052f;
+    spin  = p123_rot0 + p123_dir * t * 0.00052f;
     ca    = cosf(spin); sa = sinf(spin);
     scale = P123_R * (1.0f + 0.018f * sinf(t * 0.00061f));
-    pb    = (int)(t * 3.0f);
+    pb    = (int)(t * 3.0f) + p123_pbase;
 
     for (i = 0; i < p123_nc; i++) {
         float br = 1.0f / p123_c[i].b, rr;
@@ -174,7 +218,7 @@ void pattern_123(uint32_t *fb, int w, int h, int frame, int sl,
         if (cx + rr < 0.0f || cx - rr > P123_LW || cy + rr < 0.0f || cy - rr > P123_LH)
             continue;
         puls = 0.70f + 0.30f * sinf(t * 0.0085f - 0.75f * (float)p123_c[i].d);
-        col  = pal[(pb + p123_c[i].d * 2900 + (i & 7) * 260) & JD_PAL_MASK];
+        col  = pal[(pb + p123_c[i].d * p123_dstep + (i & 7) * 260) & JD_PAL_MASK];
         cr = (int)((col >> 16) & 255); cg = (int)((col >> 8) & 255);
         cb = (int)(col & 255);
         {   /* keep faint palette entries visible as line art */

@@ -638,6 +638,10 @@ extern void pattern_635(uint32_t*, int, int, int, int, uint32_t, const uint32_t*
 extern void pattern_636(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_637(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 extern void pattern_638(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_639(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_640(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_641(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
+extern void pattern_642(uint32_t*, int, int, int, int, uint32_t, const uint32_t*);
 const jd_pattern_fn jd_patterns[] = {
     pattern_001,
     pattern_002,
@@ -1277,6 +1281,10 @@ const jd_pattern_fn jd_patterns[] = {
     pattern_636,
     pattern_637,
     pattern_638,
+    pattern_639,
+    pattern_640,
+    pattern_641,
+    pattern_642,
 };
 const char *const jd_pattern_names[] = {
     "001 kaleido rose",
@@ -1917,6 +1925,10 @@ const char *const jd_pattern_names[] = {
     "636 dragon curve fold",
     "637 sierpinski flow",
     "638 lyapunov zoom",
+    "639 multibrot morph",
+    "640 nova fractal",
+    "641 neon mandel",
+    "642 clifford dust",
 };
 const unsigned char jd_pattern_family[] = {
     3,
@@ -2557,5 +2569,9 @@ const unsigned char jd_pattern_family[] = {
     8,
     8,
     8,
+    8,
+    8,
+    8,
+    8,
 };
-const int jd_pattern_count = 638;
+const int jd_pattern_count = 642;

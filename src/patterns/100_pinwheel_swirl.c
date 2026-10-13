@@ -20,6 +20,18 @@ static uint8_t  p100_shp[2048];       /* ((cos+1)/2)^1.3 * 255           */
 static uint32_t p100_ramp[256];       /* per-frame shade -> ARGB         */
 static float    p100_hue[256][3];
 static int      p100_ready;
+/* 3.6.5: it ignored its seed, so every appearance was the same six-armed
+ * clockwise pinwheel at the same hues. The seed now picks the arm count,
+ * the hand of the spiral, the turning direction, a small off-centre eye and
+ * where on the palette the shading starts (variety audit). */
+static uint32_t p100_seed = 0xFFFFFFFFu;
+static int      p100_arms = 6;          /* arm count                        */
+static float    p100_hand = 1.0f;       /* spiral hand: +1 / -1             */
+static float    p100_dir  = 1.0f;       /* turning direction                */
+static float    p100_ex = 0.0f, p100_ey = 0.0f;   /* eye offset, low-res px */
+static float    p100_hbase;             /* ramp start, 0..1                  */
+
+static uint32_t p100_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
 
 static void p100_buildhue(const uint32_t *pal)
 {
@@ -55,15 +67,15 @@ static void p100_init(void)
     }
     for (y = 0; y < P100_LH; y++) {
         float ly = ((float)y + 0.5f) * (240.0f / (float)P100_LH);
-        float dy = ly - 120.0f;
+        float dy = ly - 120.0f - p100_ey;
         for (x = 0; x < P100_LW; x++) {
             float lx = ((float)x + 0.5f) * (320.0f / (float)P100_LW);
-            float dx = lx - 160.0f;
+            float dx = lx - 160.0f - p100_ex;
             float r = sqrtf(dx * dx + dy * dy);
             float th = atan2f(dy, dx);
             float e = 1.15f - r / 195.0f;
             int idx = y * P100_LW + x;
-            int a6 = (int)(6.0f * th * (2048.0f / (2.0f * P100_PI)));
+            int a6 = (int)((float)p100_arms * th * (2048.0f / (2.0f * P100_PI)));
             if (e < 0.0f) e = 0.0f; if (e > 1.0f) e = 1.0f;
             p100_a6[idx] = (uint16_t)(((a6 % 2048) + 4096) & 2047);
             p100_rp[idx] = (uint16_t)(powf(r, 0.95f) * 64.0f);
@@ -137,16 +149,30 @@ void pattern_100(uint32_t *fb, int w, int h, int frame, int sl,
     float t = (float)frame;
     float twist, kq, hoff, spin;
     int tph, i, n;
-    (void)sl; (void)seed;
+    (void)sl;
 
-    if (!p100_ready) p100_init();
+    if (seed != p100_seed || !p100_ready) {
+        uint32_t a = p100_h(seed ^ 0x1000u), b = p100_h(a), c = p100_h(b);
+        p100_arms  = 3 + (int)(a % 6u);                           /* 3..8     */
+        p100_hand  = (a & 0x100u) ? 1.0f : -1.0f;
+        p100_dir   = (a & 0x200u) ? 1.0f : -1.0f;
+        p100_ex    = -22.0f + (float)(b % 1000u) * 0.044f;        /* +-22     */
+        p100_ey    = -14.0f + (float)((b >> 12) % 1000u) * 0.028f;/* +-14     */
+        p100_hbase = (float)(c % 1000u) * 0.001f;
+        p100_rs    = 77u;                    /* same dither every rebuild  */
+        p100_seed  = seed;
+        p100_init();                         /* angle field for this run   */
+    }
     p100_buildhue(pal);
 
     spin = t * 0.003f; spin -= 2.0f * P100_PI * floorf(spin / (2.0f * P100_PI));
-    twist = 0.085f * (1.0f + 0.22f * sinf(spin));
-    kq = twist * (2048.0f / (2.0f * P100_PI)) / 64.0f;
-    tph = (int)(t * 0.012f * (2048.0f / (2.0f * P100_PI)));
-    hoff = -t * 0.00055f; hoff -= floorf(hoff);
+    /* the breathing twist also slides the arms; run it with the same sense as
+     * the spin (hand x dir) or the two cancel at the rim and the swirl stalls
+     * (3.6.5: audit motion fell 22 -> 10 with the spin reversed) */
+    twist = 0.085f * (1.0f + 0.22f * sinf(p100_hand * p100_dir * spin));
+    kq = p100_hand * twist * (2048.0f / (2.0f * P100_PI)) / 64.0f;
+    tph = (int)(p100_dir * t * 0.012f * (2048.0f / (2.0f * P100_PI)));
+    hoff = p100_hbase - p100_dir * t * 0.00055f; hoff -= floorf(hoff);   /* rolls with the spin */
     p100_buildramp(hoff);
 
     n = P100_N;

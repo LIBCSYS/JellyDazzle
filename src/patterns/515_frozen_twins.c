@@ -1,6 +1,6 @@
 /* 515 Frozen Twins — the whole segment is one strike in extreme slow
  * motion: a downward leader creeps from the top and an upward leader from
- * the ground, each unfurling its branches over ~900 frames as they feel
+ * the ground, each unfurling its branches over ~780..1020 frames (seed picks) as they feel
  * toward a meeting point; when they touch, the junction blooms softly and
  * a slow return stroke brightens the joined channel over ~80 frames, after
  * which the whole thing hangs in the air, breathing, hue sliding down its
@@ -11,6 +11,8 @@ static gk g515;
 static gk_bolt bd515, bu515;       /* down leader, up leader */
 static uint32_t bs515 = 0xFFFFFFFFu;
 static float mx515, my515;
+static float meet515 = 900.0f;     /* frames until the leaders touch      */
+static int   pal515;               /* ramp start                          */
 
 void pattern_515(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
@@ -20,18 +22,27 @@ void pattern_515(uint32_t *fb, int w, int h, int frame, int sl,
     float cw = (float)g515.cw, ch = (float)g515.ch, sc = g515.sc, t = (float)frame;
     if (seed != bs515 || sl < 2) {
         gk_seed(&g515, seed ^ 0x5157u);
-        mx515 = cw * (0.35f + 0.3f * gk_rf(&g515));
-        my515 = ch * (0.42f + 0.16f * gk_rf(&g515));
-        float tx = cw * (0.25f + 0.5f * gk_rf(&g515));
-        gk_bolt_gen(&g515, &bd515, tx, -ch * 0.02f, mx515, my515, 0.2f, 7, 6, 0.45f);
-        float bx = cw * (0.25f + 0.5f * gk_rf(&g515));
-        gk_bolt_gen(&g515, &bu515, bx, ch * 1.02f, mx515, my515, 0.2f, 7, 6, 0.45f);
+        /* 3.6.5: wider meeting-point and root ranges, plus seed-picked
+         * jaggedness, branchiness, approach time and a ramp start over the
+         * whole palette (it was seed & 8191, a quarter of it).  The strike
+         * kept landing in the same middle band in the same colours, so
+         * appearances read as one picture (variety audit). */
+        mx515 = cw * (0.22f + 0.56f * gk_rf(&g515));
+        my515 = ch * (0.34f + 0.32f * gk_rf(&g515));
+        float jag = 0.15f + 0.12f * gk_hash(seed ^ 0x5151u);
+        int   nbr = 4 + (int)(gk_hash(seed ^ 0x5152u) * 5.0f);
+        meet515 = 780.0f + 240.0f * gk_hash(seed ^ 0x5153u);
+        pal515  = (int)(gk_hash(seed ^ 0x5154u) * 32768.0f);
+        float tx = cw * (0.10f + 0.80f * gk_rf(&g515));
+        gk_bolt_gen(&g515, &bd515, tx, -ch * 0.02f, mx515, my515, jag, 7, nbr, 0.45f);
+        float bx = cw * (0.10f + 0.80f * gk_rf(&g515));
+        gk_bolt_gen(&g515, &bu515, bx, ch * 1.02f, mx515, my515, jag, 7, nbr, 0.45f);
         bs515 = seed;
     }
     float s = (float)sl;
-    int base = (int)(t * 0.9f) + (int)(seed & 8191u);
-    float prog = s / 900.0f;                             /* both leaders creep in */
-    float ret = gk_smooth((s - 900.0f) / 80.0f);         /* return stroke */
+    int base = (int)(t * 0.9f) + pal515;
+    float prog = s / meet515;                            /* both leaders creep in */
+    float ret = gk_smooth((s - meet515) / 80.0f);        /* return stroke */
     float breathe = 0.85f + 0.15f * sinf(t * 0.017f);
     float amp = 0.55f + 0.7f * ret * breathe;
     float wt = 0.35f + 0.35f * ret;
@@ -61,7 +72,7 @@ void pattern_515(uint32_t *fb, int w, int h, int frame, int sl,
         }
     }
     /* junction bloom */
-    float jb = gk_env(s - 880.0f, 40.0f, 60.0f, 400.0f) * 0.9f + 0.25f * ret * breathe;
+    float jb = gk_env(s - (meet515 - 20.0f), 40.0f, 60.0f, 400.0f) * 0.9f + 0.25f * ret * breathe;
     if (jb > 0.0f) {
         float jc[3], jh[3];
         gk_col(pal, base + 1200, 0.5f, 1.0f * jb, jc);

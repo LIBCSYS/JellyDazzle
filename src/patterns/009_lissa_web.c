@@ -19,6 +19,21 @@ static uint16_t p9_hrad[P9_IW * P9_IH];
 static uint8_t p9_glut[1024];
 static int p9_init;
 
+/* 3.6.5: seed-derived look. Every appearance used to be identical (variety
+ * audit, dSeed 0). The seed now picks the Lissajous ratio (the shape of the
+ * ribbon itself), its size, where in the lacing tour we start, which way the
+ * stamps turn, and the ramp start. The detune keeps each ratio slowly
+ * precessing the way the original 3:4.0048 did. */
+static uint32_t p9_seed = 0xFFFFFFFFu;
+static float p9_fa, p9_fb, p9_amp, p9_dir, p9_tph;
+static int p9_seq0;
+static uint32_t p9_poff;
+
+static uint32_t p9_hash(uint32_t x) {          /* murmur3 finaliser */
+    x ^= x >> 16; x *= 0x85ebca6bu; x ^= x >> 13; x *= 0xc2b2ae35u; x ^= x >> 16;
+    return x;
+}
+
 #define P9_SCALE 8192.0f
 #define P9_BMAX  12.0f
 
@@ -57,8 +72,27 @@ static void p9_blit(uint32_t *fb, int w, int h, const uint32_t *pal, uint32_t of
 
 void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
-    (void)sl; (void)seed;
+    (void)sl;
     static const int seq[6] = {5, 7, 9, 12, 8, 6};
+    static const float ratio[5][2] = {
+        {3.0f, 4.0f}, {2.0f, 3.0f}, {3.0f, 5.0f}, {4.0f, 5.0f}, {1.0f, 2.0f}};
+    if (seed != p9_seed) {
+        uint32_t hs = p9_hash(seed ^ 0x5BE0CD19u);
+        int ri;
+        p9_seed = seed;
+        ri = (int)(hs % 5u);
+        p9_fa = ratio[ri][0];
+        p9_fb = ratio[ri][1] * 1.0012f;           /* same relative detune */
+        p9_amp = 78.0f + 22.0f * (float)((hs >> 4) & 255) / 255.0f;
+        p9_seq0 = (int)((hs >> 12) % 6u);
+        p9_dir = (hs & 0x100000u) ? 1.0f : -1.0f;
+        hs = p9_hash(hs);
+        p9_tph = (float)(hs % 4000u);
+        /* ramp start is held to the first quarter of the ramp: the field already
+         * spans about a quarter of it, and the library's ramps go dark at both
+         * ends, so a free offset would land some seeds in a near-black stretch */
+        p9_poff = (hs >> 12) % 8192u;
+    }
     if (!p9_init) {
         p9_init = 1;
         for (int i = 0; i < P9_NS; i++)
@@ -76,7 +110,7 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
                 p9_hrad[y * P9_IW + x] = (uint16_t)(rs * 0.0022f * P9_SCALE);
             }
     }
-    float t = (float)frame;
+    float t = (float)frame + p9_tph;
     /* The stamp count used to snap to the next entry of seq[] the instant
      * frame/320 ticked, re-lacing the whole web in one frame (measured
      * delta ~29 every 320 frames — a slow strobe).  Cross-fade the two
@@ -91,14 +125,15 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
         float u = (float)(pos - (320 - P9_XF)) * (1.0f / (float)P9_XF);
         mb = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f);
     }
-    arm_n[0] = seq[leg % 6];       arm_w[0] = 1.0f - mb;
-    arm_n[1] = seq[(leg + 1) % 6]; arm_w[1] = mb;
+    arm_n[0] = seq[(leg + p9_seq0) % 6];     arm_w[0] = 1.0f - mb;
+    arm_n[1] = seq[(leg + 1 + p9_seq0) % 6]; arm_w[1] = mb;
     /* temporal rates halved vs the lab prototype to satisfy the motion law */
-    float sb = t * 0.006f, phx = t * 0.00075f, stamp = t * 0.0009f;
+    float sb = t * 0.006f, phx = t * 0.00075f, stamp = t * 0.0009f * p9_dir;
+    const float fa = p9_fa, fbq = p9_fb, amp = p9_amp;
     for (int i = 0; i < P9_NS; i++) {
         float s = (float)i * 0.006f + sb;
-        p9_px[i] = 92.0f * sinf(3.0f * s + phx);
-        p9_py[i] = 92.0f * sinf(4.0048f * s);
+        p9_px[i] = amp * sinf(fa * s + phx);
+        p9_py[i] = amp * sinf(fbq * s);
     }
     for (int i = 0; i < P9_IW * P9_IH; i++) p9_acc[i] = 0.0f;
     float cx = P9_IW * 0.5f, cy = P9_IH * 0.5f;
@@ -154,6 +189,7 @@ void pattern_009(uint32_t *fb, int w, int h, int frame, int sl,
         if (q > 65535) q = 65535;
         p9_idx[i] = (uint16_t)q;
     }
-    uint32_t off = (uint32_t)((double)frame * (0.0005 * (double)P9_SCALE)) & JD_PAL_MASK;
+    uint32_t off = ((uint32_t)((double)frame * (0.0005 * (double)P9_SCALE)) + p9_poff)
+                 & JD_PAL_MASK;
     p9_blit(fb, w, h, pal, off);
 }

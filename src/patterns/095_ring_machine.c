@@ -2,7 +2,11 @@
  * Two stacks of red concentric arcs bow outward like giant parentheses around
  * an "H" of blue->magenta gradient rectangles with a pulsing red crossbar and a
  * white diamond core; a red X-lattice of struts and dim green scanlines sit
- * behind. Full repaint at 640x480 (320x240 logical), bilinear upscale. */
+ * behind. Full repaint at 640x480 (320x240 logical), bilinear upscale.
+ * 3.6.5: the colours were a fixed red/blue/magenta/green set with a 15% tint
+ * (dPal 3.4, C did nothing) and nothing read the seed (dSeed 0). Every role
+ * now comes from a seed-chosen point on the ramp, and the seed also moves the
+ * arc centres, ring pitch and direction, and the lattice slopes. */
 #include "../engine/jellydazzle.h"
 #include <math.h>
 
@@ -28,19 +32,46 @@ static inline float p95_lsin(float a)
     return p95_sin[((int)(a * 325.9493f + 2048.5f)) & 2047];
 }
 
-static void p95_tint(const uint32_t *pal, float *tn)
+static uint32_t p95_seed = 0xFFFFFFFFu;
+static int   p95_poff, p95_pstep;
+static float p95_acx, p95_rf, p95_rdir, p95_m[3], p95_thr[3];
+
+static uint32_t p95_h(uint32_t x)
 {
-    float s[3] = { 0.0f, 0.0f, 0.0f }, mx;
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p95_reseed(uint32_t seed)
+{
+    static const float m0[3] = { 0.28f, 0.55f, 0.85f };
+    uint32_t a = p95_h(seed ^ 0x9595u), b = p95_h(a);
+    float k = 0.80f + (float)((b >> 8) & 255u) * (0.45f / 255.0f);
     int i;
-    for (i = 0; i < 64; i++) {
-        uint32_t u = pal[(i * 512) & JD_PAL_MASK];
-        s[0] += (float)((u >> 16) & 255);
-        s[1] += (float)((u >> 8) & 255);
-        s[2] += (float)(u & 255);
+    p95_poff  = (int)(a & JD_PAL_MASK);
+    p95_pstep = 5461 + (int)((b & 255u) * 10u);   /* roles 1/6..1/4.7 ramp apart */
+    p95_acx   = 40.0f + (float)((a >> 15) & 31u);  /* arc centre offset from mid */
+    p95_rf    = 0.42f + (float)((a >> 20) & 255u) * (0.30f / 255.0f);
+    p95_rdir  = (a & 0x10000000u) ? 1.0f : -1.0f;
+    for (i = 0; i < 3; i++) {
+        /* keep each strut ~2.4 px thick whatever its slope */
+        p95_m[i] = m0[i] * k;
+        p95_thr[i] = 1.2f * sqrtf(1.0f + p95_m[i] * p95_m[i]);
     }
-    mx = s[0] > s[1] ? s[0] : s[1]; if (s[2] > mx) mx = s[2];
-    if (mx < 1.0f) mx = 1.0f;
-    for (i = 0; i < 3; i++) tn[i] = 0.85f + 0.15f * (s[i] / mx);
+    p95_seed = seed;
+}
+
+/* One role colour from the ramp, brightest channel scaled to lv: a dark
+ * stretch of the ramp cannot black a role out and the scene keeps its
+ * original brightness. */
+static void p95_role(const uint32_t *pal, int k, float lv, float *c)
+{
+    uint32_t u = pal[(p95_poff + k * p95_pstep) & JD_PAL_MASK];
+    float r = (float)((u >> 16) & 255), g = (float)((u >> 8) & 255);
+    float b = (float)(u & 255), mx = r > g ? r : g;
+    if (b > mx) mx = b;
+    if (mx < 8.0f) { r = g = b = mx = 8.0f; }
+    c[0] = r * lv / mx; c[1] = g * lv / mx; c[2] = b * lv / mx;
 }
 
 static void p95_blit(uint32_t *fb, int w, int h)
@@ -79,13 +110,22 @@ void pattern_095(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
 {
     float t = (float)frame;
-    float tring, tscan, tn[3], bpul, rph;
-    int x, y;
-    (void)sl; (void)seed;
+    float tring, tscan, bpul, rph;
+    float carc[3], clat[3], cra[3], crb[3], cbar[3], cscn[3];
+    float acl, acr;
+    int x, y, i;
+    (void)sl;
 
     if (!p95_ready) p95_init();
-    p95_tint(pal, tn);
-    tring = t * 0.02f;  tring -= 2.0f * P95_PI * floorf(tring / (2.0f * P95_PI));
+    if (seed != p95_seed) p95_reseed(seed);
+    p95_role(pal, 0, 255.0f, carc);
+    p95_role(pal, 1, 255.0f, cra);
+    p95_role(pal, 2, 245.0f, crb);
+    p95_role(pal, 3, 235.0f, cbar);
+    p95_role(pal, 4, 80.0f, cscn);
+    for (i = 0; i < 3; i++) clat[i] = carc[i] * 0.6f;
+    acl = 160.0f - p95_acx; acr = 160.0f + p95_acx;
+    tring = t * 0.02f * p95_rdir;  tring -= 2.0f * P95_PI * floorf(tring / (2.0f * P95_PI));
     tscan = t * 0.01f;  tscan -= 2.0f * P95_PI * floorf(tscan / (2.0f * P95_PI));
     bpul  = 0.75f + 0.25f * p95_lsin(t * 0.015f - 2.0f * P95_PI
             * floorf(t * 0.015f / (2.0f * P95_PI)));
@@ -99,16 +139,16 @@ void pattern_095(uint32_t *fb, int w, int h, int frame, int sl,
         int scan = (((int)ly) & 3) == 0;
         int inbar = ay < 11.0f;
         int rect = 0;
-        float rr_c = 0.0f, bb_c = 0.0f;
+        float rs = 0.0f;
         uint32_t *out = p95_low + (long)y * P95_LW;
         if (ly >= 36.0f && ly < 102.0f) {
             float u = (ly - 36.0f) / 66.0f;
             float s = p95_lsin(u * 2.4f + rph); if (s < 0.0f) s = 0.0f;
-            rr_c = 90.0f + 150.0f * s; bb_c = 255.0f - 60.0f * s; rect = 1;
+            rs = s; rect = 1;
         } else if (ly >= 138.0f && ly < 204.0f) {
             float u = (ly - 138.0f) / 66.0f;
             float s = p95_lsin(u * 2.4f + rph); if (s < 0.0f) s = 0.0f;
-            rr_c = 90.0f + 150.0f * s; bb_c = 255.0f - 60.0f * s; rect = 1;
+            rs = s; rect = 1;
         }
         for (x = 0; x < P95_LW; x++) {
             float lx = ((float)x + 0.5f) * (320.0f / (float)P95_LW);
@@ -116,52 +156,60 @@ void pattern_095(uint32_t *fb, int w, int h, int frame, int sl,
             float fr = 0.0f, fg = 0.0f, fb2 = 0.0f;
             int r, g, b;
 
-            if (scan) fg = 55.0f + 25.0f * p95_lsin(lx * 0.05f + tscan);
+            if (scan) {
+                float sv = (55.0f + 25.0f * p95_lsin(lx * 0.05f + tscan)) * (1.0f / 80.0f);
+                fr = cscn[0] * sv; fg = cscn[1] * sv; fb2 = cscn[2] * sv;
+            }
 
-            /* red X lattice */
-            if ((ay - ax * 0.28f < 1.3428f && ax * 0.28f - ay < 1.3428f) ||
-                (ay - ax * 0.55f < 1.2338f && ax * 0.55f - ay < 1.2338f) ||
-                (ay - ax * 0.85f < 1.0705f && ax * 0.85f - ay < 1.0705f)) {
-                fr = 150.0f; fg = 20.0f; fb2 = 30.0f;
+            /* X lattice */
+            if ((ay - ax * p95_m[0] < p95_thr[0] && ax * p95_m[0] - ay < p95_thr[0]) ||
+                (ay - ax * p95_m[1] < p95_thr[1] && ax * p95_m[1] - ay < p95_thr[1]) ||
+                (ay - ax * p95_m[2] < p95_thr[2] && ax * p95_m[2] - ay < p95_thr[2])) {
+                fr = clat[0]; fg = clat[1]; fb2 = clat[2];
             }
 
             /* red arc stacks: "(" left, ")" right */
             {
                 float ex, rd, sv;
-                ex = lx - 108.0f;
+                ex = lx - acl;
                 if (-ex > 8.0f) {
                     rd = sqrtf(ex * ex + dy2);
                     if (rd > 26.0f && rd < 108.0f) {
-                        sv = p95_lsin(rd * 0.55f - tring);
+                        sv = p95_lsin(rd * p95_rf - tring);
                         if (sv > 0.15f) {
-                            float sh = 0.55f + 0.45f * p95_lsin(rd * 0.55f - tring + 1.3f);
-                            fr = 255.0f * sh; fg = 30.0f * sh; fb2 = 45.0f * sh;
+                            float sh = 0.55f + 0.45f * p95_lsin(rd * p95_rf - tring + 1.3f);
+                            fr = carc[0] * sh; fg = carc[1] * sh; fb2 = carc[2] * sh;
                         }
                     }
                 }
-                ex = lx - 212.0f;
+                ex = lx - acr;
                 if (ex > 8.0f) {
                     rd = sqrtf(ex * ex + dy2);
                     if (rd > 26.0f && rd < 108.0f) {
-                        sv = p95_lsin(rd * 0.55f - tring);
+                        sv = p95_lsin(rd * p95_rf - tring);
                         if (sv > 0.15f) {
-                            float sh = 0.55f + 0.45f * p95_lsin(rd * 0.55f - tring + 1.3f);
-                            fr = 255.0f * sh; fg = 30.0f * sh; fb2 = 45.0f * sh;
+                            float sh = 0.55f + 0.45f * p95_lsin(rd * p95_rf - tring + 1.3f);
+                            fr = carc[0] * sh; fg = carc[1] * sh; fb2 = carc[2] * sh;
                         }
                     }
                 }
             }
 
             if (lx >= 96.0f && lx < 224.0f) {
-                if (rect) { fr = rr_c; fg = 30.0f; fb2 = bb_c; }
-                if (inbar) { fr = 235.0f * bpul; fg = 25.0f; fb2 = 55.0f; }
+                if (rect) {
+                    fr = cra[0] + (crb[0] - cra[0]) * rs;
+                    fg = cra[1] + (crb[1] - cra[1]) * rs;
+                    fb2 = cra[2] + (crb[2] - cra[2]) * rs;
+                }
+                if (inbar) { fr = cbar[0] * bpul; fg = cbar[1] * bpul; fb2 = cbar[2] * bpul; }
             }
             if (ax + ay < 13.0f) {
                 if (ax + ay < 6.0f) { fr = 255.0f; fg = 245.0f; fb2 = 250.0f; }
-                else { fr = 255.0f; fg = 70.0f; fb2 = 90.0f; }
+                else { fr = 0.6f * cbar[0] + 100.0f; fg = 0.6f * cbar[1] + 100.0f;
+                       fb2 = 0.6f * cbar[2] + 100.0f; }
             }
 
-            r = (int)(fr * tn[0]); g = (int)(fg * tn[1]); b = (int)(fb2 * tn[2]);
+            r = (int)fr; g = (int)fg; b = (int)fb2;
             if (r > 255) r = 255; if (g > 255) g = 255; if (b > 255) b = 255;
             out[x] = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
         }

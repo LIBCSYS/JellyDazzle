@@ -15,10 +15,54 @@ static uint8_t p81_ring[1024][3];
 static float p81_pw[1025];
 static int p81_inited;
 
-static const float p81_cx[P81_NM] = { 160.0f,  62.0f, 258.0f,  62.0f, 258.0f };
-static const float p81_cy[P81_NM] = { 120.0f,  60.0f,  60.0f, 180.0f, 180.0f };
-static const float p81_R [P81_NM] = {  46.0f,  30.0f,  30.0f,  30.0f,  30.0f };
-static const float p81_ph[P81_NM] = {   0.0f,   1.5f,   3.0f,   4.5f,   6.0f };
+/* lab layout; 3.6.5 jitters it per seed into p81_cx/cy/R/ph below */
+static const float p81_cx0[P81_NM] = { 160.0f,  62.0f, 258.0f,  62.0f, 258.0f };
+static const float p81_cy0[P81_NM] = { 120.0f,  60.0f,  60.0f, 180.0f, 180.0f };
+static const float p81_R0 [P81_NM] = {  46.0f,  30.0f,  30.0f,  30.0f,  30.0f };
+static const float p81_ph0[P81_NM] = {   0.0f,   1.5f,   3.0f,   4.5f,   6.0f };
+
+/* 3.6.5: seed now nudges each medallion's position and size, reshuffles
+ * their morph phases, flips the spin pattern, sets morph speed and the hue
+ * start, and tints the ring-field from the palette — every appearance used
+ * to be the same quincunx in the same violet (variety audit dSeed 0.00). */
+static uint32_t p81_seed = 0xFFFFFFFFu;
+static float p81_cx[P81_NM], p81_cy[P81_NM], p81_R[P81_NM], p81_ph[P81_NM];
+static float p81_sdir = 1.0f, p81_mspd = 1.0f, p81_hue0 = 0.0f, p81_ring_hue = 0.75f;
+
+static uint32_t p81_hash(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return x;
+}
+
+static void p81_reseed(uint32_t seed)
+{
+    uint32_t hsh = p81_hash(seed ^ 0x81A0u);
+    int i;
+    for (i = 0; i < P81_NM; i++) {
+        hsh = p81_hash(hsh + (uint32_t)i);
+        /* corners only drift outward-ish (-4..+11 px away from the centre)
+         * and the centre +-8 px, so medallions never overlap; corner rims
+         * still clear the frame edge at the largest size */
+        if (i == 0) {
+            p81_cx[i] = p81_cx0[i] + (float)((int)(hsh & 15u) - 8);
+            p81_cy[i] = p81_cy0[i] + (float)((int)((hsh >> 5) & 15u) - 8) * 0.75f;
+        } else {
+            float sx = p81_cx0[i] < 160.0f ? -1.0f : 1.0f;
+            float sy = p81_cy0[i] < 120.0f ? -1.0f : 1.0f;
+            p81_cx[i] = p81_cx0[i] + sx * (float)((int)(hsh & 15u) - 4);
+            p81_cy[i] = p81_cy0[i] + sy * (float)((int)((hsh >> 5) & 15u) - 4) * 0.75f;
+        }
+        p81_R[i]  = p81_R0[i] * (0.82f + (float)((hsh >> 10) & 63u) * (0.33f / 63.0f));
+        p81_ph[i] = p81_ph0[i] + (float)((hsh >> 16) & 255u) * (5.7f / 255.0f);
+    }
+    hsh = p81_hash(hsh ^ 0x5Au);
+    p81_sdir = (hsh & 1u) ? -1.0f : 1.0f;
+    p81_mspd = 0.8f + (float)((hsh >> 1) & 63u) * (0.6f / 63.0f);
+    p81_hue0 = (float)((hsh >> 7) & 1023u) * (1.0f / 1024.0f);
+    p81_ring_hue = (float)((hsh >> 17) & 1023u) * (1.0f / 1024.0f);
+    p81_seed = seed;
+}
 
 static void p81_init(void)
 {
@@ -68,15 +112,19 @@ void pattern_081(uint32_t *fb, int w, int h, int frame, int sl,
     float isx = 1.0f / sx, isy = 1.0f / sy;
     float spin[P81_NM];
     int i, x, y;
-    (void)sl; (void)seed;
+    const float *rc;
+    (void)sl;
 
     if (!p81_inited) p81_init();
+    if (seed != p81_seed) p81_reseed(seed);
     p81_buildpal(pal);
+    rc = p81_ptab[(int)(p81_ring_hue * 1024.0f) & 1023];
 
-    /* ground ring LUT: r0 in [0,256) at 0.25 px steps */
+    /* ground ring LUT: r0 in [0,256) at 0.25 px steps. 3.6.5: tint from the
+     * palette (was fixed violet .35/.22/.65); 0.65 keeps the lab's level */
     for (i = 0; i < 1024; i++) {
         float f = 0.10f + 0.06f * sinf((float)i * 0.25f * 0.05f - t * 0.010f);
-        float r = f * 0.35f, g = f * 0.22f, b = f * 0.65f;
+        float r = f * 0.65f * rc[0], g = f * 0.65f * rc[1], b = f * 0.65f * rc[2];
         p81_ring[i][0] = (uint8_t)(r * 255.0f);
         p81_ring[i][1] = (uint8_t)(g * 255.0f);
         p81_ring[i][2] = (uint8_t)(b * 255.0f);
@@ -84,7 +132,7 @@ void pattern_081(uint32_t *fb, int w, int h, int frame, int sl,
 
     /* per-medallion morph tables */
     for (i = 0; i < P81_NM; i++) {
-        float s = fmodf(t * 0.0035f + p81_ph[i] * 0.7f, 4.0f);
+        float s = fmodf(t * 0.0035f * p81_mspd + p81_ph[i] * 0.7f, 4.0f);
         int n1, n2, k;
         float m, R = p81_R[i];
         if (s < 0.0f) s += 4.0f;
@@ -96,7 +144,7 @@ void pattern_081(uint32_t *fb, int w, int h, int frame, int sl,
             float rr = (1.0f - m) * p81_ngon(th, n1) + m * p81_ngon(th, n2);
             p81_inv[i][k] = 1.0f / (R * rr);
         }
-        spin[i] = fmodf(t * 0.004f * ((i & 1) ? -1.0f : 1.0f) + p81_ph[i], P81_TAU);
+        spin[i] = fmodf(t * 0.004f * p81_sdir * ((i & 1) ? -1.0f : 1.0f) + p81_ph[i], P81_TAU);
         if (spin[i] < 0.0f) spin[i] += P81_TAU;
     }
 
@@ -117,7 +165,7 @@ void pattern_081(uint32_t *fb, int w, int h, int frame, int sl,
     /* ---- medallions ---- */
     for (i = 0; i < P81_NM; i++) {
         float R = p81_R[i], lim = R * 1.09f + 2.0f;
-        float hoff = (float)i * 0.19f + t * 0.0012f;
+        float hoff = p81_hue0 + (float)i * 0.19f + t * 0.0012f;
         int x0 = (int)((p81_cx[i] - lim) * sx), x1 = (int)((p81_cx[i] + lim) * sx) + 1;
         int y0 = (int)((p81_cy[i] - lim) * sy), y1 = (int)((p81_cy[i] + lim) * sy) + 1;
         const float *iv = p81_inv[i];

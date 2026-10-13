@@ -91,6 +91,28 @@ static float p55_bgr[P55_LW * P55_LH];   /* red ground */
 static float p55_bgb[P55_LW * P55_LH];   /* blue ground */
 static float p55_fade[P55_TRAIL];
 
+/* 3.6.5: per-appearance shape — the seed used to be ignored, so every
+ * appearance was the same six-fold carousel (variety audit). The seed now
+ * picks the kaleidoscope fold (4..8), comet speed and orbit size, which way
+ * the pinwheel turns, and where on the ramp the comet hues start. */
+#define P55_MAXF 8
+static uint32_t p55_seed = 0xFFFFFFFFu;
+static int p55_nf = 6;
+static float p55_oms = 1.0f, p55_rs = 1.0f, p55_gdir = 1.0f, p55_h0;
+static uint32_t p55_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p55_reseed(uint32_t seed)
+{
+    uint32_t a = p55_h(seed ^ 0x5555u), b = p55_h(a), c = p55_h(b);
+    p55_nf   = 4 + (int)(a % 5u);                                /* 4..8 folds */
+    p55_oms  = (0.75f + (float)((a >> 8) % 1000u) * 0.0005f)     /* 0.75..1.25 */
+               * ((b & 1u) ? 1.0f : -1.0f);                      /* comet direction */
+    p55_rs   = 0.80f + (float)((b >> 4) % 1000u) * 0.0003f;      /* 0.80..1.10 */
+    p55_gdir = (b & 2u) ? 1.0f : -1.0f;
+    p55_h0   = (float)((c >> 6) % 1000u) * 0.001f;
+    p55_seed = seed;
+}
+
 static void p55_init(void)
 {
     int x, y, j;
@@ -115,10 +137,11 @@ void pattern_055(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
 {
     float tt = (float)(frame % 1048576) + 300.0f;
-    float grot, mca[6], msa[6];
+    float grot, mca[P55_MAXF], msa[P55_MAXF];
     int i, j, c, m, ring, n;
-    (void)sl; (void)seed;
+    (void)sl;
     if (!p55_init_done) p55_init();
+    if (seed != p55_seed) p55_reseed(seed);
 
     n = P55_LW * P55_LH;
     for (i = 0; i < n; i++) {
@@ -127,21 +150,21 @@ void pattern_055(uint32_t *fb, int w, int h, int frame, int sl,
         p55_acc[i * 3 + 2] = p55_bgb[i];
     }
 
-    grot = tt * 0.0021f;
-    for (m = 0; m < 6; m++) {
-        float a = grot + (float)m * (P55_TAU / 6.0f);
+    grot = tt * 0.0021f * p55_gdir + p55_h0 * P55_TAU;
+    for (m = 0; m < p55_nf; m++) {
+        float a = grot + (float)m * (P55_TAU / (float)p55_nf);
         mca[m] = cosf(a); msa[m] = sinf(a);
     }
 
     for (c = 0; c < P55_NC; c++) {
-        float om = 0.016f + 0.0055f * (float)c;
-        float hue0 = (float)c * 0.31f + tt * 0.0006f;
+        float om = (0.016f + 0.0055f * (float)c) * p55_oms;
+        float hue0 = p55_h0 + (float)c * 0.31f + tt * 0.0006f;
         for (j = 0; j < P55_TRAIL; j++) {
             float times = tt - (float)j * 1.5f;
             float u = (float)j / (float)P55_TRAIL;
             float th = times * om + (float)c * 2.1f;
-            float rad = 38.0f + 20.0f * (float)c
-                        + 30.0f * sinf(times * 0.0075f + (float)c * 1.7f);
+            float rad = (38.0f + 20.0f * (float)c
+                        + 30.0f * sinf(times * 0.0075f + (float)c * 1.7f)) * p55_rs;
             float x0 = rad * cosf(th);
             float y0 = rad * sinf(th) * 0.85f;
             float sat = 0.85f - 0.6f * expf(-(float)j * (1.0f / 6.0f));
@@ -149,7 +172,7 @@ void pattern_055(uint32_t *fb, int w, int h, int frame, int sl,
             float wgt = p55_fade[j] * 1.05f;
             float cr, cg, cb;
             p55_color(pal, hue0 + 0.11f * u, sat, val, &cr, &cg, &cb);
-            for (m = 0; m < 6; m++) {
+            for (m = 0; m < p55_nf; m++) {
                 float ca = mca[m], sa = msa[m];
                 float x = P55_CX + x0 * ca - y0 * sa;
                 float y = P55_CY + (x0 * sa + y0 * ca) * 0.92f;
@@ -164,7 +187,7 @@ void pattern_055(uint32_t *fb, int w, int h, int frame, int sl,
         int ns = 12 + 8 * ring;
         float dir = ring ? 1.0f : -1.0f;
         float cr, cg, cb;
-        p55_color(pal, 0.12f + tt * 0.0006f + 0.3f * (float)ring, 0.6f, 1.0f, &cr, &cg, &cb);
+        p55_color(pal, p55_h0 + 0.12f + tt * 0.0006f + 0.3f * (float)ring, 0.6f, 1.0f, &cr, &cg, &cb);
         for (j = 0; j < ns; j++) {
             float aa = (float)j * (P55_TAU / (float)ns) + tt * 0.015f * dir;
             p55_splat(P55_CX + rr * cosf(aa), P55_CY + rr * sinf(aa) * 0.92f,

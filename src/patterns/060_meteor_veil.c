@@ -103,30 +103,43 @@ static float p60_rf(void)
     return (float)(p60_rs >> 8) * (1.0f / 16777216.0f);
 }
 
-static void p60_init(void)
+/* 3.6.5: per-appearance shower — the seed used to be ignored, so every
+ * appearance replayed the same meteor schedule over the same stars (variety
+ * audit). The seed now scatters stars and meteors, sets the radiant's slant
+ * and the fall's gravity, and picks where on the ramp the hues start. */
+static uint32_t p60_seed = 0xFFFFFFFFu;
+static float p60_mg = P60_MG, p60_slant = 1.0f;
+static uint32_t p60_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p60_init(uint32_t seed)
 {
     static const float hues[4] = {0.58f, 0.62f, 0.08f, 0.66f};
     int i;
-    float acc = 0.0f;
-    p60_rs = 0x60E7C012u;
+    float acc = 0.0f, h0;
+    uint32_t a = p60_h(seed ^ 0x6060u), b = p60_h(a), c = p60_h(b);
+    p60_mg    = P60_MG * (0.6f + (float)(a % 1000u) * 0.0009f);   /* 0.6..1.5x */
+    p60_slant = 0.65f + (float)((a >> 10) % 1000u) * 0.0007f;     /* 0.65..1.35 */
+    h0 = (float)((b >> 6) % 1000u) * 0.001f;
+    p60_rs = 0x60E7C012u ^ (c | 1u);
     for (i = 0; i < P60_NS; i++) {
         p60_sx[i] = p60_rf() * P60_LW;
         p60_sy[i] = p60_rf() * P60_LH;
         p60_sv[i] = 0.10f + p60_rf() * 0.20f;
         p60_sp[i] = p60_rf() * P60_TAU;
-        p60_sh[i] = hues[(int)(p60_rf() * 4.0f) & 3];
+        p60_sh[i] = hues[(int)(p60_rf() * 4.0f) & 3] + h0;
     }
     for (i = 0; i < P60_NM; i++) {
         acc += 34.0f + (float)((int)(p60_rf() * 28.0f));   /* 34..61 */
         p60_mt[i] = acc;
         p60_mx0[i] = 10.0f + p60_rf() * (P60_LW * 0.55f - 10.0f);
         p60_my0[i] = -16.0f + p60_rf() * 56.0f;
-        p60_mdx[i] = 0.85f + p60_rf() * 0.45f;
+        p60_mdx[i] = (0.85f + p60_rf() * 0.45f) * p60_slant;
         p60_mvy[i] = 0.45f + p60_rf() * 0.25f;
-        p60_mh[i] = p60_rf();
+        p60_mh[i] = p60_rf() + h0;
     }
     p60_period = acc;
     p60_init_done = 1;
+    p60_seed = seed;
 }
 
 void pattern_060(uint32_t *fb, int w, int h, int frame, int sl,
@@ -134,8 +147,8 @@ void pattern_060(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float tt, tc;
     int i, x, y, kbase, kk;
-    (void)sl; (void)seed;
-    if (!p60_init_done) p60_init();
+    (void)sl;
+    if (!p60_init_done || seed != p60_seed) p60_init(seed);
 
     tt = (float)(frame % 16777216) + 160.0f;
     tc = fmodf(tt, p60_period);
@@ -181,7 +194,7 @@ void pattern_060(uint32_t *fb, int w, int h, int frame, int sl,
             float wgt = expf(-ago * (1.0f / 170.0f))
                         * (0.30f + 0.70f * (a / (amax > 1.0f ? amax : 1.0f))) * 1.6f;
             lx = p60_mx0[ki] + p60_mdx[ki] * a;
-            ly = p60_my0[ki] + p60_mvy[ki] * a + 0.5f * P60_MG * a * a;
+            ly = p60_my0[ki] + p60_mvy[ki] * a + 0.5f * p60_mg * a * a;
             p60_splat(lx, ly, cr, cg, cb, wgt);
             p60_splat((float)(P60_LW - 1) - lx, ly, cr, cg, cb, wgt);
         }

@@ -24,6 +24,8 @@ static uint8_t  p124_lut[512];          /* px distance*32 -> intensity      */
 static uint32_t p124_ramp[256];
 static int      p124_ready;
 
+static uint32_t p124_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
 static void p124_init(void)
 {
     int i;
@@ -73,13 +75,24 @@ void pattern_124(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)(frame & 0xFFFFF);
     float qn, cb2, d, rc2, rc, R, invR, ar, ai, aa, rot, cr_, sr_;
-    int x, y, i, pb;
+    int x, y, i, pb, hstep;
+    /* 3.6.5: the seed only chose 1 of 8 phases from its low three bits —
+     * both audit seeds share them — so every appearance looked the same.
+     * The seed (hashed) now sets the q phase, the path and direction of the
+     * hyperbolic glide, the turning direction, the ramp start and how fast
+     * hue steps with fold depth (variety audit). */
+    uint32_t sa = p124_h(seed ^ 0x1240u), sb = p124_h(sa);
+    float qph  = (float)(sa & 1023u) * (6.2831853f / 1024.0f);
+    float gph  = (float)((sa >> 10) & 1023u) * (6.2831853f / 1024.0f);
+    float gdir = (sa & 0x100000u) ? 1.0f : -1.0f;
+    float rdir = (sa & 0x200000u) ? 1.0f : -1.0f;
     (void)sl;
 
     if (!p124_ready) p124_init();
+    hstep = 15 + (int)(sb % 30u);                               /* 15..44 */
 
     /* q glides 5 -> 7 -> 5: the vertex figure itself breathes */
-    qn  = 6.0f + 1.35f * sinf(t * 0.00019f + (float)(seed & 7) * 0.8f);
+    qn  = 6.0f + 1.35f * sinf(t * 0.00019f + qph);
     cb2 = cosf(3.14159265f / qn); cb2 = cb2 * cb2;
     d   = sqrtf(cb2 / (0.5f - (1.0f - cb2)));
     rc2 = d * d - 1.0f;
@@ -88,13 +101,13 @@ void pattern_124(uint32_t *fb, int w, int h, int frame, int sl,
     invR = 1.0f / R;
 
     /* hyperbolic translation: |a| stays well inside the disk */
-    aa  = 0.42f + 0.24f * sinf(t * 0.00027f);
-    ar  = aa * cosf(t * 0.00041f);
-    ai  = aa * sinf(t * 0.00041f);
-    rot = t * 0.00023f;
+    aa  = 0.42f + 0.24f * sinf(t * 0.00027f + gph);
+    ar  = aa * cosf(gdir * t * 0.00041f + gph * 1.7f);
+    ai  = aa * sinf(gdir * t * 0.00041f + gph * 1.7f);
+    rot = rdir * t * 0.00023f + qph;
     cr_ = cosf(rot); sr_ = sinf(rot);
 
-    pb = (int)(t * 4.0f);
+    pb = (int)(t * 4.0f) + (int)((sb >> 8) & JD_PAL_MASK);
     for (i = 0; i < 256; i++)
         p124_ramp[i] = pal[(pb + i * 128) & JD_PAL_MASK] & 0x00FFFFFFu;
 
@@ -158,7 +171,7 @@ void pattern_124(uint32_t *fb, int w, int h, int frame, int sl,
             iv = (int)((float)iv * fade);
             if (iv > 255) { c = iv - 255; iv = 255; if (c > 180) c = 180; }
             else c = 0;
-            hi  = (it * 27 + (int)(t * 0.7f)) & 255;
+            hi  = (it * hstep + (int)(t * 0.7f)) & 255;
             col = p124_ramp[hi];
             cr = (int)((((col >> 16) & 255) * iv) >> 8) + c;
             cg = (int)((((col >> 8) & 255) * iv) >> 8) + c;

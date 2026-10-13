@@ -3,28 +3,30 @@
 **An audio-reactive kaleidoscope for Apple Silicon.** It listens to whatever is playing —
 on your Mac, iPhone or iPad — and paints to it, never the same pattern, never the same colours.
 
-### 🎉 Version 3.6.4 — **depth, and fractals that flow** · in App Review for Mac, iPhone and iPad
+### 🎉 Version 3.6.6 — **four new fractals, and see the beat** · in App Review
 
-- **Depth:** layers drift in from the distance and float toward you with gentle parallax, and the
-  backgrounds slowly zoom and turn — it feels like being *inside* the kaleidoscope.
-- **Fractals flow:** they evolve continuously instead of flickering as they redraw.
-- **All 662 routines now play** — 3.5.9 silently left 22 of its new creatures and fractals out.
-- **Never the same twice:** every launch opens on fresh shapes and fresh colours, and patterns
-  that looked identical each time now vary their shape and follow your colours.
+- **Four new fractals:** a neon Mandelbrot drawn as glowing filaments, Nova spiral basins, a
+  Multibrot that blooms from one fold to five and back, and Clifford attractors woven like silk.
+- **See the beat:** a new **M** button puts the beat meter on screen — the bar is now
+  **C · S · M · ?** (colour, shape, meter, about).
+- **Every background drifts** — some used to sit frozen at a random zoom — and the same kind of
+  shape no longer comes straight back.
+- **All 666 routines play**, and 60+ patterns that looked identical each time now vary.
 
-Submitted October 12, 2026. Until Apple approves it, the
-**[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** carries 3.5.9
-(creatures and fractals, October 10) on the Mac and on [iPhone and iPad](#iphone-and-ipad).
+Submitted October 12, 2026. The
+**[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** carries 3.6.4 (depth, and
+fractals that flow) on [iPhone and iPad](#iphone-and-ipad); the Mac App Store follows. The direct
+Mac download below is **3.6.6 now**.
 
 An homage to **DAZZLE.EXE**, rebuilt from scratch — mostly C, with an ARM64 assembly core:
-24 engine modes hand-written in ARM64 assembly under a library of 638 C pattern plug-ins,
+24 engine modes hand-written in ARM64 assembly under a library of 642 C pattern plug-ins,
 layered by a compositor written in C.
 
 ## ⬇️ Download
 
 ### **[Get JellyDazzle on the App Store — Mac, iPhone and iPad](https://apps.apple.com/us/app/jellydazzle/id6808884433)**
 
-Free, and it updates itself — to 3.6.4 as soon as Apple approves it.
+Free, and it updates itself — to 3.6.6 as soon as Apple approves it.
 
 **Not using the App Store?** Signed, notarised direct download — always the latest version:
 [Download JellyDazzle for macOS · Apple Silicon (.zip)](https://github.com/LIBCSYS/JellyDazzle/releases/latest/download/JellyDazzle-macOS-arm64.zip)
@@ -40,7 +42,7 @@ trick — download it and open it.
 **macOS 11 or later · Apple Silicon (M1+) · MIT**
 
 > **Which one do I want?** The **App Store** is for Mac, iPhone and iPad and updates itself
-> (3.5.9 today, 3.6.4 once approved). The direct download above is **3.6.4** for the Mac, signed and
+> (3.6.4 on iPhone and iPad today, 3.6.6 once approved). The direct download above is **3.6.6** for the Mac, signed and
 > notarised, for Macs that do not use the App Store.
 
 > ⚠️ **First launch can take 30–60 seconds** while it measures the routine library and
@@ -64,8 +66,8 @@ More at [dazzle.jelia.nyc](https://dazzle.jelia.nyc/) ·
 
 ## iPhone and iPad
 
-**Version 3.5.9 is on the App Store now, and 3.6.4 is in App Review.** It is the same engine — the
-same ARM64 assembly core and, from 3.6.4, all 662 routines, creatures and fractals included — running
+**Version 3.6.4 is on the App Store now, and 3.6.6 is in App Review.** It is the same engine — the
+same ARM64 assembly core and, from 3.6.6, all 666 routines, the new fractals included — running
 on iOS and iPadOS 15 or later.
 
 - **Your music keeps playing.** iOS does not let one app hear another, so on a phone
@@ -87,8 +89,8 @@ The iOS port and the 3.5 changes land in this repository with the release.
 | | |
 |---|---|
 | **24** | ARM64 assembly engine modes |
-| **638** | C pattern plug-ins |
-| **662** | routines total |
+| **642** | C pattern plug-ins |
+| **666** | routines total |
 | **180** | palette schemes, interpolated in OKLab |
 
 Every routine in the tree is compiled into the shipping binary. Nothing is held back.

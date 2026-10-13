@@ -6,8 +6,36 @@
 #include "../engine/jellydazzle.h"
 #include <math.h>
 
-#define P91_CW 28          /* confetti cells across a half-diamond */
-#define P91_CH 22
+#define P91_CW 32          /* confetti cells across a half-diamond (5px cells worst case) */
+#define P91_CH 26
+
+/* 3.6.5: seed now salts the confetti hash and picks the cell size, the
+ * rhombus proportions, ring pitch and speed and the ramp start. Every
+ * appearance used to be the same rhombus with the same confetti (variety
+ * audit, dSeed 0). */
+static uint32_t p91_seed = 0xFFFFFFFFu;
+static uint32_t p91_salt1, p91_salt2;
+static float p91_icell, p91_iw, p91_ih, p91_ring, p91_rspd, p91_hoff;
+
+static uint32_t p91_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p91_reseed(uint32_t seed)
+{
+    uint32_t a = p91_h(seed ^ 0x9191u), b = p91_h(a);
+    p91_salt1 = p91_h(b ^ 0x51u);
+    p91_salt2 = p91_h(p91_salt1);
+    p91_icell = 1.0f / (5.0f + (float)(a % 4u));             /* 5..8 px cells */
+    p91_iw    = 1.0f / (136.0f + (float)((a >> 4) & 31u));    /* half-width */
+    p91_ih    = 1.0f / (82.0f + (float)((a >> 9) & 31u));     /* half-height */
+    p91_ring  = 4.0f + (float)((a >> 14) & 255u) * (3.0f / 255.0f);
+    p91_rspd  = 0.012f + (float)((a >> 22) & 255u) * (0.008f / 255.0f);
+    p91_hoff  = (float)(b & 255u) * (1.0f / 256.0f);
+    p91_seed  = seed;
+}
 
 static uint32_t p91_cell[P91_CH][P91_CW];   /* per-frame confetti colours */
 static float    p91_hue[256][3];            /* brightness-normalised palette */
@@ -35,9 +63,11 @@ static void p91_cells(float t)
     int cy, cx;
     for (cy = 0; cy < P91_CH; cy++) {
         for (cx = 0; cx < P91_CW; cx++) {
-            int h1 = (int)(((uint32_t)cx * 73856093u) ^ ((uint32_t)cy * 19349663u)) & 255;
-            int h2 = (int)(((uint32_t)cx * 83492791u) ^ ((uint32_t)cy * 2971215073u)) & 255;
-            float hu = (float)h1 * (1.0f / 255.0f)
+            int h1 = (int)p91_h(((uint32_t)cx * 73856093u) ^ ((uint32_t)cy * 19349663u)
+                                ^ p91_salt1) & 255;
+            int h2 = (int)p91_h(((uint32_t)cx * 83492791u) ^ ((uint32_t)cy * 2971215073u)
+                                ^ p91_salt2) & 255;
+            float hu = (float)h1 * (1.0f / 255.0f) + p91_hoff
                      + t * 0.0022f * (0.5f + (float)h2 * (1.0f / 255.0f));
             float val = 0.66f + 0.34f * sinf((float)h1 * 0.21f + t * 0.01f + (float)h2 * 0.05f);
             int hi, r, g, b;
@@ -60,11 +90,13 @@ void pattern_091(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)frame;
     float sxf = 320.0f / (float)w, syf = 240.0f / (float)h;
-    float tsh = t * 0.016f;
+    float tsh;
     float puls, sstep, sph0;
     int x, y;
-    (void)sl; (void)seed;
+    (void)sl;
 
+    if (seed != p91_seed) p91_reseed(seed);
+    tsh = t * p91_rspd;
     tsh = tsh - 3.0f * floorf(tsh * (1.0f / 3.0f));   /* keep floor(ph)%3 stable */
     puls = 0.8f + 0.2f * sinf(t * 0.02f);
     sstep = 0.20f * sxf;
@@ -76,22 +108,22 @@ void pattern_091(uint32_t *fb, int w, int h, int frame, int sl,
     for (y = 0; y < h; y++) {
         float ly = ((float)y + 0.5f) * syf;
         float ay = ly - 120.0f; if (ay < 0.0f) ay = -ay;
-        float ayk = ay * (1.0f / 92.0f);
-        int   cyi = (int)(ay * (1.0f / 6.0f));
+        float ayk = ay * p91_ih;
+        int   cyi = (int)(ay * p91_icell);
         int   streakrow = (ay < 3.0f);
         uint32_t *dst = fb + (long)y * (long)w;
         if (cyi >= P91_CH) cyi = P91_CH - 1;
         for (x = 0; x < w; x++) {
             float lx = ((float)x + 0.5f) * sxf;
             float ax = lx - 160.0f; if (ax < 0.0f) ax = -ax;
-            float dd = ax * (1.0f / 148.0f) + ayk;
+            float dd = ax * p91_iw + ayk;
             uint32_t c = 0;
             if (dd < 0.88f) {
-                int cxi = (int)(ax * (1.0f / 6.0f));
+                int cxi = (int)(ax * p91_icell);
                 float ph, fr;
                 if (cxi >= P91_CW) cxi = P91_CW - 1;
                 c = p91_cell[cyi][cxi];
-                ph = dd * 5.0f - tsh + 6.0f;
+                ph = dd * p91_ring - tsh + 6.0f;
                 fr = ph - (float)(int)ph;
                 if (fr < 0.16f && dd > 0.06f) {
                     int k = (int)ph % 3;

@@ -106,20 +106,38 @@ static float p57_rn(float sd)
     return sd * sqrtf(-2.0f * logf(u1)) * cosf(P57_TAU * u2);
 }
 
-static void p57_init(void)
+/* 3.6.5: per-appearance galaxy — the seed used to be ignored, so every
+ * appearance was the same two-armed spiral (variety audit). The seed now
+ * scatters the stars and picks arm count (2..4), how tightly the arms wind,
+ * which way the disc spins, the axis tilt start, and where on the ramp the
+ * core-to-rim hues start. */
+static uint32_t p57_seed = 0xFFFFFFFFu;
+static float p57_dir = 1.0f, p57_ax0, p57_h0;
+static int p57_bg_done;
+static uint32_t p57_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p57_init(uint32_t seed)
 {
-    int i, x, y;
-    p57_rs = 0x57A1E00Du;
+    int i, x, y, narm;
+    float wind;
+    uint32_t a = p57_h(seed ^ 0x5757u), b = p57_h(a), c = p57_h(b);
+    narm = 2 + (int)(a % 3u);
+    wind = 1.6f + (float)((a >> 8) % 1000u) * 0.0018f;          /* 1.6..3.4 */
+    p57_dir = (b & 1u) ? 1.0f : -1.0f;
+    p57_ax0 = (float)((b >> 4) % 1000u) * (P57_TAU / 1000.0f);
+    p57_h0  = (float)((c >> 6) % 1000u) * 0.001f;
+    p57_rs = 0x57A1E00Du ^ (c | 1u);
     for (i = 0; i < P57_N; i++) {
         float rr = 132.0f * powf(p57_rf(), 0.72f);
-        float arm = (p57_rf() < 0.5f) ? 0.0f : 3.14159265358979f;
+        float arm = (float)((int)(p57_rf() * (float)narm) % narm) * (P57_TAU / (float)narm);
         p57_r[i] = rr;
         p57_th0[i] = arm + p57_rn(0.30f) * (0.35f + rr / 90.0f);
         p57_hj[i] = p57_rn(0.025f);
         p57_tw[i] = p57_rf() * P57_TAU;
-        p57_spir[i] = 2.5f * logf(1.0f + rr / 13.0f);
-        p57_om[i] = 0.0042f / (0.45f + rr / 60.0f);
-        p57_hue[i] = 0.64f - 0.56f * expf(-rr / 55.0f) + p57_hj[i];
+        /* spin sign flips the winding too, so arms always trail the rotation */
+        p57_spir[i] = wind * logf(1.0f + rr / 13.0f) * p57_dir;
+        p57_om[i] = 0.0042f / (0.45f + rr / 60.0f) * p57_dir;
+        p57_hue[i] = p57_h0 + 0.64f - 0.56f * expf(-rr / 55.0f) + p57_hj[i];
         p57_sat[i] = 0.80f - 0.45f * expf(-rr / 22.0f);
         p57_v0[i] = 0.38f + 0.62f * expf(-rr / 80.0f);
     }
@@ -128,7 +146,10 @@ static void p57_init(void)
         p57_fsy[i] = 12.0f + p57_rf() * (P57_LH - 24.0f);
         p57_fsp[i] = p57_rf() * P57_TAU;
     }
-    /* static deep-space ground + core halo */
+    p57_seed = seed;
+    p57_init_done = 1;
+    if (p57_bg_done) return;
+    /* static deep-space ground + core halo (seed-independent, built once) */
     for (y = 0; y < P57_LH; y++) {
         float dy = ((float)y - P57_CY) / 0.62f;
         for (x = 0; x < P57_LW; x++) {
@@ -141,7 +162,7 @@ static void p57_init(void)
             p[2] = 0.05f + 0.10f * expf(-d / 60.0f);
         }
     }
-    p57_init_done = 1;
+    p57_bg_done = 1;
 }
 
 void pattern_057(uint32_t *fb, int w, int h, int frame, int sl,
@@ -150,13 +171,13 @@ void pattern_057(uint32_t *fb, int w, int h, int frame, int sl,
     float tt = (float)(frame % 1048576) + 400.0f;
     float axis, ca, sa, hshift;
     int i, k, n;
-    (void)sl; (void)seed;
-    if (!p57_init_done) p57_init();
+    (void)sl;
+    if (!p57_init_done || seed != p57_seed) p57_init(seed);
 
     n = P57_LW * P57_LH * 3;
     for (i = 0; i < n; i++) p57_acc[i] = p57_bg[i];
 
-    axis = tt * 0.00055f;
+    axis = p57_ax0 + tt * 0.00055f * p57_dir;
     ca = cosf(axis); sa = sinf(axis);
     hshift = tt * 0.00025f;
 

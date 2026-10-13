@@ -13,6 +13,36 @@ static uint16_t *p64_a12;   /* 12*angle, 1024-unit turn scaled x16 */
 static uint16_t *p64_dep;   /* depth * 64 */
 static uint8_t  *p64_shd;   /* r/(r+42) * 63 */
 static uint32_t p64_lut[64][256];
+/* 3.6.5: seed-derived look — every appearance used to be the same 24-ray
+ * forge (variety audit dSeed 0.00). Tables are rebuilt only on reseed. */
+static uint32_t p64_seed = 0xFFFFFFFFu;
+static int    p64_mult = 12;            /* angular frequency: 2*mult rays */
+static double p64_ox = 0.0, p64_oy = 0.0; /* core offset, 320-space px */
+static int    p64_poff = 0;             /* ramp start on the 32768 palette */
+static double p64_sws = 1.0, p64_rgs = 1.0, p64_bns = 1.0;
+static int    p64_bendamp = 1434;
+
+static uint32_t p64_hash(uint32_t x) {
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return x;
+}
+
+/* ray count, core offset, sweep direction, ring/bend speed, bend depth and
+ * ramp start. Ranges kept tight enough that it still reads as the forge. */
+static void p64_reseed(uint32_t seed) {
+    static const int mults[6] = { 9, 10, 12, 13, 14, 16 };
+    uint32_t a = p64_hash(seed ^ 0x64F0u), b = p64_hash(a), c = p64_hash(b);
+    p64_mult = mults[a % 6u];
+    p64_ox = (double)((int)((a >> 8) & 63) - 32) * 0.9;
+    p64_oy = (double)((int)((a >> 14) & 63) - 32) * 0.6;
+    p64_sws = ((b & 1u) ? -1.0 : 1.0) * (1.0 + ((b >> 1) & 255) * (0.6 / 255.0));
+    p64_rgs = 1.0 + ((b >> 9) & 255) * (0.35 / 255.0);
+    p64_bns = ((b >> 17) & 1u) ? -1.0 : 1.0;
+    p64_bendamp = 900 + (int)((c >> 4) % 1000u);       /* 0.34..0.73 rad */
+    p64_poff = (int)(c >> 17) & JD_PAL_MASK;
+    p64_w = 0;                       /* force geometry rebuild */
+    p64_seed = seed;
+}
 
 /* luminance envelope of the lab forge ramp: iron black -> ember -> gold ->
  * white-hot -> gold -> ember -> iron black. Colour still comes from pal. */
@@ -43,13 +73,13 @@ static void p64_init(int w, int h) {
     p64_dep = (uint16_t *)malloc((size_t)w * h * 2);
     p64_shd = (uint8_t *)malloc((size_t)w * h);
     for (y = 0, i = 0; y < h; y++) {
-        double py = (y - h * 0.5) * sy;
+        double py = (y - h * 0.5) * sy - p64_oy;
         for (x = 0; x < w; x++, i++) {
-            double px = (x - w * 0.5) * sx;
+            double px = (x - w * 0.5) * sx - p64_ox;
             double r = hypot(px, py) + 1e-3;
             double a = atan2(py, px);
             double depth = 2200.0 / (r + 12.0);
-            double ph = fmod(a * 12.0 * (1024.0 / (2.0 * M_PI)) * 16.0, 16384.0);
+            double ph = fmod(a * p64_mult * (1024.0 / (2.0 * M_PI)) * 16.0, 16384.0);
             if (ph < 0) ph += 16384.0;
             p64_a12[i] = (uint16_t)ph;
             p64_dep[i] = (uint16_t)(depth * 64.0);
@@ -64,8 +94,17 @@ static void p64_build_lut(const uint32_t *pal) {
     int idx, s, j;
     int ar[7], ag[7], ab[7];
     for (j = 0; j < 6; j++) {
-        uint32_t c = pal[(j * 5461) & JD_PAL_MASK];
+        uint32_t c = pal[(j * 5461 + p64_poff) & JD_PAL_MASK];
+        int m;
         ar[j] = (c >> 16) & 255; ag[j] = (c >> 8) & 255; ab[j] = c & 255;
+        /* 3.6.5: a seeded ramp start can land on a dark stretch of the
+         * palette; the envelope already supplies the darkness, so lift each
+         * stop's brightest channel to 190 or the forge goes dull. */
+        m = ar[j] > ag[j] ? ar[j] : ag[j]; if (ab[j] > m) m = ab[j];
+        if (m < 190) {
+            if (m < 8) { ar[j] = ag[j] = ab[j] = 8; m = 8; }
+            ar[j] = ar[j] * 190 / m; ag[j] = ag[j] * 190 / m; ab[j] = ab[j] * 190 / m;
+        }
     }
     ar[6] = ar[0]; ag[6] = ag[0]; ab[6] = ab[0];
     for (idx = 0; idx < 256; idx++) {
@@ -88,17 +127,20 @@ void pattern_064(uint32_t *fb, int w, int h, int frame, int sl,
     int i, n = w * h;
     double t = (double)frame;
     int sweep, bendt, ringt;
-    (void)sl; (void)seed;
+    (void)sl;
+    if (seed != p64_seed) p64_reseed(seed);
     p64_init(w, h);
     p64_build_lut(pal);
     /* x16 units of a 1024-step turn; 1 rad = 2607.6 units */
-    sweep = (int)fmod(t * 0.004 * 2607.6, 16384.0);
-    bendt = (int)fmod(t * 0.008 * 2607.6, 16384.0);
-    ringt = 16384 - (int)fmod(t * 0.040 * 2607.6, 16384.0);
+    sweep = (int)fmod(t * 0.004 * p64_sws * 2607.6, 16384.0);
+    if (sweep < 0) sweep += 16384;
+    bendt = (int)fmod(t * 0.008 * p64_bns * 2607.6, 16384.0);
+    if (bendt < 0) bendt += 16384;
+    ringt = 16384 - (int)fmod(t * 0.040 * p64_rgs * 2607.6, 16384.0);
     for (i = 0; i < n; i++) {
         int dep = p64_dep[i];
         int bph = ((dep * 117) >> 6) + bendt;            /* depth*0.045 rad */
-        int bend = (p64_sin[(bph >> 4) & 1023] * 1434) >> 15;   /* 0.55 rad */
+        int bend = (p64_sin[(bph >> 4) & 1023] * p64_bendamp) >> 15;   /* seeded depth */
         int rays = p64_sin[((p64_a12[i] + sweep + bend) >> 4) & 1023];
         int rph = ((dep * 1173) >> 6) + ringt;           /* depth*0.45 rad */
         int rngs = p64_sin[(rph >> 4) & 1023];

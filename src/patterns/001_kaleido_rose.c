@@ -10,8 +10,22 @@ static float p1_r[P1_IW * P1_IH];
 static uint16_t p1_field[P1_IW * P1_IH];
 static int p1_init;
 
+/* 3.6.5: seed-derived look. Every appearance used to be identical (variety
+ * audit, dSeed 0) and rotating a dihedral fold barely changes it, so the seed
+ * picks things that read as a different rose: where in the fold sequence we
+ * start, ring scale, lobe count, spin direction and the ramp start. */
+static uint32_t p1_seed = 0xFFFFFFFFu;
+static int p1_seq0, p1_lobe;
+static float p1_rsc, p1_dir, p1_tph;
+static uint32_t p1_poff;
+
+static uint32_t p1_hash(uint32_t x) {          /* murmur3 finaliser */
+    x ^= x >> 16; x *= 0x85ebca6bu; x ^= x >> 13; x *= 0xc2b2ae35u; x ^= x >> 16;
+    return x;
+}
+
 static float p1_fieldval(float thf, int N, float t, float r) {
-    float rose = r - 78.0f * fabsf(cosf(3.0f * thf * (float)N * 0.25f + t * 0.003f));
+    float rose = r - 78.0f * fabsf(cosf((float)p1_lobe * thf * (float)N * 0.25f + t * 0.003f));
     return 0.50f
          + 0.28f * sinf(r * 0.055f - t * 0.006f + 2.5f * cosf(thf * 6.0f))
          + 0.22f * sinf(rose * 0.09f + t * 0.002f);
@@ -41,7 +55,7 @@ static void p1_upsample(uint32_t *fb, int w, int h, const uint16_t *f,
 
 void pattern_001(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
-    (void)sl; (void)seed;
+    (void)sl;
     static const int seq[10] = {4, 6, 8, 10, 12, 14, 16, 12, 8, 6};
     if (!p1_init) {
         p1_init = 1;
@@ -52,19 +66,35 @@ void pattern_001(uint32_t *fb, int w, int h, int frame, int sl,
                 p1_r[y * P1_IW + x] = sqrtf(X * X + Y * Y);
             }
     }
-    float t = (float)frame;
-    int i = (frame / 240) % 10, j = (i + 1) % 10;
+    if (seed != p1_seed) {
+        uint32_t hs = p1_hash(seed ^ 0x2545F491u);
+        p1_seed = seed;
+        p1_seq0 = (int)(hs % 10u);
+        p1_lobe = 2 + (int)((hs >> 4) % 3u);                 /* 2..4 lobes */
+        p1_rsc = 0.90f + 0.55f * (float)((hs >> 8) & 255) / 255.0f;
+        p1_dir = (hs & 0x10000u) ? 1.0f : -1.0f;
+        hs = p1_hash(hs);
+        p1_tph = (float)(hs % 3000u);                        /* field phase */
+        /* ramp start is held to the first quarter of the ramp: the field already
+         * spans about a quarter of it, and the library's ramps go dark at both
+         * ends, so a free offset would land some seeds in a near-black stretch */
+        p1_poff = (hs >> 12) % 8192u;
+    }
+    /* time phase only moves the slow field terms; the fold schedule still
+     * runs on the real frame so crossfades stay where they were */
+    float t = (float)frame + p1_tph;
+    int i = (frame / 240 + p1_seq0) % 10, j = (i + 1) % 10;
     float fph = (float)(frame % 240) / 240.0f;
     float m = (fph - 0.7f) / 0.3f;
     if (m < 0.0f) m = 0.0f;
     if (m > 1.0f) m = 1.0f;
     m = m * m * (3.0f - 2.0f * m);
-    float rot = t * 0.0010f;
+    float rot = t * 0.0010f * p1_dir;
     int Na = seq[i], Nb = seq[j];
     float wa = (float)M_PI / (float)Na, wb = (float)M_PI / (float)Nb;
     float inv2wa = 1.0f / (2.0f * wa), inv2wb = 1.0f / (2.0f * wb);
     for (int k = 0; k < P1_IW * P1_IH; k++) {
-        float th = p1_th[k] + rot, r = p1_r[k];
+        float th = p1_th[k] + rot, r = p1_r[k] * p1_rsc;
         float ta = th - floorf(th * inv2wa) * 2.0f * wa;
         float thf = fabsf(ta - wa);
         float v = p1_fieldval(thf, Na, t, r);
@@ -79,6 +109,6 @@ void pattern_001(uint32_t *fb, int w, int h, int frame, int sl,
         if (q > 65535) q = 65535;
         p1_field[k] = (uint16_t)q;
     }
-    uint32_t off = (uint32_t)((double)frame * 1.28) & JD_PAL_MASK;
+    uint32_t off = ((uint32_t)((double)frame * 1.28) + p1_poff) & JD_PAL_MASK;
     p1_upsample(fb, w, h, p1_field, pal, off);
 }

@@ -39,6 +39,51 @@ static int p105_ready;
 
 static const uint8_t p105_rules[6] = { 90, 150, 18, 22, 126, 182 };
 
+/* 3.6.5: the seed only nudged spin and hue, and the automaton history ran on
+ * from wherever the last appearance left it, so the audit measured the same
+ * picture for every seed. Now the seed picks the opening rule, the initial
+ * row (one cell, or a mirrored constellation of 3-7), ring pitch and the
+ * ellipse aspect, and the history is pre-run for a full disc of rings so a
+ * new appearance opens on a finished mandala rather than a dot. */
+static uint32_t p105_seed = 0xFFFFFFFFu;
+static float    p105_dr = 1.86f;        /* ring pitch                       */
+static float    p105_ax = 1.06f, p105_ay = 0.82f;   /* ellipse aspect       */
+static int      p105_nseed = 1;         /* live cells in an initial row     */
+static int      p105_sgap = 32;         /* spacing of those cells           */
+
+static uint32_t p105_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+/* the seed row: centre cell plus mirrored pairs, so bilateral symmetry holds */
+static void p105_seedrow(uint8_t *row)
+{
+    int k;
+    memset(row, 0, P105_NC);
+    row[P105_NC / 2] = 1;
+    for (k = 1; k <= (p105_nseed - 1) / 2; k++) {
+        row[(P105_NC / 2 + k * p105_sgap) % P105_NC] = 1;
+        row[(P105_NC / 2 - k * p105_sgap + P105_NC * 4) % P105_NC] = 1;
+    }
+}
+
+/* one generation; re-seeds when the rule changes (old behaviour, plus the
+ * run's own seed row instead of the fixed three-cell one) */
+static void p105_step(void)
+{
+    const uint8_t *src = p105_hist[p105_head];
+    uint8_t *dst;
+    int i, rule = p105_rules[(p105_gen / 96) % 6];
+    p105_head = (p105_head + 1) % P105_RINGS;
+    dst = p105_hist[p105_head];
+    for (i = 0; i < P105_NC; i++) {
+        int l = src[(i + P105_NC - 1) % P105_NC];
+        int c = src[i];
+        int r = src[(i + 1) % P105_NC];
+        dst[i] = (uint8_t)((rule >> ((l << 2) | (c << 1) | r)) & 1);
+    }
+    if (p105_gen % 96 == 95) p105_seedrow(dst);
+    p105_gen++;
+}
+
 static void p105_init(void)
 {
     int i;
@@ -116,38 +161,35 @@ void pattern_105(uint32_t *fb, int w, int h, int frame, int sl,
     (void)sl;
 
     if (!p105_ready) p105_init();
-    hbase = (int)(t * 1.2f) + (int)(seed & 32767);
+    if (seed != p105_seed) {
+        uint32_t a = p105_h(seed ^ 0x1055u), b = p105_h(a), c = p105_h(b);
+        p105_nseed = 1 + 2 * (int)(a % 4u);                        /* 1,3,5,7 */
+        p105_sgap  = 9 + (int)((a >> 8) % 40u);                    /* 9..48   */
+        p105_dr    = 1.62f + (float)(b % 1000u) * 0.00048f;        /* 1.62..2.1 */
+        p105_ax    = 0.92f + (float)((b >> 12) % 1000u) * 0.00022f;/* .92..1.14 */
+        p105_ay    = p105_ax * (0.72f + (float)((c >> 4) % 1000u) * 0.00012f);
+        p105_gen   = (int)(c % 6u) * 96 + 1;                       /* opening rule */
+        p105_head  = 0;
+        p105_seedrow(p105_hist[0]);
+        for (i = 0; i < P105_RINGS - 1; i++) p105_step();          /* full disc now */
+        p105_last  = frame;
+        p105_seed  = seed;
+    }
+    hbase = (int)(t * 1.2f) + (int)(p105_h(seed) & 32767);
     p105_build_ramp(pal, hbase);
 
     /* --- advance the automaton on its own clock --- */
     if (frame < p105_last || frame - p105_last >= P105_STEP) {
-        const uint8_t *src = p105_hist[p105_head];
-        uint8_t *dst;
-        int rule = p105_rules[(p105_gen / 96) % 6];
-        p105_head = (p105_head + 1) % P105_RINGS;
-        dst = p105_hist[p105_head];
-        for (i = 0; i < P105_NC; i++) {
-            int l = src[(i + P105_NC - 1) % P105_NC];
-            int c = src[i];
-            int r = src[(i + 1) % P105_NC];
-            dst[i] = (uint8_t)((rule >> ((l << 2) | (c << 1) | r)) & 1);
-        }
-        if (p105_gen % 96 == 95) {           /* re-seed when the rule changes */
-            memset(dst, 0, P105_NC);
-            dst[P105_NC / 2] = 1;
-            dst[(P105_NC / 2 + P105_NC / 3) % P105_NC] = 1;
-            dst[(P105_NC / 2 - P105_NC / 3 + P105_NC) % P105_NC] = 1;
-        }
-        p105_gen++;
+        p105_step();
         p105_last = frame;
     }
     frac = (float)(frame - p105_last) * (1.0f / (float)P105_STEP);
     if (frac < 0.0f) frac = 0.0f;
     if (frac > 1.0f) frac = 1.0f;
 
-    dr = 1.86f;
+    dr = p105_dr;
     r0 = 5.0f;
-    spin = t * 0.00047f + (float)(seed & 1023) * 0.0061f;
+    spin = t * 0.00047f + (float)(p105_h(seed ^ 0x51u) & 1023) * 0.0061f;
     cx = P105_LW * 0.5f; cy = P105_LH * 0.5f;
 
     memset(p105_acc, 0, sizeof p105_acc);
@@ -168,8 +210,8 @@ void pattern_105(uint32_t *fb, int w, int h, int frame, int sl,
             if (!row[i]) continue;
             for (k = 0; k < sub; k++) {
                 int q = ((i * 4) + (k * 4) / sub + spq) & (P105_NC * 4 - 1);
-                float px = cx + r * p105_cs[q] * 1.06f;
-                float py = cy + r * p105_sn[q] * 0.82f;
+                float px = cx + r * p105_cs[q] * p105_ax;
+                float py = cy + r * p105_sn[q] * p105_ay;
                 p105_dot(px, py, cp, bri * 0.30f / (float)sub);
                 p105_dot(px + p105_cs[q] * 0.9f, py + p105_sn[q] * 0.7f,
                          cp, bri * 0.22f / (float)sub);

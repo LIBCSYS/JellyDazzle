@@ -23,6 +23,35 @@ static float p88_gnd[1024][3];
 static float p88_cell[P88_CN * P88_CN][4];   /* Rs, iRs, hb, bp */
 static int p88_inited;
 
+/* 3.6.5: seed now picks the drift heading, star size, ring density, hue
+ * spread, the cell hash and the ramp start. Every appearance used to be the
+ * same tiling in the same colours drifting the same way (variety audit,
+ * dSeed 0). */
+static uint32_t p88_seed = 0xFFFFFFFFu;
+static float p88_vx, p88_vy, p88_rs0, p88_ring, p88_hspr, p88_hoff;
+static double p88_so;
+
+static uint32_t p88_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p88_reseed(uint32_t seed)
+{
+    uint32_t a = p88_h(seed ^ 0x8888u), b = p88_h(a);
+    float ang = (float)(a & 1023u) * (P88_TAU / 1024.0f);
+    float sp  = 0.026f + (float)((a >> 10) & 255u) * (0.016f / 255.0f);
+    p88_vx   = sp * cosf(ang);
+    p88_vy   = sp * sinf(ang);
+    p88_rs0  = 24.0f + (float)((a >> 18) & 255u) * (5.0f / 255.0f);
+    p88_ring = 0.25f + (float)(b & 255u) * (0.22f / 255.0f);
+    p88_hspr = 0.30f + (float)((b >> 8) & 255u) * (0.35f / 255.0f);
+    p88_hoff = (float)((b >> 16) & 1023u) * (1.0f / P88_HSPAN);
+    p88_so   = (double)(p88_h(b) & 0xFFFFu) * 0.0173;
+    p88_seed = seed;
+}
+
 /* Column geometry. The two candidate lattice columns (their index and the
  * offset u within the cell) depend only on x and on the frame's dxo scroll,
  * never on y — so the two floorf/int round-trips per pixel collapse to one
@@ -88,7 +117,7 @@ static inline void p88_colour(float u, float v, const float *cl, int k,
     float Rs = cl[0], r, g, b, rim;
     if (d8 < Rs) {
         float hue = d8 * cl[1] + cl[2];
-        float bri = 0.55f + 0.45f * p88_lsin(d8 * 0.35f + cl[3]);
+        float bri = 0.55f + 0.45f * p88_lsin(d8 * p88_ring + cl[3]);
         const float *c = p88_ptab[(int)(hue * P88_HSPAN + 4096.0f) & 1023];
         r = c[0] * bri; g = c[1] * bri; b = c[2] * bri;
     } else {
@@ -109,13 +138,16 @@ void pattern_088(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)frame;
     float isx = 320.0f / (float)w, isy = 240.0f / (float)h;
-    float dxo = t * 0.03f, dyo = t * 0.018f;
-    float hdrift = t * 0.0013f, gph = -t * 0.006f, bph = -t * 0.014f;
+    float dxo, dyo;
+    float hdrift, gph = -t * 0.006f, bph = -t * 0.014f;
     float brt = t * 0.011f;
     int mbase, nbase, mi, ni, i, x, y, blk;
-    (void)sl; (void)seed;
+    (void)sl;
 
     if (!p88_inited) p88_init();
+    if (seed != p88_seed) p88_reseed(seed);
+    dxo = t * p88_vx; dyo = t * p88_vy;
+    hdrift = t * 0.0013f + p88_hoff;
     p88_buildpal(pal);
 
     /* ground weave LUT over (x+y) folded into 1024 slots of 0.5 units */
@@ -130,12 +162,12 @@ void pattern_088(uint32_t *fb, int w, int h, int frame, int sl,
         for (mi = 0; mi < P88_CN; mi++) {
             double cx = (double)(mbase + mi) * (double)P88_HL;
             double cy = (double)(nbase + ni) * (double)P88_HL;
-            double s = sin(cx * 0.113 + cy * 0.271) * 43758.5453;
+            double s = sin(cx * 0.113 + cy * 0.271 + p88_so) * 43758.5453;
             float ch = (float)(s - floor(s));
-            float Rs = 27.0f + 4.0f * p88_lsin(brt + ch * 6.28f);
+            float Rs = p88_rs0 + 4.0f * p88_lsin(brt + ch * 6.28f);
             float *cl = p88_cell[ni * P88_CN + mi];
             cl[0] = Rs;
-            cl[1] = 0.45f / Rs;
+            cl[1] = p88_hspr / Rs;
             cl[2] = ch * 0.35f + hdrift;
             cl[3] = bph + ch * 6.28f;
         }

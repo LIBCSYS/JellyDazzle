@@ -8,6 +8,19 @@
 
 static uint16_t p6_field[P6_IW * P6_IH];
 
+/* 3.6.5: seed-derived look. Every appearance used to be identical (variety
+ * audit, dSeed 0). The seed now picks cell size, petal count per wedge, ring
+ * density, drift heading, where in the p6<->p6m morph it starts, and the
+ * ramp start. */
+static uint32_t p6_seed = 0xFFFFFFFFu;
+static float p6_L, p6_pk, p6_rk, p6_vx, p6_vy, p6_tph;
+static uint32_t p6_poff;
+
+static uint32_t p6_hash(uint32_t x) {          /* murmur3 finaliser */
+    x ^= x >> 16; x *= 0x85ebca6bu; x ^= x >> 13; x *= 0xc2b2ae35u; x ^= x >> 16;
+    return x;
+}
+
 static void p6_upsample(uint32_t *fb, int w, int h, const uint16_t *f,
                         const uint32_t *pal, uint32_t off) {
     uint32_t sx = (uint32_t)(((P6_IW - 1) << 16) - 1) / (uint32_t)(w > 1 ? w - 1 : 1);
@@ -32,14 +45,34 @@ static void p6_upsample(uint32_t *fb, int w, int h, const uint16_t *f,
 
 void pattern_006(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
-    (void)sl; (void)seed;
+    (void)sl;
+    if (seed != p6_seed) {
+        uint32_t hs = p6_hash(seed ^ 0x510E527Fu);
+        float ang;
+        p6_seed = seed;
+        p6_L = 56.0f + 46.0f * (float)(hs & 255) / 255.0f;      /* 56..102 */
+        /* 3 or 6 petals per C6 wedge: 6 closes seamlessly, 3 is the classic */
+        p6_pk = ((hs >> 8) & 1u) ? 6.0f : 3.0f;
+        p6_rk = 0.90f + 0.55f * (float)((hs >> 9) & 255) / 255.0f;
+        ang = 6.2831853f * (float)((hs >> 17) & 1023) / 1024.0f;
+        p6_vx = 0.0447f * cosf(ang);         /* original drift speed */
+        p6_vy = 0.0447f * sinf(ang);
+        hs = p6_hash(hs);
+        p6_tph = (float)(hs % 3200u);       /* one full morph period */
+        /* ramp start is held to the first quarter of the ramp: the field already
+         * spans about a quarter of it, and the library's ramps go dark at both
+         * ends, so a free offset would land some seeds in a near-black stretch */
+        p6_poff = (hs >> 12) % 8192u;
+    }
     const float S3 = 1.7320508f;
-    const float L = 78.0f, invL = 1.0f / 78.0f;
+    const float L = p6_L, invL = 1.0f / p6_L;
+    const float pk = p6_pk, rk = p6_rk;
     const float W2 = (float)M_PI / 3.0f, invW2 = 3.0f / (float)M_PI;
     const float WH = (float)M_PI / 6.0f;
-    float t = (float)frame;
+    float t = (float)frame + p6_tph;
     /* temporal rates halved vs the lab prototype to satisfy the motion law */
-    float ox = t * 0.04f - P6_IW * 0.5f, oy = t * 0.02f - P6_IH * 0.5f;
+    float ox = (float)frame * p6_vx - P6_IW * 0.5f;
+    float oy = (float)frame * p6_vy - P6_IH * 0.5f;
     float pa = -t * 0.005f, pb = -t * 0.0035f;
     float m = 0.5f + 0.5f * sinf(t * 0.002f);
     m = m * m * (3.0f - 2.0f * m);
@@ -60,11 +93,11 @@ void pattern_006(uint32_t *fb, int w, int h, int frame, int sl,
             float th = atan2f(dyc, dx);
             float thA = th - floorf(th * invW2) * W2;      /* C6 rotation fold */
             float thB = fabsf(thA - WH);                   /* D6 mirror fold   */
-            float rr = r * 0.16f + pa, rs = r * 0.09f + pb;
-            float vA = 0.5f + 0.30f * sinf(3.0f * thA + rr)
-                            + 0.20f * sinf(rs + sinf(thA * 3.0f));
-            float vB = 0.5f + 0.30f * sinf(3.0f * thB + rr)
-                            + 0.20f * sinf(rs + sinf(thB * 3.0f));
+            float rr = r * 0.16f * rk + pa, rs = r * 0.09f * rk + pb;
+            float vA = 0.5f + 0.30f * sinf(pk * thA + rr)
+                            + 0.20f * sinf(rs + sinf(thA * pk));
+            float vB = 0.5f + 0.30f * sinf(pk * thB + rr)
+                            + 0.20f * sinf(rs + sinf(thB * pk));
             float val = vA * im + vB * m;
             float idx = val * 0.9f + r * 0.0015f;
             int q = (int)(idx * 4096.0f + 8192.0f);
@@ -73,6 +106,7 @@ void pattern_006(uint32_t *fb, int w, int h, int frame, int sl,
             row[x] = (uint16_t)q;
         }
     }
-    uint32_t off = (uint32_t)((double)frame * (0.0004 * 4096.0)) & JD_PAL_MASK;
+    uint32_t off = ((uint32_t)((double)frame * (0.0004 * 4096.0)) + p6_poff)
+                 & JD_PAL_MASK;
     p6_upsample(fb, w, h, p6_field, pal, off);
 }

@@ -21,6 +21,7 @@ static gk g612;
 static uint32_t bs612 = 0xFFFFFFFFu;
 static int   base612;
 static float wx612, wy612, wdir612, wsc612, whue612;
+static float rate612 = 0.050f;     /* fluke beats, radians per frame     */
 static float bx612[NB612], by612[NB612], bvy612[NB612], br612[NB612];
 static float bage612[NB612], bph612[NB612];
 static int   bnext612;
@@ -42,7 +43,14 @@ void pattern_612(uint32_t *fb, int w, int h, int frame, int sl,
         base612 = (int)(seed & 0x7FFFu);
         wdir612 = (gk_hash(seed ^ 0x101u) < 0.5f) ? 1.0f : -1.0f;
         wsc612  = (0.85f + 0.40f * gk_hash(seed ^ 0x102u)) * sc;
-        wx612   = (wdir612 > 0.0f) ? -140.0f * wsc612 : cw + 140.0f * wsc612;
+        /* 3.6.5: the whale used to start 140 px off the entry edge and, at
+         * 0.3..1.15 px a frame, spent the first 150-odd frames of every
+         * appearance entirely off-canvas — a black screen for the opening
+         * seconds, and motion 0.00 in the variety audit at 320x240.  Start it
+         * already in the water at a seed-picked point along its track; it
+         * still swims off and re-enters from the edge as before. */
+        wx612   = cw * (0.22f + 0.56f * gk_hash(seed ^ 0x105u));
+        rate612 = 0.042f + 0.016f * gk_hash(seed ^ 0x106u);
         wy612   = (0.34f + 0.30f * gk_hash(seed ^ 0x103u)) * ch;
         whue612 = gk_hash(seed ^ 0x104u);
         for (i = 0; i < NB612; i++) bage612[i] = -1.0f;
@@ -51,7 +59,9 @@ void pattern_612(uint32_t *fb, int w, int h, int frame, int sl,
     }
 
     float t  = (float)frame;
-    float ph = t * 0.050f;                      /* one fluke beat per ~125 f */
+    /* one fluke beat per ~110..150 f; 3.6.5: the seed sets the tempo, so
+     * one whale is unhurried and the next a little brisker */
+    float ph = t * rate612;
 
     /* Speed follows the sweep rate, not the sweep position.  The -2.1 offset
      * is the same lag the body carries, so thrust arrives when the fluke is

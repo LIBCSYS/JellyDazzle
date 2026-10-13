@@ -91,11 +91,17 @@ void pattern_622(uint32_t *fb, int w, int h, int frame, int sl,
     float col[3];
 
     if (seed != bs622) {
-        base622 = (int)(seed & 0x7FFFu);
+        /* 3.6.5: the parade always marched mostly rightward at one size
+         * range; now the seed picks which way the column heads, an overall
+         * scale for the troupe, and the ramp start through a hash rather
+         * than raw low bits (variety audit). */
+        base622 = (int)(gk_hash(seed ^ 0x6220u) * 32768.0f);
+        int   way  = gk_hash(seed ^ 0x6221u) < 0.5f ? 1 : -1;
+        float troop = 0.85f + 0.35f * gk_hash(seed ^ 0x6222u);
         for (i = 0; i < NB622; i++) {
             uint32_t r = seed ^ (uint32_t)(i * 4421);
-            bsz622[i]  = (0.75f + 0.75f * gk_hash(r + 1u)) * sc;
-            bdir622[i] = gk_hash(r + 2u) > 0.25f ? 1 : -1;   /* mostly one way */
+            bsz622[i]  = (0.75f + 0.75f * gk_hash(r + 1u)) * sc * troop;
+            bdir622[i] = gk_hash(r + 2u) > 0.25f ? way : -way;  /* mostly one way */
             bx622[i]   = gk_hash(r + 3u) * cw;
             by622[i]   = ch * (0.18f + 0.66f * gk_hash(r + 4u));
             bsp622[i]  = (0.55f + 0.55f * gk_hash(r + 5u)) * sc;

@@ -19,6 +19,34 @@ static uint32_t p65_ramp[256];
 static int p65_uw = -1;
 static int *p65_uxi;
 static uint8_t *p65_uxf;
+/* 3.6.5: seed now picks petal count, echo ratio, spin direction, a small
+ * centre drift and the ramp start — every appearance used to be the same
+ * 5-petal flower in the same colours (variety audit dSeed 0.00). */
+static uint32_t p65_seed = 0xFFFFFFFFu;
+static int    p65_pet = 5;
+static double p65_ratio = 1.9, p65_spin = 1.0, p65_dive = 1.0, p65_tw = 0.5;
+static double p65_ox = 0.0, p65_oy = 0.0;
+static int    p65_poff = 0;
+
+static uint32_t p65_hash(uint32_t x) {
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return x;
+}
+
+static void p65_reseed(uint32_t seed) {
+    static const int pets[6] = { 3, 4, 5, 6, 7, 8 };
+    uint32_t a = p65_hash(seed ^ 0x65E0u), b = p65_hash(a);
+    p65_pet = pets[a % 6u];
+    p65_ratio = 1.70 + ((a >> 8) & 255) * (0.40 / 255.0);
+    p65_tw = (((a >> 16) & 1u) ? -1.0 : 1.0) * (0.35 + ((a >> 17) & 127) * (0.35 / 127.0));
+    p65_spin = ((b & 1u) ? -1.0 : 1.0) * (0.8 + ((b >> 1) & 127) * (0.8 / 127.0));
+    p65_dive = 1.0 + ((b >> 8) & 127) * (0.4 / 127.0);
+    p65_ox = (double)((int)((b >> 15) & 31) - 16) * 1.5;
+    p65_oy = (double)((int)((b >> 20) & 31) - 16) * 1.0;
+    p65_poff = (int)(b >> 17) & JD_PAL_MASK;
+    p65_tab_ok = 0;                  /* petal angle table depends on it */
+    p65_seed = seed;
+}
 
 static void p65_init(void) {
     int x, y, i;
@@ -26,11 +54,11 @@ static void p65_init(void) {
     for (i = 0; i < 1024; i++)
         p65_sin[i] = (int16_t)(32767.0 * sin(i * (2.0 * M_PI / 1024.0)));
     for (y = 0, i = 0; y < P65_GH; y++) {
-        double py = y - P65_GH * 0.5;
+        double py = y - P65_GH * 0.5 - p65_oy;
         for (x = 0; x < P65_GW; x++, i++) {
-            double px = x - P65_GW * 0.5;
+            double px = x - P65_GW * 0.5 - p65_ox;
             p65_r[i] = (float)hypot(px, py);
-            p65_a5[i] = (float)(atan2(py, px) * 5.0 * (1024.0 / (2.0 * M_PI)));
+            p65_a5[i] = (float)(atan2(py, px) * p65_pet * (1024.0 / (2.0 * M_PI)));
         }
     }
     p65_tab_ok = 1;
@@ -44,8 +72,16 @@ static void p65_build_ramp(const uint32_t *pal) {
     int idx, j = 0, k;
     int ar[7], ag[7], ab[7];
     for (k = 0; k < 6; k++) {
-        uint32_t c = pal[(k * 5461) & JD_PAL_MASK];
+        uint32_t c = pal[(k * 5461 + p65_poff) & JD_PAL_MASK];
+        int m;
         ar[k] = (c >> 16) & 255; ag[k] = (c >> 8) & 255; ab[k] = c & 255;
+        /* 3.6.5: seeded ramp start may sit on a dark stretch; lift the
+         * brightest channel to 190, the envelope still shapes the darks */
+        m = ar[k] > ag[k] ? ar[k] : ag[k]; if (ab[k] > m) m = ab[k];
+        if (m < 190) {
+            if (m < 8) { ar[k] = ag[k] = ab[k] = 8; m = 8; }
+            ar[k] = ar[k] * 190 / m; ag[k] = ag[k] * 190 / m; ab[k] = ab[k] * 190 / m;
+        }
     }
     ar[6] = ar[0]; ag[6] = ag[0]; ab[6] = ab[0];
     for (idx = 0; idx < 256; idx++) {
@@ -109,20 +145,22 @@ void pattern_065(uint32_t *fb, int w, int h, int frame, int sl,
     int wi[P65_NOCT];
     int k, i, wsum = 0;
     double t = (double)frame;
-    double z = t * 0.0035, frac = z - floor(z), spin = t * 0.0009;
+    double z, frac, spin;
     float fac;
-    (void)sl; (void)seed;
+    (void)sl;
+    if (seed != p65_seed) p65_reseed(seed);
+    z = t * 0.0035 * p65_dive; frac = z - floor(z); spin = t * 0.0009 * p65_spin;
     p65_init();
     p65_build_ramp(pal);
 
     for (k = 0; k < P65_NOCT; k++) {
         double m = k - frac;
-        double sc = pow(1.9, m) * 0.021;
-        double th = m * 0.5 + spin;
+        double sc = pow(p65_ratio, m) * 0.021 * pow(1.9 / p65_ratio, 4.0);
+        double th = m * p65_tw + spin;
         double ww = pow(0.62, m) * (m + 1.0 < 1.0 ? (m + 1.0 < 0.0 ? 0.0 : m + 1.0) : 1.0);
         A[k] = (float)(sc * 6.0 * (1024.0 / (2.0 * M_PI)));
         B[k] = (float)(sc * 1.5 * (1024.0 / (2.0 * M_PI)));
-        C[k] = (float)(th * 5.0 * (1024.0 / (2.0 * M_PI)));
+        C[k] = (float)(th * p65_pet * (1024.0 / (2.0 * M_PI)));
         wi[k] = (int)(ww * 256.0);
         wsum += wi[k];
     }

@@ -17,6 +17,13 @@
 static uint8_t  p130_lut[256];          /* phase position -> line intensity  */
 static int      p130_ready;
 
+/* 3.6.5: murmur finaliser, so neighbouring seeds land far apart */
+static uint32_t p130_mix(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x85EBCA6Bu; x ^= x >> 13; x *= 0xC2B2AE35u; x ^= x >> 16;
+    return x;
+}
+
 static void p130_init(void)
 {
     int i;
@@ -37,21 +44,33 @@ void pattern_130(uint32_t *fb, int w, int h, int frame, int sl,
     uint32_t stepx[P130_NF], stepy[P130_NF], base[P130_NF];
     int cr[P130_NF], cg[P130_NF], cb[P130_NF], amp[P130_NF];
     int i, x, y, pbase;
-    (void)sl; (void)seed;
+    /* 3.6.5: the seed now picks the grid's resting angle, line pitch, the
+     * gamma offsets of each family, which way the grid turns and where on
+     * the palette ramp the five hues start.  It used to be ignored, so every
+     * appearance was the same grid in the same colours (variety audit).
+     * All of it is fixed for the segment, so motion stays the slow creep. */
+    uint32_t hs = p130_mix(seed ^ 0x130u);
+    float rot0  = (float)(hs & 1023u) * (P130_TAU / 1024.0f);
+    float pitch = 0.75f + 0.55f * (float)((hs >> 10) & 255u) / 255.0f;
+    float dirn  = (hs & 0x40000u) ? 1.0f : -1.0f;
+    int   pal0  = (int)(p130_mix(hs) & JD_PAL_MASK);
+    int   pstep = 4100 + (int)((hs >> 19) & 4095u);    /* hue gap between families */
+    (void)sl;
 
     if (!p130_ready) p130_init();
     if (w < 2 || h < 2) return;
 
-    spin    = t * 0.0000105f;
-    spacing = (float)h / (5.6f + 0.9f * sinf(t * 0.00023f));
+    spin    = rot0 + dirn * t * 0.0000105f;
+    spacing = pitch * (float)h / (5.6f + 0.9f * sinf(t * 0.00023f));
     inv     = 1.0f / spacing;
-    pbase   = (int)(t * 17.0f);
+    pbase   = pal0 + (int)(t * 17.0f);
 
     for (i = 0; i < P130_NF; i++) {
         float a  = spin + (float)i * (P130_TAU / (2.0f * P130_NF));
         float ca = cosf(a) * inv, sa = sinf(a) * inv;
-        float g  = t * (0.00055f + 0.00021f * (float)i) + 0.7f * (float)i;
-        uint32_t c = pal[(pbase + i * 6203) & JD_PAL_MASK];
+        float g  = t * (0.00055f + 0.00021f * (float)i) + 0.7f * (float)i
+                 + (float)((hs >> (3 * i)) & 7u) * 0.125f;
+        uint32_t c = pal[(pbase + i * pstep) & JD_PAL_MASK];
         stepx[i] = (uint32_t)(int32_t)(ca * 4294967296.0f);
         stepy[i] = (uint32_t)(int32_t)(sa * 4294967296.0f);
         base[i]  = (uint32_t)(int32_t)((g - 0.5f * ((float)w * ca + (float)h * sa))

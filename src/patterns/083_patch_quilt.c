@@ -17,6 +17,19 @@ static float p83_hue[P83_GY][P83_GX];
 static int   p83_mid[P83_GY][P83_GX];
 static int p83_inited;
 
+/* 3.6.5: seed now reshuffles which motif and phase each patch gets, where on
+ * the ramp the quilt starts, its motif scale and which way the motifs run.
+ * The cell hash used to be a constant, so every appearance was the same
+ * quilt (variety audit, dSeed 0). */
+static uint32_t p83_seed = 0xFFFFFFFFu;
+static float p83_hoff, p83_sc, p83_dir;
+
+static uint32_t p83_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
 /* Column geometry: the patch column, the offset within it and the two edge
  * distances are pure functions of x, so they are computed once per resolution
  * instead of once per pixel. Expressions are verbatim from the inner loop. */
@@ -41,14 +54,19 @@ static void p83_fillcols(p83_col *c, int x0, int n, float isx)
     }
 }
 
-static void p83_init(void)
+static void p83_init(uint32_t seed)
 {
     int i, gx, gy;
+    uint32_t a = p83_h(seed ^ 0x8383u), b = p83_h(a);
+    double so = (double)(a & 0xFFFFu) * 0.0137;     /* shifts the cell hash */
+    p83_hoff = (float)((b >> 4) & 1023u) * (1.0f / P83_HSPAN);
+    p83_sc   = 0.75f + (float)((b >> 14) & 255u) * (0.6f / 255.0f);
+    p83_dir  = (b & 1u) ? 1.0f : -1.0f;
     for (i = 0; i < 2048; i++)
         p83_sin[i] = sinf((float)i * (6.28318530718f / 2048.0f));
     for (gy = 0; gy < P83_GY; gy++)
         for (gx = 0; gx < P83_GX; gx++) {
-            double s = sin((double)gx * 127.1 + (double)gy * 311.7) * 43758.5453;
+            double s = sin((double)gx * 127.1 + (double)gy * 311.7 + so) * 43758.5453;
             double h = s - floor(s);
             p83_ph[gy][gx] = (float)(h * 6.2832);
             p83_hue[gy][gx] = (float)(h * 0.9);
@@ -56,6 +74,7 @@ static void p83_init(void)
             if (p83_mid[gy][gx] > 3) p83_mid[gy][gx] = 3;
         }
     p83_inited = 1;
+    p83_seed = seed;
 }
 
 static void p83_buildpal(const uint32_t *pal)
@@ -80,15 +99,17 @@ void pattern_083(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)frame;
     float isx = 320.0f / (float)w, isy = 240.0f / (float)h;
-    float a0 = -t * 0.016f, a1 = t * 0.014f, a2 = -t * 0.012f;
-    float a3 = t * 0.010f, a4 = -t * 0.010f;
-    float hrot = t * 0.0012f;
+    float a0, a1, a2, a3, a4, hrot, k;
     float sashr, sashg, sashb, sm;
     float bh;
     int x, y, ir, ig, ib, x0, i, blk;
-    (void)sl; (void)seed;
+    (void)sl;
 
-    if (!p83_inited) p83_init();
+    if (!p83_inited || seed != p83_seed) p83_init(seed);
+    a0 = -t * 0.016f * p83_dir; a1 = t * 0.014f * p83_dir; a2 = -t * 0.012f * p83_dir;
+    a3 = t * 0.010f * p83_dir; a4 = -t * 0.010f * p83_dir;
+    hrot = t * 0.0012f + p83_hoff;
+    k = p83_sc;
     p83_buildpal(pal);
 
     if (p83_colw != w) {
@@ -140,17 +161,17 @@ void pattern_083(uint32_t *fb, int w, int h, int frame, int sl,
 
             switch (p83_mid[cgy][cgx]) {
             case 0:
-                fld = 0.5f + 0.5f * p83_lsin((au + av) * 0.30f + a0 + ph);
+                fld = 0.5f + 0.5f * p83_lsin((au + av) * (0.30f * k) + a0 + ph);
                 break;
             case 1:
-                fld = 0.5f + 0.5f * p83_lsin(sqrtf(u * u + v * v) * 0.35f + a1 + ph);
+                fld = 0.5f + 0.5f * p83_lsin(sqrtf(u * u + v * v) * (0.35f * k) + a1 + ph);
                 break;
             case 2:
-                fld = 0.5f + 0.5f * p83_lsin((au < av ? au : av) * 0.55f + a2 + ph);
+                fld = 0.5f + 0.5f * p83_lsin((au < av ? au : av) * (0.55f * k) + a2 + ph);
                 break;
             default:
-                fld = 0.5f + 0.5f * (p83_lsin(u * 0.45f + a3 + ph)
-                                     * p83_lsin(v * 0.45f + a4));
+                fld = 0.5f + 0.5f * (p83_lsin(u * (0.45f * k) + a3 + ph)
+                                     * p83_lsin(v * (0.45f * k) + a4));
                 break;
             }
             hue = p83_hue[cgy][cgx] + fld * 0.22f + hrot;

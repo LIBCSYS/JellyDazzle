@@ -17,6 +17,9 @@ static seg488 segs488[MAXS488];
 static tip488 tips488[MAXT488];
 static int ns488, nt488, last488 = -1;
 static uint32_t bs488 = 0xFFFFFFFFu;
+/* 3.6.5: growth temperament, picked per seed in reset488 */
+static float wan488 = 0.3f, pull488 = 0.05f, rate488 = 0.22f;
+static int   fork488 = 10, pal488;
 
 static void reset488(uint32_t seed)
 {
@@ -25,6 +28,16 @@ static void reset488(uint32_t seed)
     ns488 = 0; nt488 = 0;
     memset(tips488, 0, sizeof tips488);
     int roots = 1 + (int)(gk_rf(&g488) * 2.0f);
+    /* 3.6.5: the seed only moved the root before, so every tree grew with
+     * the same habit in the same quarter of the ramp (seed & 8191).  Now it
+     * also picks how hard the tips wander, how strongly they are pulled
+     * upright (a tall spire vs a wide bush), how often they fork, how fast
+     * they climb, and the ramp start over the whole palette (variety audit). */
+    wan488  = 0.20f + 0.22f * gk_hash(seed ^ 0x4881u);
+    pull488 = 0.025f + 0.060f * gk_hash(seed ^ 0x4882u);
+    fork488 = 7 + (int)(gk_hash(seed ^ 0x4883u) * 8.0f);
+    rate488 = 0.18f + 0.10f * gk_hash(seed ^ 0x4884u);
+    pal488  = (int)(gk_hash(seed ^ 0x4885u) * 32768.0f);
     for (int i = 0; i < roots; i++) {
         tip488 *t = &tips488[nt488++];
         t->x = cw * (0.3f + 0.4f * gk_rf(&g488)); t->y = ch * 1.02f;
@@ -39,13 +52,13 @@ static void grow488(int sl)
     for (int i = 0; i < nt488; i++) {
         tip488 *t = &tips488[i];
         if (!t->alive) continue;
-        if (gk_rf(&g488) > 0.22f) continue;             /* ~every fourth frame */
+        if (gk_rf(&g488) > rate488) continue;           /* ~every fourth frame */
         if (ns488 >= MAXS488) { t->alive = 0; continue; }
         float step = (2.6f + 2.0f * gk_rf(&g488)) * sc;
         /* wander, pulled back toward straight up, and away from the walls */
-        t->a += gk_rs(&g488) * 0.3f;
+        t->a += gk_rs(&g488) * wan488;
         float up = -GK_TAU * 0.25f;
-        t->a += (up - t->a) * 0.05f;
+        t->a += (up - t->a) * pull488;
         if (t->x < cw * 0.15f) t->a += 0.05f; if (t->x > cw * 0.85f) t->a -= 0.05f;
         float nx = t->x + cosf(t->a) * step, ny = t->y + sinf(t->a) * step;
         seg488 *s = &segs488[ns488++];
@@ -55,7 +68,7 @@ static void grow488(int sl)
         if (ny < ch * 0.04f || nx < 0.0f || nx > cw || t->wd < 0.12f) t->alive = 0;
         /* fork on a schedule: every 10..20 steps a tip splits */
         if (--t->nf <= 0 && nt488 < MAXT488) {
-            t->nf = 10 + (int)(gk_rf(&g488) * 10.0f);
+            t->nf = fork488 + (int)(gk_rf(&g488) * 10.0f);
             tip488 *n = &tips488[nt488++];
             *n = *t;
             float d = (gk_rf(&g488) < 0.5f ? -1.0f : 1.0f) * (0.5f + 0.5f * gk_rf(&g488));
@@ -75,7 +88,7 @@ void pattern_488(uint32_t *fb, int w, int h, int frame, int sl,
     if (sl != last488 && sl < 1750) grow488(sl);
     last488 = sl;
     float sc = g488.sc, t = (float)frame, ch = (float)g488.ch;
-    int base = (int)(seed & 8191u) + (int)(t * 0.5f);
+    int base = pal488 + (int)(t * 0.5f);
     float fade = gk_smooth((float)sl / 30.0f);
     float breathe = 0.85f + 0.15f * sinf(t * 0.015f);
     for (int i = 0; i < ns488; i++) {

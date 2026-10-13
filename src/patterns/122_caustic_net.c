@@ -22,6 +22,8 @@ static float    p122_sin[1024];
 static uint32_t p122_ramp[256];
 static int      p122_ready;
 
+static uint32_t p122_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
 static void p122_init(void)
 {
     int i;
@@ -74,15 +76,26 @@ void pattern_122(uint32_t *fb, int w, int h, int frame, int sl,
     float cxx[P122_NW], cyy[P122_NW], cxy[P122_NW], ha[P122_NW], swell, ga;
     uint32_t sx[P122_NW], sy[P122_NW], b0[P122_NW];
     int i, x, y, pb, gxi, gyi;
-    (void)sl; (void)seed;
+    /* 3.6.5: it ignored its seed, so every appearance was the same pool
+     * floor. The seed now turns the whole wave set, jitters each wave's
+     * heading, scales the wavelengths (bigger or finer net), flips the
+     * travel of the swell and picks the palette start (variety audit). */
+    uint32_t sa = p122_h(seed ^ 0x1220u), sb = p122_h(sa), sc = p122_h(sb);
+    float rot  = (float)(sa & 1023u) * (P122_TAU / 1024.0f);
+    float lsc  = 0.78f + (float)((sa >> 10) % 1000u) * 0.00044f;   /* .78..1.22 */
+    float sdir = (sb & 1u) ? 1.0f : -1.0f;
+    float jit[P122_NW];
+    (void)sl;
 
     if (!p122_ready) p122_init();
+    for (i = 0; i < P122_NW; i++)
+        jit[i] = ((float)((sb >> (4 + i * 5)) & 31u) - 15.5f) * 0.035f;   /* +-0.54 rad */
 
     swell = 0.80f + 0.20f * sinf(t * 0.00037f);
-    ga    = t * 0.000077f;                      /* hue-band drift direction  */
+    ga    = rot + t * 0.000077f;                /* hue-band drift direction  */
     gxi   = (int)(cosf(ga) * 112.0f);
     gyi   = (int)(sinf(ga) * 112.0f);
-    pb = (int)(t * 5.0f);
+    pb = (int)(t * 5.0f) + (int)(sc & JD_PAL_MASK);
     for (i = 0; i < 256; i++) {
         uint32_t c = pal[(pb + i * 128) & JD_PAL_MASK];
         int cr = (int)((c >> 16) & 255), cg = (int)((c >> 8) & 255), cb = (int)(c & 255);
@@ -93,15 +106,15 @@ void pattern_122(uint32_t *fb, int w, int h, int frame, int sl,
     }
 
     for (i = 0; i < P122_NW; i++) {
-        float a  = th0[i] + t * 0.000041f * (float)(1 + (i & 1) * 2);
-        float k  = P122_TAU / len[i];
+        float a  = rot + jit[i] + th0[i] + t * 0.000041f * (float)(1 + (i & 1) * 2);
+        float k  = P122_TAU / (len[i] * lsc);
         float ca = cosf(a), sa = sinf(a);
         float c  = amp[i] * swell;
         cxx[i] = c * ca * ca; cyy[i] = c * sa * sa; cxy[i] = c * ca * sa;
         ha[i]  = amp[i] * 0.42f;
         sx[i]  = (uint32_t)(int32_t)(k * ca * (1024.0f / P122_TAU) * 16777216.0f);
         sy[i]  = (uint32_t)(int32_t)(k * sa * (1024.0f / P122_TAU) * 16777216.0f);
-        b0[i]  = (uint32_t)(int32_t)(t * spd[i] * (1024.0f / P122_TAU) * 16777216.0f);
+        b0[i]  = (uint32_t)(int32_t)(sdir * t * spd[i] * (1024.0f / P122_TAU) * 16777216.0f);
     }
 
     for (y = 0; y < P122_LH; y++) {

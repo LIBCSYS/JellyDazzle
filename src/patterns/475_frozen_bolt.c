@@ -1,6 +1,6 @@
 /* 475 Frozen Bolt — one enormous bolt drawn over the whole segment, a
  * crack spreading through glass in slow motion: the leader tip creeps
- * downward across ~1500 frames, its branches unfurling as it passes, and
+ * downward across ~1300..1700 frames (seed picks), its branches unfurling as it passes, and
  * everything it has drawn stays lit with a slow breathing halo, hue sliding
  * along the channel.  Segment-clocked (sl) so a fresh bolt begins each
  * segment; sparse overlay, black elsewhere.  Repaint pattern. */
@@ -9,8 +9,8 @@
 static gk g475;
 static gk_bolt b475;
 static uint32_t bs475 = 0xFFFFFFFFu;
-
-#define GROW475 1500.0f
+static float grow475 = 1500.0f;     /* frames for the leader to cross     */
+static int   pal475;                /* ramp start for this bolt           */
 
 void pattern_475(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
@@ -21,15 +21,30 @@ void pattern_475(uint32_t *fb, int w, int h, int frame, int sl,
     if (seed != bs475) {
         gk_seed(&g475, seed * 3u + 17u);
         float x0 = cw * (0.3f + 0.4f * gk_rf(&g475));
-        gk_bolt_gen(&g475, &b475, x0, -ch * 0.02f, x0 + cw * 0.3f * gk_rs(&g475), ch * 1.02f,
-                    0.24f, 8, 9, 0.5f);
+        /* 3.6.5: the seed now also sets the lean of the strike (up to a
+         * near-diagonal), how jagged and how branchy it is, how long the
+         * crawl takes and where on the ramp it starts.  The ramp start was
+         * seed & 8191, a quarter of the palette, and the bolt was the same
+         * near-vertical stroke every time (variety audit). */
+        float lean = cw * (0.15f + 0.45f * gk_hash(seed ^ 0x4751u));
+        if (gk_hash(seed ^ 0x4752u) < 0.5f) lean = -lean;
+        float jag  = 0.18f + 0.12f * gk_hash(seed ^ 0x4753u);
+        int   nbr  = 7 + (int)(gk_hash(seed ^ 0x4754u) * 5.0f);
+        float blen = 0.40f + 0.20f * gk_hash(seed ^ 0x4755u);
+        grow475 = 1300.0f + 400.0f * gk_hash(seed ^ 0x4756u);
+        pal475  = (int)(gk_hash(seed ^ 0x4757u) * 32768.0f);
+        x0 -= lean * 0.5f;
+        if (x0 < cw * 0.08f) x0 = cw * 0.08f;
+        if (x0 > cw * 0.92f) x0 = cw * 0.92f;
+        gk_bolt_gen(&g475, &b475, x0, -ch * 0.02f, x0 + lean + cw * 0.12f * gk_rs(&g475), ch * 1.02f,
+                    jag, 8, nbr, blen);
         bs475 = seed;
     }
     /* first 40 frames of a segment fade in from black so the previous
      * segment's finished bolt hands over softly */
     float fade = gk_smooth((float)sl / 40.0f);
-    float prog = (float)sl / GROW475;
-    int base = (int)(seed & 8191u) + (int)(frame * 0.6f);
+    float prog = (float)sl / grow475;
+    int base = pal475 + (int)(frame * 0.6f);
     float breathe = 0.8f + 0.2f * sinf((float)frame * 0.017f);
     for (int i = 0; i < b475.n; i++) {
         const gk_bseg *s = &b475.s[i];

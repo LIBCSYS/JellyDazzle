@@ -87,6 +87,27 @@ static void p53_blit(uint32_t *fb, int w, int h)
 #define P53_TRAIL 180
 static int p53_init_done;
 
+/* 3.6.5: per-appearance shape — the seed used to be ignored, so every
+ * appearance was the same eight-petal rose (variety audit). The seed now
+ * picks petal count, orbit eccentricity and size, precession direction, the
+ * spacing angle between petals and where on the ramp the hues start. */
+static uint32_t p53_seed = 0xFFFFFFFFu;
+static int p53_np = P53_NPART;
+static float p53_e = 0.38f, p53_as = 1.0f, p53_pdir = 1.0f, p53_gold = 2.399f, p53_h0;
+static uint32_t p53_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p53_reseed(uint32_t seed)
+{
+    uint32_t a = p53_h(seed ^ 0x5353u), b = p53_h(a), c = p53_h(b);
+    p53_np   = 5 + (int)(a % 4u);                               /* 5..8 petals */
+    p53_e    = 0.24f + (float)((a >> 8) % 1000u) * 0.00030f;    /* 0.24..0.54 */
+    p53_as   = 0.85f + (float)((b >> 4) % 1000u) * 0.00030f;    /* 0.85..1.15 */
+    p53_pdir = (b & 1u) ? 1.0f : -1.0f;
+    p53_gold = 1.6f + (float)((c >> 4) % 1000u) * 0.0016f;      /* 1.6..3.2 rad */
+    p53_h0   = (float)((c >> 16) % 1000u) * 0.001f;
+    p53_seed = seed;
+}
+
 static void p53_init(void)
 {
     int x, y;
@@ -108,23 +129,24 @@ void pattern_053(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float tt = (float)(frame % 1048576) + 260.0f;
     int i, j, p;
-    (void)sl; (void)seed;
+    (void)sl;
     if (!p53_init_done) p53_init();
+    if (seed != p53_seed) p53_reseed(seed);
 
     for (i = 0; i < P53_LW * P53_LH * 3; i++)
         p53_acc[i] = p53_gnd[i];
 
-    for (p = 0; p < P53_NPART; p++) {
+    for (p = 0; p < p53_np; p++) {
         float om = 0.011f + 0.0016f * (float)p;
-        float prec = 0.0021f * (1.0f + 0.35f * (float)p);
-        float e = 0.38f;
-        float ap = 40.0f + 6.5f * (float)p;
-        float hue = (float)p / (float)P53_NPART + tt * 0.00045f;
+        float prec = 0.0021f * (1.0f + 0.35f * (float)p) * p53_pdir;
+        float e = p53_e;
+        float ap = (40.0f + 6.5f * (float)p) * p53_as;
+        float hue = p53_h0 + (float)p / (float)p53_np + tt * 0.00045f;
         for (j = 0; j < P53_TRAIL; j++) {
             float times = tt - (float)j * 1.35f;
             float fj = 1.0f - (float)j / (float)P53_TRAIL;
             float fade = fj * sqrtf(fj);           /* ^1.5 */
-            float phi = om * times + (float)p * 2.399f;
+            float phi = om * times + (float)p * p53_gold;
             float rel = phi - prec * times;
             float rr = ap * (1.0f - e * e) / (1.0f + e * cosf(rel));
             float x = rr * cosf(phi) * 0.98f;

@@ -62,7 +62,8 @@ files=$(ls [0-9][0-9][0-9]_*.c [0-9][0-9][0-9].c 2>/dev/null | sort)
     # The new FRACTALS (629-638) join the existing fractal family 8 so they
     # inherit its no-two-together rule and its cost separation.
     elif [ $n -ge 611 ] && [ $n -le 628 ]; then fam=11
-    elif [ $n -ge 629 ] && [ $n -le 638 ]; then fam=8
+    # 3.6.6: 639-642 (multibrot, nova, neon mandel, clifford) from fractals.md
+    elif [ $n -ge 629 ] && [ $n -le 642 ]; then fam=8
     fi
     # (the 336-468 ground kit keeps its keyword families only: those are
     #  grounds, and the compositor's kit-alternation rule handles their look)

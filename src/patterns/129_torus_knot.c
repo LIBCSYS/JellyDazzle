@@ -22,6 +22,13 @@
 static uint32_t p129_low[P129_N];
 static uint32_t p129_ramp[256];
 
+/* 3.6.5: murmur finaliser — the knot choice used to read seed & 7 raw */
+static uint32_t p129_mix(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x85EBCA6Bu; x ^= x >> 13; x *= 0xC2B2AE35u; x ^= x >> 16;
+    return x;
+}
+
 static void p129_blit(uint32_t *fb, int w, int h)
 {
     int x, y;
@@ -102,24 +109,37 @@ void pattern_129(uint32_t *fb, int w, int h, int frame, int sl,
     float t = (float)(frame & 0xFFFFF);
     float R, a, ax, ay, ca, sa, cb, sb, foc, scale;
     float cx = P129_LW * 0.5f, cy = P129_LH * 0.5f;
-    int i, pb, pp, qq;
+    int i, pb, pp, qq, kq;
+    /* 3.6.5: the seed went in raw as seed & 7, so any two seeds sharing low
+     * bits drew the same knot tumbling from the same pose in the same
+     * colours (variety audit).  Hashed now, and it also picks the starting
+     * tumble pose, which way each axis turns, the size and where on the
+     * palette ramp the strand starts.  Rates are unchanged, so motion is too. */
+    uint32_t hs = p129_mix(seed ^ 0x129u);
+    float ox  = (float)((hs >> 3) & 1023u) * (P129_TAU / 1024.0f);
+    float oy  = (float)((hs >> 13) & 1023u) * (P129_TAU / 1024.0f);
+    float sgx = (hs & 0x800000u) ? 1.0f : -1.0f;
+    float sgy = (hs & 0x1000000u) ? 1.0f : -1.0f;
+    float zoom = 0.88f + 0.24f * (float)((hs >> 25) & 127u) / 127.0f;
+    int   pal0 = (int)(p129_mix(hs) & JD_PAL_MASK);
     (void)sl;
 
-    pp = pq[seed & 7][0]; qq = pq[seed & 7][1];
+    kq = (int)(hs & 7u);
+    pp = pq[kq][0]; qq = pq[kq][1];
 
     for (i = 0; i < P129_N; i++) p129_low[i] = 0xFF000000u;
-    pb = (int)(t * 3.5f);
+    pb = pal0 + (int)(t * 3.5f);
     for (i = 0; i < 256; i++)
         p129_ramp[i] = pal[(pb + i * 128) & JD_PAL_MASK] & 0x00FFFFFFu;
 
     R  = 1.00f;
-    a  = 0.36f + 0.11f * sinf(t * 0.00047f);
-    ax = t * 0.00061f;
-    ay = t * 0.00043f + 0.9f;
+    a  = 0.36f + 0.11f * sinf(t * 0.00047f + ox);
+    ax = sgx * t * 0.00061f + ox;
+    ay = sgy * t * 0.00043f + 0.9f + oy;
     ca = cosf(ax); sa = sinf(ax);
     cb = cosf(ay); sb = sinf(ay);
     foc   = 3.4f;
-    scale = (float)P129_LH * 0.232f;
+    scale = (float)P129_LH * 0.232f * zoom;
 
     for (i = 0; i < P129_SMP; i++) {
         float u  = (float)i * (P129_TAU / (float)P129_SMP);

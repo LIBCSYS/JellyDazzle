@@ -31,6 +31,7 @@ static float dhd626[ND626];                   /* body heading                */
 static float dsz626[ND626], dhu626[ND626];
 static float dwp626[ND626], dwr626[ND626];    /* wing phase and rate         */
 static int   dmode626[ND626], dtim626[ND626]; /* 0 hover 1 dart, frames left */
+static float hold626 = 1.0f;                  /* 3.6.5: hover-length scale   */
 
 /* One wing: hinge, base sweep, stroke angle, length.  Drawn as a tapering
  * two-stroke blade so the tip stays thin at any scale. */
@@ -60,7 +61,12 @@ void pattern_626(uint32_t *fb, int w, int h, int frame, int sl,
     float col[3];
 
     if (seed != bs626) {
-        base626 = (int)(seed & 0x7FFFu);
+        /* 3.6.5: seed now sets the swarm's temperament (patient hoverers
+         * vs restless darters), an overall body size, and the ramp start
+         * through a hash instead of raw low bits (variety audit). */
+        base626 = (int)(gk_hash(seed ^ 0x6260u) * 32768.0f);
+        hold626 = 0.60f + 0.90f * gk_hash(seed ^ 0x6261u);
+        float big = 0.85f + 0.35f * gk_hash(seed ^ 0x6262u);
         for (i = 0; i < ND626; i++) {
             uint32_t r = seed ^ (uint32_t)(i * 9941);
             dx626[i]   = cw * (0.12f + 0.76f * gk_hash(r + 1u));
@@ -68,7 +74,7 @@ void pattern_626(uint32_t *fb, int w, int h, int frame, int sl,
             dvx626[i]  = 0.0f; dvy626[i] = 0.0f;
             dtx626[i]  = 0.0f; dty626[i] = 0.0f;
             dhd626[i]  = gk_hash(r + 3u) * GK_TAU;
-            dsz626[i]  = (0.80f + 0.60f * gk_hash(r + 4u)) * sc;
+            dsz626[i]  = (0.80f + 0.60f * gk_hash(r + 4u)) * sc * big;
             dhu626[i]  = gk_hash(r + 5u);
             dwp626[i]  = gk_hash(r + 6u) * GK_TAU;
             dwr626[i]  = 0.85f + 0.30f * gk_hash(r + 7u);   /* fast — it is a blur */
@@ -98,7 +104,7 @@ void pattern_626(uint32_t *fb, int w, int h, int frame, int sl,
                 /* DART -> HOVER: target velocity zero, the easing arrests it */
                 dtx626[i] = 0.0f; dty626[i] = 0.0f;
                 dmode626[i] = 0;
-                dtim626[i]  = 30 + (int)(gk_hash((uint32_t)frame ^ (uint32_t)(i * 787)) * 110.0f);
+                dtim626[i]  = (int)((30.0f + gk_hash((uint32_t)frame ^ (uint32_t)(i * 787)) * 110.0f) * hold626);
             }
         }
 

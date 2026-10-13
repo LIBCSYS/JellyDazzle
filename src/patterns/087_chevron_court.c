@@ -17,6 +17,31 @@ static float p87_ray[512];
 static float p87_core[2048][3];
 static int p87_inited;
 
+/* 3.6.5: seed now picks chevron pitch and slope, march direction, ray count,
+ * core size and the ramp start. Every appearance used to be the same court
+ * in the same colours (variety audit, dSeed 0). */
+static uint32_t p87_seed = 0xFFFFFFFFu;
+static float p87_pitch, p87_slope, p87_dir, p87_nray, p87_hoff, p87_cw, p87_ch;
+
+static uint32_t p87_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p87_reseed(uint32_t seed)
+{
+    uint32_t a = p87_h(seed ^ 0x8787u), b = p87_h(a);
+    p87_pitch = 0.15f + (float)(a & 255u) * (0.15f / 255.0f);
+    p87_slope = 0.70f + (float)((a >> 8) & 255u) * (0.70f / 255.0f);
+    p87_dir   = (a & 0x10000u) ? 1.0f : -1.0f;
+    p87_nray  = (float)(6u + ((a >> 17) % 15u));          /* 6..20 rays */
+    p87_hoff  = (float)(b & 1023u) * (1.0f / P87_HSPAN);
+    p87_cw    = 56.0f + (float)((b >> 10) & 31u);          /* core half-width */
+    p87_ch    = 20.0f + (float)((b >> 15) & 15u);          /* core half-height */
+    p87_seed  = seed;
+}
+
 static void p87_init(void)
 {
     int i;
@@ -60,17 +85,20 @@ void pattern_087(uint32_t *fb, int w, int h, int frame, int sl,
     float isx = 320.0f / (float)w, isy = 240.0f / (float)h;
     float chue;
     int i, x, y, hs;
-    (void)sl; (void)seed;
+    float cw, ch;
+    (void)sl;
 
     if (!p87_inited) p87_init();
+    if (seed != p87_seed) p87_reseed(seed);
+    cw = p87_cw; ch = p87_ch;
     p87_buildpal(pal);
 
     /* chevron body LUT over s in [0,512) at 0.5 px steps */
     for (i = 0; i < 1024; i++) {
         float s = (float)i * 0.5f;
-        float c1 = 0.5f + 0.5f * p87_lsin(s * 0.22f + t * 0.012f);
+        float c1 = 0.5f + 0.5f * p87_lsin(s * p87_pitch + t * 0.012f * p87_dir);
         float c2 = 0.5f + 0.5f * p87_lsin(s * 0.085f - t * 0.006f);
-        float hue = 0.86f + 0.10f * p87_lsin(s * 0.018f - t * 0.004f);
+        float hue = 0.86f + p87_hoff + 0.10f * p87_lsin(s * 0.018f - t * 0.004f);
         float c3 = (p87_lsin(s * 0.15f - t * 0.009f) - 0.62f) * (1.0f / 0.38f);
         float bri = 0.12f + 0.60f * c1 * c2, fr;
         const float *c = p87_ptab[(int)(hue * P87_HSPAN + 4096.0f) & 1023];
@@ -84,12 +112,12 @@ void pattern_087(uint32_t *fb, int w, int h, int frame, int sl,
     /* ray fan LUT over the first-quadrant angle */
     for (i = 0; i < 512; i++) {
         float th = (float)i * (1.570796327f / 512.0f);
-        float r = (p87_lsin(th * 12.0f + t * 0.008f) - 0.90f) * 10.0f;
+        float r = (p87_lsin(th * p87_nray + t * 0.008f * p87_dir) - 0.90f) * 10.0f;
         if (r < 0.0f) r = 0.0f; if (r > 1.0f) r = 1.0f;
         p87_ray[i] = r;
     }
     /* core scanline ramp, indexed by proto row * 8 */
-    chue = 0.38f + 0.05f * p87_lsin(t * 0.005f);
+    chue = 0.38f + p87_hoff + 0.05f * p87_lsin(t * 0.005f);
     hs = (int)(chue * P87_HSPAN + 4096.0f) & 1023;
     for (i = 0; i < 2048; i++) {
         float yy = (float)i * 0.125f;
@@ -107,11 +135,11 @@ void pattern_087(uint32_t *fb, int w, int h, int frame, int sl,
         int ci = (int)(yy * 8.0f); if (ci > 2047) ci = 2047; if (ci < 0) ci = 0;
         for (x = 0; x < w; x++) {
             float u = fabsf(((float)x + 0.5f) * isx - 160.0f);
-            float s = u + v, cr, cg, cb;
+            float s = u + v * p87_slope, cr, cg, cb;
             int k, ir, ig, ib;
 
-            if (u < 74.0f && v < 30.0f) {
-                if (u < 70.0f && v < 26.0f) {
+            if (u < cw + 4.0f && v < ch + 4.0f) {
+                if (u < cw && v < ch) {
                     cr = p87_core[ci][0]; cg = p87_core[ci][1]; cb = p87_core[ci][2];
                 } else {
                     cr = 0.95f; cg = 0.88f; cb = 0.70f;

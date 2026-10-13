@@ -90,6 +90,34 @@ static int p56_init_done;
 static float p56_hu[P56_N];     /* u = i/N */
 static float p56_fade[P56_NTR];
 
+/* 3.6.5: per-appearance figure — the seed used to be ignored, so every
+ * appearance traced the same 2:3 ribbon (variety audit). The seed now picks
+ * the Lissajous pair, the ribbon's width/height and spread, which way it
+ * turns, a start phase, and where on the ramp the hues start.
+ * The strand's y:x phase ratio along u MUST equal the y:x time-rate ratio
+ * (it was 1.5 against 2:3): then the figure holds still and the strand slides
+ * along it. Mismatch them and the whole knot churns about 7x faster (tried). */
+static uint32_t p56_seed = 0xFFFFFFFFu;
+static float p56_fa = 2.0f, p56_fb = 3.0f, p56_ax = 118.0f, p56_ay = 86.0f;
+static float p56_sp0 = 1.7f, p56_dir = 1.0f, p56_th0, p56_h0;
+static uint32_t p56_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p56_reseed(uint32_t seed)
+{
+    static const float fa[6] = {2.0f, 3.0f, 2.0f, 4.0f, 3.0f, 1.0f};
+    static const float fb[6] = {3.0f, 4.0f, 5.0f, 5.0f, 5.0f, 2.0f};
+    uint32_t a = p56_h(seed ^ 0x5656u), b = p56_h(a), c = p56_h(b);
+    int k = (int)(a % 6u);
+    p56_fa  = fa[k]; p56_fb = fb[k];
+    p56_ax  = 106.0f + (float)((a >> 8) % 1000u) * 0.024f;        /* 106..130 */
+    p56_ay  = 76.0f + (float)((a >> 18) % 1000u) * 0.020f;        /* 76..96 */
+    p56_sp0 = 1.4f + (float)((b >> 4) % 1000u) * 0.0006f;         /* 1.4..2.0 */
+    p56_dir = (b & 1u) ? 1.0f : -1.0f;
+    p56_th0 = (float)((b >> 16) % 1000u) * (P56_TAU / 1000.0f);
+    p56_h0  = (float)((c >> 6) % 1000u) * 0.001f;
+    p56_seed = seed;
+}
+
 static void p56_init(void)
 {
     int i;
@@ -107,8 +135,9 @@ void pattern_056(uint32_t *fb, int w, int h, int frame, int sl,
     float tt = (float)(frame % 1048576) + 150.0f;
     float spread;
     int i, j, n;
-    (void)sl; (void)seed;
+    (void)sl;
     if (!p56_init_done) p56_init();
+    if (seed != p56_seed) p56_reseed(seed);
 
     n = P56_LW * P56_LH;
     for (i = 0; i < n; i++) {
@@ -117,23 +146,25 @@ void pattern_056(uint32_t *fb, int w, int h, int frame, int sl,
         p56_acc[i * 3 + 2] = 0.07f;
     }
 
-    spread = 1.7f + 1.1f * sinf(tt * 0.0008f);
+    spread = p56_sp0 + 1.1f * sinf(tt * 0.0008f);
 
     for (j = 0; j < P56_NTR; j++) {
         float ttj = tt - (float)j * 5.2f;
-        float th = ttj * 0.0040f;
+        /* x phase advances at the old 2 x 0.004 whatever the pair */
+        float th = ttj * (0.0080f / p56_fa) * p56_dir + p56_th0;
         float drift = ttj * 0.0013f;
-        float a2 = 2.0f * th, a3 = 3.0f * th + drift;
+        float a2 = p56_fa * th, a3 = p56_fb * th + drift;
+        float kr = p56_fb / p56_fa;
         float fade = p56_fade[j];
         float sat = j ? 0.92f : 0.5f;
         float val = 1.0f - 0.30f * ((float)j / (float)P56_NTR);
         float wf = fade * 0.85f, wb = fade * 0.28f;
-        float hue0 = tt * 0.00025f;
+        float hue0 = p56_h0 + tt * 0.00025f;
         for (i = 0; i < P56_N; i++) {
             float u = p56_hu[i];
             float ph = u * P56_TAU * spread;
-            float x0 = 118.0f * sinf(a2 + ph);
-            float y0 = 86.0f * sinf(a3 + ph * 1.5f);
+            float x0 = p56_ax * sinf(a2 + ph);
+            float y0 = p56_ay * sinf(a3 + ph * kr);
             float cr, cg, cb;
             p56_color(pal, hue0 + u * 0.9f, sat, val, &cr, &cg, &cb);
             p56_splat(P56_CX + x0, P56_CY + y0, cr, cg, cb, wf);

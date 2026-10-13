@@ -15,6 +15,22 @@ static uint16_t p92_map[P92_N];        /* cls*256 + static shade index */
 static uint32_t p92_lut[6 * 256];
 static int      p92_ready;
 
+/* 3.6.5: seed now picks the ray count, border wedge count, rosette lobes,
+ * meander scale, the class colour offsets, the ramp start and which way the
+ * wheel rolls. The frozen map used to be one fixed picture in one fixed
+ * colour order (variety audit, dSeed 0). The map is rebuilt only when the
+ * seed changes, so the per-frame cost is unchanged. */
+static uint32_t p92_seed = 0xFFFFFFFFu;
+static float p92_nray, p92_nwedge, p92_lobes, p92_ks, p92_rdir;
+static float p92_offs[6];
+static int   p92_poff;
+
+static uint32_t p92_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
 static const unsigned char p92_key[12][13] = {
     "111111111111",
     "100000000000",
@@ -37,9 +53,18 @@ static float p92_stop[8][3];
 static const float p92_off[6] = { 150.0f, 0.0f, 96.0f, 170.0f, 210.0f, 40.0f };
 static const float p92_dim[6] = { 0.45f, 0.95f, 0.85f, 0.90f, 1.00f, 0.70f };
 
-static void p92_build(void)
+static void p92_build(uint32_t seed)
 {
     int py, px, i, j;
+    uint32_t a = p92_h(seed ^ 0x9292u), b = p92_h(a), c = p92_h(b);
+    p92_nray   = (float)(24u + (a % 33u));                     /* 24..56 rays */
+    p92_nwedge = (float)(16u + 2u * ((a >> 6) % 9u));          /* 16..32, even */
+    p92_lobes  = (float)(5u + ((a >> 12) % 4u));               /* 5..8 lobes */
+    p92_ks     = 0.80f + (float)((a >> 16) & 255u) * (0.45f / 255.0f);
+    p92_rdir   = (a & 0x1000000u) ? 1.0f : -1.0f;
+    p92_poff   = (int)(b & JD_PAL_MASK);
+    for (i = 0; i < 6; i++)                    /* jitter each class's wheel slot */
+        p92_offs[i] = p92_off[i] + (float)((p92_h(c + (uint32_t)i) >> 8) & 63u) - 32.0f;
     for (i = 0; i < P92_N; i++) p92_map[i] = 0;
     for (py = 0; py < P92_LH; py++) {
         float ly = ((float)py + 0.5f) * 0.5f;              /* 320x240 space */
@@ -50,17 +75,17 @@ static void p92_build(void)
             int cls = 0;
             float shade = 0.0f;
             float ang = atan2f(ay, ax + 0.001f);
-            float q = ang * 40.0f / (P92_PI * 0.5f);
+            float q = ang * p92_nray / (P92_PI * 0.5f);
             if (ang < 0.42f && (q - floorf(q)) < 0.30f) { cls = 5; shade = ax * 0.5f; }
             if (ax < 132.0f && ay < 92.0f && !(ax < 116.0f && ay < 76.0f)) {
                 float a2 = atan2f(dy, dx);
-                float wq = a2 / (2.0f * P92_PI) * 24.0f;
+                float wq = a2 / (2.0f * P92_PI) * p92_nwedge;
                 wq = wq - floorf(wq);
                 if (wq < 0.5f) { cls = 3; shade = a2 * 18.0f; }
                 else           { cls = 0; shade = 0.0f; }
             }
             if (ax < 116.0f && ay < 76.0f) {
-                int kx = ((int)ax % 24) >> 1, ky = ((int)ay % 24) >> 1;
+                int kx = ((int)(ax * p92_ks) % 24) >> 1, ky = ((int)(ay * p92_ks) % 24) >> 1;
                 cls = (p92_key[ky][kx] == '1') ? 2 : 1;
                 shade = 0.0f;
             }
@@ -72,7 +97,7 @@ static void p92_build(void)
                     float rr = sqrtf(ex * ex + ey * ey);
                     if (rr < 12.0f) {
                         float ra = atan2f(ey, ex);
-                        if (rr < 7.0f + 3.2f * cosf(6.0f * ra)) { cls = 4; shade = 0.0f; }
+                        if (rr < 7.0f + 3.2f * cosf(p92_lobes * ra)) { cls = 4; shade = 0.0f; }
                     }
                 }
             }
@@ -84,13 +109,14 @@ static void p92_build(void)
         }
     }
     p92_ready = 1;
+    p92_seed = seed;
 }
 
 static void p92_stops(const uint32_t *pal)
 {
     int i;
     for (i = 0; i < 8; i++) {
-        uint32_t u = pal[((i * 4096) + 512) & JD_PAL_MASK];
+        uint32_t u = pal[((i * 4096) + 512 + p92_poff) & JD_PAL_MASK];
         float r = (float)((u >> 16) & 255), g = (float)((u >> 8) & 255);
         float b = (float)(u & 255);
         float mx = r > g ? r : g, mn = r < g ? r : g, k;
@@ -108,7 +134,7 @@ static void p92_lutbuild(float roll)
     int cls, s;
     for (cls = 0; cls < 6; cls++) {
         float dim = p92_dim[cls];
-        float base = p92_off[cls] + roll;
+        float base = p92_offs[cls] + roll;
         for (s = 0; s < 256; s++) {
             float p = base + (float)s;
             int i0, i1, r, g, b;
@@ -132,12 +158,13 @@ static void p92_lutbuild(float roll)
 void pattern_092(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
 {
-    float roll = (float)frame * 0.35f;
+    float roll;
     uint32_t stepx;
     int x, y;
-    (void)sl; (void)seed;
+    (void)sl;
 
-    if (!p92_ready) p92_build();
+    if (!p92_ready || seed != p92_seed) p92_build(seed);
+    roll = (float)frame * 0.35f * p92_rdir;
     p92_stops(pal);
     roll = roll - 256.0f * floorf(roll * (1.0f / 256.0f));
     p92_lutbuild(roll);

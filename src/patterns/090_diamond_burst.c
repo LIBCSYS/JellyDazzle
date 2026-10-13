@@ -22,6 +22,33 @@ static float p90_bx[1024];
 static float p90_ay[512];
 static int p90_inited;
 
+/* 3.6.5: seed now picks the rhombus aspect, the heart's share of it, band
+ * pitch, step and travel direction, the confetti hash and the ramp start.
+ * Every appearance used to be the same burst in the same colours (variety
+ * audit, dSeed 0). */
+static uint32_t p90_seed = 0xFFFFFFFFu;
+static float p90_asp, p90_di, p90_bw, p90_bstep, p90_bdir, p90_hoff;
+static double p90_so;
+
+static uint32_t p90_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p90_reseed(uint32_t seed)
+{
+    uint32_t a = p90_h(seed ^ 0x9090u), b = p90_h(a);
+    p90_asp   = 1.22f + (float)(a & 255u) * (0.55f / 255.0f);
+    p90_di    = P90_D * (0.50f + (float)((a >> 8) & 255u) * (0.20f / 255.0f));
+    p90_bw    = 11.0f + (float)((a >> 16) & 255u) * (11.0f / 255.0f);
+    p90_bdir  = (a & 0x1000000u) ? 1.0f : -1.0f;
+    p90_bstep = 0.17f + (float)(b & 255u) * (0.28f / 255.0f);
+    p90_hoff  = (float)((b >> 8) & 1023u) * (1.0f / P90_HSPAN);
+    p90_so    = (double)((b >> 18) & 0x3FFFu) * 0.0191;
+    p90_seed  = seed;
+}
+
 /* Column geometry. px, |px|, the confetti column and the streak-LUT index are
  * pure functions of x, so they are built once per resolution rather than once
  * per pixel. Expressions are copied verbatim from the inner loop. */
@@ -78,13 +105,17 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)frame;
     float isx = 320.0f / (float)w, isy = 240.0f / (float)h;
-    float rsh = t * 0.010f, hdrift = t * 0.0012f, cdrift = t * 0.0015f;
-    float spark = t * 0.02f;
+    float rsh, hdrift, cdrift;
+    float spark = t * 0.02f, ibw, di;
     int i, jx, jy, x, y, x0, blk;
-    (void)sl; (void)seed;
+    (void)sl;
 
     blk = 0;
     if (!p90_inited) p90_init();
+    if (seed != p90_seed) p90_reseed(seed);
+    rsh = t * 0.010f * p90_bdir; hdrift = t * 0.0012f + p90_hoff;
+    cdrift = t * 0.0015f + p90_hoff;
+    ibw = 1.0f / p90_bw; di = p90_di;
     p90_buildpal(pal);
 
     if (p90_colw != w) {
@@ -97,11 +128,11 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
     /* rim band LUT over the diamond norm m, 0.5 unit steps */
     for (i = 0; i < 1024; i++) {
         float m = (float)i * 0.5f;
-        float ph = m * (1.0f / 16.0f) - rsh;
+        float ph = m * ibw - rsh;
         float fl = floorf(ph), fr = ph - fl;
         float sv = p90_lsin(fr * 3.14159265f);
         float band = sv * sv;
-        float hue = fl * 0.31f + hdrift;
+        float hue = fl * p90_bstep + hdrift;
         float bri = 0.30f + 0.70f * band;
         const float *c = p90_ptab[(int)(hue * P90_HSPAN + 65536.0f) & 1023];
         p90_rim[i][0] = c[0] * bri; p90_rim[i][1] = c[1] * bri;
@@ -110,7 +141,7 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
     /* confetti cell colours */
     for (jy = 0; jy < P90_CY; jy++)
         for (jx = 0; jx < P90_CX; jx++) {
-            double s = sin((double)jx * 12.9898 + (double)jy * 78.233) * 43758.5453;
+            double s = sin((double)jx * 12.9898 + (double)jy * 78.233 + p90_so) * 43758.5453;
             float hv = (float)(s - floor(s));
             float sp = 0.5f + 0.5f * p90_lsin(hv * 6.2832f + spark
                                               + (float)(jx + jy) * 0.4f);
@@ -131,7 +162,7 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
     for (y = 0; y < h; y++) {
         float py = ((float)y + 0.5f) * isy - 120.0f;
         float ay = fabsf(py);
-        float m0 = ay * 1.45f;
+        float m0 = ay * p90_asp;
         float fall;
         int ky = (int)(ay * 4.0f);
         uint32_t *row = fb + (long)y * w;
@@ -149,7 +180,7 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
             int k, ir, ig, ib;
             x = x0 + i;
 
-            if (m <= P90_DI) {
+            if (m <= di) {
                 int jxc = cc[i].jxc;
                 cr = p90_conf[jyc][jxc][0];
                 cg = p90_conf[jyc][jxc][1];
@@ -169,7 +200,7 @@ void pattern_090(uint32_t *fb, int w, int h, int frame, int sl,
             /* bright silhouette edges at the two diamond boundaries */
             e = 1.0f - fabsf(m - P90_D) * (1.0f / 2.2f);
             if (e > 0.0f) { cr += e * 0.32f; cg += e * 0.80f; cb += e * 0.80f; }
-            e = 1.0f - fabsf(m - P90_DI) * (1.0f / 2.2f);
+            e = 1.0f - fabsf(m - di) * (1.0f / 2.2f);
             if (e > 0.0f) { cr += e * 0.80f; cg += e * 0.40f; cb += e * 0.80f; }
 
             ir = (int)(cr * 255.0f); if (ir > 255) ir = 255; if (ir < 0) ir = 0;

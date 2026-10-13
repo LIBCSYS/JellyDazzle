@@ -22,6 +22,41 @@ static int   *p69_qy;              /* per-frame |dy|*aspect in 1/16 px */
 static float *p69_ox;              /* per-frame dx */
 static float *p69_oy;              /* per-frame dy*aspect */
 static uint32_t p69_lut[64][256];
+/* 3.6.5: seed now picks glide speed, sway/bob path, tile width, pillar
+ * thickness, the floor/wall colour split and the ramp start — every
+ * appearance used to be the same amber corridor (variety audit dSeed 0.00).
+ * Tile length and pillar spacing stay put: fly wraps on their LCM. */
+static uint32_t p69_seed = 0xFFFFFFFFu;
+static double p69_spd = 0.35;
+static double p69_swa = 16.0, p69_swf = 0.004, p69_swp = 0.0;
+static double p69_boa = 7.0, p69_bof = 0.0027, p69_bop = 0.0;
+static float  p69_tw = 0.0625f;      /* 1/tile width across the plane */
+static int    p69_pilw = 1024;       /* pillar length in v64 units, of 5760 */
+static int    p69_tadd = 46, p69_wadd = 36;
+static int    p69_poff = 0;
+
+static uint32_t p69_hash(uint32_t x) {
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return x;
+}
+
+static void p69_reseed(uint32_t seed) {
+    static const float tws[4] = { 0.045f, 0.0625f, 0.0625f, 0.085f };
+    uint32_t a = p69_hash(seed ^ 0x69D0u), b = p69_hash(a), c = p69_hash(b);
+    p69_spd = 0.33 + (a & 255) * (0.17 / 255.0);
+    p69_swa = 10.0 + ((a >> 8) & 63) * (14.0 / 63.0);
+    p69_swf = 0.003 + ((a >> 14) & 63) * (0.002 / 63.0);
+    p69_swp = ((a >> 20) & 255) * (6.2831853 / 256.0);
+    p69_boa = 4.0 + (b & 63) * (7.0 / 63.0);
+    p69_bof = 0.0022 + ((b >> 6) & 63) * (0.0014 / 63.0);
+    p69_bop = ((b >> 12) & 255) * (6.2831853 / 256.0);
+    p69_tw = tws[(b >> 20) & 3u];
+    p69_pilw = 760 + (int)((b >> 22) & 511u);
+    p69_tadd = 30 + (int)(c & 63u);
+    p69_wadd = 20 + (int)((c >> 6) & 127u);
+    p69_poff = (int)(c >> 17) & JD_PAL_MASK;
+    p69_seed = seed;
+}
 
 static void p69_init(int w, int h) {
     int x, y, i;
@@ -60,8 +95,16 @@ static void p69_build_lut(const uint32_t *pal) {
     int idx, s, j, e = 0;
     int ar[7], ag[7], ab[7];
     for (j = 0; j < 6; j++) {
-        uint32_t c = pal[(j * 5461) & JD_PAL_MASK];
+        uint32_t c = pal[(j * 5461 + p69_poff) & JD_PAL_MASK];
+        int m;
         ar[j] = (c >> 16) & 255; ag[j] = (c >> 8) & 255; ab[j] = c & 255;
+        /* 3.6.5: seeded ramp start may sit on a dark stretch; lift the
+         * brightest channel to 190, fog and the envelope supply the dark */
+        m = ar[j] > ag[j] ? ar[j] : ag[j]; if (ab[j] > m) m = ab[j];
+        if (m < 190) {
+            if (m < 8) { ar[j] = ag[j] = ab[j] = 8; m = 8; }
+            ar[j] = ar[j] * 190 / m; ag[j] = ag[j] * 190 / m; ab[j] = ab[j] * 190 / m;
+        }
     }
     ar[6] = ar[0]; ag[6] = ag[0]; ab[6] = ab[0];
     for (idx = 0; idx < 256; idx++) {
@@ -87,14 +130,16 @@ void pattern_069(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     int x, y, fly;
     double t = (double)frame;
-    float sway = (float)(16.0 * sin(t * 0.004));
-    float bob  = (float)(7.0 * sin(t * 0.0027));
-    (void)sl; (void)seed;
+    float sway, bob;
+    (void)sl;
+    if (seed != p69_seed) p69_reseed(seed);
+    sway = (float)(p69_swa * sin(t * p69_swf + p69_swp));
+    bob  = (float)(p69_boa * sin(t * p69_bof + p69_bop));
     p69_init(w, h);
     p69_build_lut(pal);
     /* v is kept mod 360 (= LCM of the 40-unit tile parity and 90-unit pillar
      * spacing) so both stay phase-consistent forever */
-    fly = (int)fmod(t * 0.35 * 64.0, 23040.0);
+    fly = (int)fmod(t * p69_spd * 64.0, 23040.0);
     for (x = 0; x < w; x++) {
         float d = p69_cx[x] - sway;
         int q;
@@ -120,12 +165,12 @@ void pattern_069(uint32_t *fb, int w, int h, int frame, int sl,
             int qx = p69_qx[x], wall = qx > qy, a = wall ? qx : qy;
             float other = wall ? oy : p69_ox[x];
             float u = other * p69_inv[a];
-            int iu = (int)floorf(u * 0.0625f);
+            int iu = (int)floorf(u * p69_tw);
             int v64 = ((p69_dep[a] * 141) >> 8) + fly;
             int tile = (iu + (v64 / 1280)) & 1;
-            int pil = wall && ((v64 % 5760) < 1024);
+            int pil = wall && ((v64 % 5760) < p69_pilw);
             int fog = p69_fog[a];
-            int idx = (p69_idb[a] + tile * 46 + (wall ? 36 : 0)) & 255;
+            int idx = (p69_idb[a] + tile * p69_tadd + (wall ? p69_wadd : 0)) & 255;
             int lum;
             if (pil)       lum = (fog * 56) >> 8;
             else if (tile) lum = fog;

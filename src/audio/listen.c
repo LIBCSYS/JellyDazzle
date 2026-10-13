@@ -360,6 +360,9 @@ static void au_decay_all(void)
  * inside SDL_PollEvent, the key poll inside jd_audio_tick, the draw inside
  * jd_frame. */
 void jd_about_toggle(void) { au_about ^= 1; }
+/* 3.6.5 (J): the M button puts the beat meter on screen for everyone, not
+ * just Mac users who know the M key. Same state as the key. */
+void jd_meter_toggle(void) { au_meter ^= 1; }
 /* 3.5.1: a tap on iPhone/iPad does what SPACE does to the first-run card */
 void jd_ui_skip(void) { au_skip = 1; }
 int  jd_about_is_on(void)  { return au_about; }
@@ -768,6 +771,9 @@ void jd_audio_meter_draw(uint32_t *fb, int w, int h)
     int panel_w = pad + 4 * (bw + gap) + 20 * s + pad;
     int panel_h = pad + 5 * s + 3 * s + 5 * s + 4 * s + bh + 3 * s + 5 * s + pad;
     int x0 = 12 * s, y0 = h - 12 * s - panel_h;
+#if TARGET_OS_IPHONE
+    y0 = h - h / 12 - panel_h;     /* clear of the home indicator, level with the bar */
+#endif
     if (panel_w > w - 2 * x0) return;
     au_dim(fb, w, h, x0, y0, panel_w, panel_h);
     au_rect(fb, w, h, x0, y0, panel_w, s > 1 ? s / 2 : 1, 0xFF404048u);
@@ -823,7 +829,10 @@ void jd_audio_meter_draw(uint32_t *fb, int w, int h)
 void jd_about_draw(uint32_t *fb, int w, int h)
 {
     if (!au_about || !fb || w < 200 || h < 160) return;
-    int s = h / 300; if (s < 1) s = 1; if (s > 7) s = 7;
+    /* 3.6.6 (J: "the ? should be the same size in portrait and landscape"):
+     * size from the SHORTER side, not the height. Height-based scaling made
+     * the card twice as big in portrait as in landscape on a phone. */
+    int s = (w < h ? w : h) / 190; if (s < 1) s = 1; if (s > 7) s = 7;
     static const char *L[] = {
         "JELLYDAZZLE " JD_VERSION,
         "AN HOMAGE TO DAZZLE.EXE",
@@ -840,6 +849,7 @@ void jd_about_draw(uint32_t *fb, int w, int h)
         "C  TAP            COLOUR",
         "S  TWO FINGERS    SHAPE",
         "?  HOLD           ABOUT",
+        "M  BUTTON         BEAT METER",
         "   THREE FINGERS  STATS",
         "   SWIPE UP       EXIT",
         "",
@@ -856,11 +866,21 @@ void jd_about_draw(uint32_t *fb, int w, int h)
     const int n = (int)(sizeof L / sizeof L[0]);
     int maxlen = 0;
     for (int i = 0; i < n; i++) { int l = (int)strlen(L[i]); if (l > maxlen) maxlen = l; }
-    int pad = 8 * s, lh = 8 * s;
-    int panel_w = pad + maxlen * 4 * s + pad;
-    int panel_h = pad + n * lh + pad;
+    int pad, lh, panel_w, panel_h, block_h;
+    /* the NOW PLAYING box sits under the card (up to ~6 rows); fit both, and
+     * only ever shrink - so the two orientations land on the same size unless
+     * one of them genuinely cannot hold it */
+    for (;;) {
+        pad = 8 * s; lh = 8 * s;
+        panel_w = pad + maxlen * 4 * s + pad;
+        panel_h = pad + n * lh + pad;
+        block_h = panel_h + 6 * s + 7 * lh;
+        if ((panel_w <= w - 2 * s && block_h <= h) || s == 1) break;
+        s--;
+    }
     if (panel_w > w || panel_h > h) return;
-    int x0 = (w - panel_w) / 2, y0 = (h - panel_h) / 2;
+    int x0 = (w - panel_w) / 2, y0 = (h - block_h) / 2;
+    if (y0 < 0) y0 = 0;
     au_dim(fb, w, h, x0, y0, panel_w, panel_h);
     au_dim(fb, w, h, x0, y0, panel_w, panel_h);           /* twice: darker card */
     au_rect(fb, w, h, x0, y0, panel_w, s > 1 ? s / 2 : 1, 0xFF3A4652u);
@@ -904,7 +924,9 @@ void jd_status_draw(uint32_t *fb, int w, int h, int pct, int secs, int resumed)
 {
     if (!fb || w < 240 || h < 180) return;
     if (pct < 0) pct = 0; if (pct > 100) pct = 100;
-    int s = h / 200; if (s < 2) s = 2; if (s > 9) s = 9;   /* big: this matters */
+    /* 3.6.6: shorter side, like the About card - height made it twice the size
+     * in portrait as in landscape. The width-fit loop below still shrinks it. */
+    int s = (w < h ? w : h) / 110; if (s < 2) s = 2; if (s > 9) s = 9;   /* big: this matters */
     /* A launch that picks up a partial database must not claim to be the
      * first run — "THIS HAPPENS ONCE" on the third launch reads as a bug. */
     const char *L1 = resumed ? "PICKING UP WHERE IT LEFT OFF" : "FIRST RUN";

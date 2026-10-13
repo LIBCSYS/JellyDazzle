@@ -42,6 +42,7 @@ static int full_i = 0, lite_i = 0;
 extern void jd_menu_install(void);    /* src/app/menu_mac.m */
 #endif
 extern void jd_about_toggle(void);    /* src/audio/listen.c */
+extern void jd_meter_toggle(void);    /* src/audio/listen.c (3.6.5 M button) */
 extern int  jd_about_is_on(void);
 extern void jd_ui_skip(void);         /* src/audio/listen.c: dismiss the first-run notice */
 extern void jd_set_slot_cap(int n);   /* src/engine/compositor.c */
@@ -127,7 +128,8 @@ static void fb_refit(SDL_Renderer *ren, SDL_Texture **tex)
     } else { free(nb); if (nt) SDL_DestroyTexture(nt); }
 }
 
-/* 3.5.5 — the button bar (J: "small and out of the way", C | S | ? and X).
+/* 3.5.5 — the button bar (J: "small and out of the way", C | S | ? and X;
+ * 3.6.5 adds M, the beat meter, so everyone can see the beat).
  * Bottom-right, ~52 pt squares whatever the screen, bright for 4 s after any
  * touch or mouse movement, then a 1 s fade to a faint ghost that stays put so
  * it can always be found. No X on iPhone/iPad: Apple's HIG says an iOS app
@@ -137,11 +139,9 @@ extern void jd_ui_button(uint32_t *fb, int w, int h, int x, int y, int size, cha
 /* No X on iPhone/iPad. 3.5.7 added one (J: "X exits the app"); J reversed it the
  * same evening once the review risk was clear: "no sense tempting it… swipe up
  * works just as well". Apple's HIG: iOS apps never quit themselves. */
-#if TARGET_OS_IPHONE
-static const char BTN[] = "CS?";
-#else
-static const char BTN[] = "CS?X";
-#endif
+/* 3.6.5 (J): "C | S | M | ? and that's it" - the same four everywhere. The Mac
+ * lost its X: Esc and Cmd-Q still quit. */
+static const char BTN[] = "CSM?";
 static SDL_Window *g_win;
 static Uint32 ui_touch;               /* last touch / mouse activity, ms */
 
@@ -177,20 +177,12 @@ static int bar_hit(double fx, double fy)                  /* fb coords -> button
 
 static void bar_act(int i, int *running)
 {
+    (void)running;                                        /* X (the only user) left the bar in 3.6.5 */
     switch (BTN[i]) {
     case 'C': jd_req_palette = 1; break;
     case 'S': jd_req_shape = 1; break;
+    case 'M': jd_meter_toggle(); break;       /* 3.6.5: the beat, on screen */
     case '?': jd_about_toggle(); break;
-    case 'X':
-#if TARGET_OS_IPHONE
-        /* SDL's iOS main does not exit when SDL_main returns, so leave directly —
-         * after closing the mic so the audio session is released cleanly. */
-        jd_audio_close();
-        exit(0);
-#else
-        if (running) *running = 0;
-#endif
-        break;
     }
     jd_ui_skip();                                         /* any button also clears the first-run card */
 }

@@ -87,17 +87,23 @@ void pattern_624(uint32_t *fb, int w, int h, int frame, int sl,
     float col[3];
 
     if (seed != bs624) {
-        base624 = (int)(seed & 0x7FFFu);
+        /* 3.6.5: seed now also sets an overall size for the pair and a
+         * shared pace (one seed a slow stalk, the next an easy amble), and
+         * the ramp start goes through a hash instead of raw low bits
+         * (variety audit). */
+        base624 = (int)(gk_hash(seed ^ 0x6240u) * 32768.0f);
+        float big  = 0.85f + 0.40f * gk_hash(seed ^ 0x6241u);
+        float pace = 0.80f + 0.45f * gk_hash(seed ^ 0x6242u);
         for (i = 0; i < NC624; i++) {
             uint32_t r = seed ^ (uint32_t)(i * 5531);
-            csz624[i]  = (0.85f + 0.55f * gk_hash(r + 1u)) * sc;
+            csz624[i]  = (0.85f + 0.55f * gk_hash(r + 1u)) * sc * big;
             cdir624[i] = gk_hash(r + 2u) > 0.5f ? 1 : -1;
             /* spaced around the frame, not thrown at random: with only a
              * couple of slow animals, two bunched starts means long stretches
              * of empty screen while both are off the side */
             cx624[i]   = cw * (((float)i + 0.75f * gk_hash(r + 3u)) / (float)NC624);
             cgy624[i]  = ch * (0.52f + 0.34f * ((float)i + gk_hash(r + 4u)) / (float)NC624);
-            csp624[i]  = (0.42f + 0.26f * gk_hash(r + 5u)) * sc;
+            csp624[i]  = (0.42f + 0.26f * gk_hash(r + 5u)) * sc * pace;
             cph624[i]  = gk_hash(r + 6u);
             chu624[i]  = gk_hash(r + 7u);
             for (k = 0; k < NT624; k++) tang624[i][k] = 0.0f;

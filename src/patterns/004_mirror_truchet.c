@@ -12,6 +12,20 @@ static uint16_t p4_gnd[P4_IW * P4_IH];
 static float p4_rsc[P4_IW * P4_IH];
 static int p4_init;
 
+/* 3.6.5: seed-derived look. Every appearance used to be identical (variety
+ * audit, dSeed 0), and spinning a D8 mandala alone does not read as new. The
+ * seed now picks tile size, ribbon weight, the Truchet coin flips, D8 vs D4
+ * fold, spin/scroll direction, ground ring density and both ramp starts. */
+static uint32_t p4_seed = 0xFFFFFFFFu;
+static float p4_L, p4_iw, p4_salt, p4_dir, p4_su, p4_sv, p4_gk, p4_tph;
+static int p4_d8;
+static uint32_t p4_ioff, p4_goff;
+
+static uint32_t p4_hash(uint32_t x) {          /* murmur3 finaliser */
+    x ^= x >> 16; x *= 0x85ebca6bu; x ^= x >> 13; x *= 0xc2b2ae35u; x ^= x >> 16;
+    return x;
+}
+
 /* Upscale scratch. Each of the 240 source rows feeds several output rows, so
  * the horizontal half of the bilinear filter is done once per source row and
  * cached; the per-pixel work drops from three bilerps to three vertical lerps.
@@ -93,7 +107,27 @@ static int p4_bilerp8(const uint8_t *f, int ix, int fx, int iy, int fy) {
 
 void pattern_004(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
-    (void)sl; (void)seed;
+    (void)sl;
+    if (seed != p4_seed) {
+        uint32_t hs = p4_hash(seed ^ 0xDAA66D2Bu);
+        p4_seed = seed;
+        p4_L = 30.0f + 20.0f * (float)(hs & 255) / 255.0f;       /* 30..50 */
+        /* ribbon half-width tracks the tile (orig 7 on 42) with some spread */
+        p4_iw = 1.0f / (p4_L * (0.13f + 0.09f * (float)((hs >> 8) & 255) / 255.0f));
+        p4_salt = (float)((hs >> 16) & 1023) * 0.7311f;
+        p4_d8 = ((hs >> 26) % 3u) != 0u;                     /* 2/3 keep D8 */
+        p4_dir = (hs & 0x80000000u) ? 1.0f : -1.0f;
+        hs = p4_hash(hs);
+        p4_su = (hs & 1u) ? 0.22f : -0.22f;
+        p4_sv = (hs & 2u) ? 0.13f : -0.13f;
+        p4_gk = 6.0f + 7.0f * (float)((hs >> 2) & 255) / 255.0f; /* was 9.2 */
+        p4_tph = (float)((hs >> 10) % 2000u);
+        hs = p4_hash(hs);
+        p4_ioff = hs & JD_PAL_MASK;
+        /* ground indices span 0..2047 (the dark foot of the ramp); a small
+         * shift tints it per seed without lifting it out of "dark ground" */
+        p4_goff = (hs >> 15) % 1024u;
+    }
     if (!p4_init) {
         p4_init = 1;
         for (int y = 0; y < P4_IH; y++)
@@ -102,11 +136,14 @@ void pattern_004(uint32_t *fb, int w, int h, int frame, int sl,
                 p4_rsc[y * P4_IW + x] = sqrtf(X * X + Y * Y);
             }
     }
-    float t = (float)frame;
-    float rot = t * 0.0020f;
+    float t = (float)frame + p4_tph;
+    float rot = t * 0.0020f * p4_dir;
     float c = cosf(rot), s = sinf(rot);
-    const float L = 42.0f, invL = 1.0f / 42.0f, R = 21.0f;
-    float su = t * 0.22f, sv = t * 0.13f;
+    const float L = p4_L, invL = 1.0f / p4_L, R = p4_L * 0.5f;
+    const float iw = p4_iw, salt = p4_salt, gk = p4_gk;
+    const int d8 = p4_d8;
+    const uint32_t goff = p4_goff;
+    float su = t * p4_su, sv = t * p4_sv;
     for (int y = 0; y < P4_IH; y++) {
         float Y = (float)y - P4_IH * 0.5f;
         uint8_t *mrow = p4_mask + y * P4_IW;
@@ -117,12 +154,12 @@ void pattern_004(uint32_t *fb, int w, int h, int frame, int sl,
             float X = (float)x - P4_IW * 0.5f;
             float xr = X * c - Y * s, yr = X * s + Y * c;
             xr = fabsf(xr); yr = fabsf(yr);
-            float fx = xr > yr ? xr : yr;
-            float fy = xr > yr ? yr : xr;
+            float fx = xr, fy = yr;
+            if (d8) { fx = xr > yr ? xr : yr; fy = xr > yr ? yr : xr; }
             float u0 = fx + su, v0 = fy + sv;
             float txf = floorf(u0 * invL), tyf = floorf(v0 * invL);
             float u = u0 - txf * L, v = v0 - tyf * L;
-            float hs = sinf(txf * 12.9898f + tyf * 78.233f) * 43758.5453f;
+            float hs = sinf(txf * 12.9898f + tyf * 78.233f + salt) * 43758.5453f;
             hs -= floorf(hs);
             if (hs >= 0.5f) u = L - u;
             float d1 = sqrtf(u * u + v * v);
@@ -130,19 +167,19 @@ void pattern_004(uint32_t *fb, int w, int h, int frame, int sl,
             float d2 = sqrtf(lu * lu + lv * lv);
             float da = fabsf(d1 - R), db = fabsf(d2 - R);
             float d = da < db ? da : db;
-            float rib = 1.0f - d * (1.0f / 7.0f);
+            float rib = 1.0f - d * iw;
             if (rib < 0.0f) rib = 0.0f;
             rib = rib * rib * (3.0f - 2.0f * rib);
             mrow[x] = (uint8_t)(rib * 255.0f);
             float hue = txf * 0.11f + tyf * 0.07f;
             hue -= floorf(hue * 0.125f) * 8.0f;      /* mod 8 keeps it bounded */
             irow[x] = (uint16_t)((int)(hue * 4096.0f) & JD_PAL_MASK);
-            int g = (int)(rrow[x] * 9.2f + t * 0.3f) & 4095;
+            int g = (int)(rrow[x] * gk + t * 0.3f) & 4095;
             if (g >= 2048) g = 4095 - g;
-            grow[x] = (uint16_t)g;
+            grow[x] = (uint16_t)((uint32_t)g + goff);
         }
     }
-    uint32_t offink = (uint32_t)((double)frame * 4.9152);
+    uint32_t offink = (uint32_t)((double)frame * 4.9152) + p4_ioff;
     uint32_t sxs = (uint32_t)(((P4_IW - 1) << 16) - 1) / (uint32_t)(w > 1 ? w - 1 : 1);
     uint32_t sys = (uint32_t)(((P4_IH - 1) << 16) - 1) / (uint32_t)(h > 1 ? h - 1 : 1);
     p4_setupup(w, sxs);

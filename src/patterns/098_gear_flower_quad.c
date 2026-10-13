@@ -17,11 +17,36 @@ static int      p98_ready;
 
 static const float p98_ctr[4][2] = { { 80.0f, 66.0f }, { 240.0f, 66.0f },
                                      { 80.0f, 174.0f }, { 240.0f, 174.0f } };
-static const float p98_YEL[3] = { 235.0f, 220.0f,  40.0f };
-static const float p98_GRN[3] = { 120.0f, 200.0f,  40.0f };
-static const float p98_NVY[3] = {  16.0f,  30.0f, 120.0f };
-static const float p98_CYN[3] = {  40.0f, 170.0f, 230.0f };
-static const float p98_BLU[3] = {  30.0f,  60.0f, 200.0f };
+/* 3.6.5: it ignored its seed (identical every appearance) and its five
+ * colours were fixed RGB constants only tinted 15% by the palette, so C
+ * barely changed it (variety audit dPal 2.3). The five roles keep their old
+ * names, but each is now read from the live palette at a seed-chosen spot
+ * on the ramp; the seed also sets tooth count, gear spacing, stripe pitch
+ * and slant, and which way the teeth turn. */
+static float    p98_YEL[3], p98_GRN[3], p98_NVY[3], p98_CYN[3], p98_BLU[3];
+static uint32_t p98_seed = 0xFFFFFFFFu;
+static float    p98_teeth = 14.0f;      /* teeth per gear                    */
+static float    p98_spr   = 0.0f;       /* gear spread from the quad centres */
+static float    p98_sk    = 0.32f;      /* stripe spatial frequency          */
+static float    p98_slx   = 1.0f;       /* stripe slant: x weight (y = 1)    */
+static float    p98_sdir  = 1.0f;       /* tooth spin direction              */
+static uint32_t p98_base;               /* where on the ramp the run starts  */
+
+static uint32_t p98_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+/* One palette role. Bright roles get the brightest channel lifted to ~190 so
+ * a dark stretch of the ramp cannot turn a gear black; the navy role is the
+ * same hue pulled down, keeping the old dark-rim/bright-face contrast. */
+static void p98_role(float *o, const uint32_t *pal, uint32_t at, int dark)
+{
+    uint32_t u = pal[at & JD_PAL_MASK];
+    float r = (float)((u >> 16) & 255), g = (float)((u >> 8) & 255), b = (float)(u & 255);
+    float mx = r > g ? r : g, k;
+    if (b > mx) mx = b;
+    if (mx < 8.0f) { r = g = b = mx = 8.0f; }
+    k = dark ? 105.0f / mx : (mx < 190.0f ? 190.0f / mx : 1.0f);
+    o[0] = r * k; o[1] = g * k; o[2] = b * k;
+}
 
 static void p98_init(void)
 {
@@ -50,19 +75,13 @@ static float p98_atan2(float y, float x)
     return r;
 }
 
-static void p98_tint(const uint32_t *pal, float *tn)
+static void p98_buildpal(const uint32_t *pal)
 {
-    float s[3] = { 0.0f, 0.0f, 0.0f }, mx;
-    int i;
-    for (i = 0; i < 64; i++) {
-        uint32_t u = pal[(i * 512) & JD_PAL_MASK];
-        s[0] += (float)((u >> 16) & 255);
-        s[1] += (float)((u >> 8) & 255);
-        s[2] += (float)(u & 255);
-    }
-    mx = s[0] > s[1] ? s[0] : s[1]; if (s[2] > mx) mx = s[2];
-    if (mx < 1.0f) mx = 1.0f;
-    for (i = 0; i < 3; i++) tn[i] = 0.85f + 0.15f * (s[i] / mx);
+    p98_role(p98_YEL, pal, p98_base,          0);
+    p98_role(p98_GRN, pal, p98_base + 5000u,  0);
+    p98_role(p98_CYN, pal, p98_base + 11000u, 0);
+    p98_role(p98_BLU, pal, p98_base + 18000u, 0);
+    p98_role(p98_NVY, pal, p98_base + 25000u, 1);
 }
 
 static void p98_blit(uint32_t *fb, int w, int h)
@@ -97,9 +116,9 @@ static void p98_blit(uint32_t *fb, int w, int h)
     }
 }
 
-static uint32_t p98_pack(const float *c, const float *tn)
+static uint32_t p98_pack(const float *c)
 {
-    int r = (int)(c[0] * tn[0]), g = (int)(c[1] * tn[1]), b = (int)(c[2] * tn[2]);
+    int r = (int)c[0], g = (int)c[1], b = (int)c[2];
     if (r > 255) r = 255; if (g > 255) g = 255; if (b > 255) b = 255;
     if (r < 0) r = 0; if (g < 0) g = 0; if (b < 0) b = 0;
     return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
@@ -116,19 +135,33 @@ void pattern_098(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal)
 {
     float t = (float)frame;
-    float swap, tn[3], tstripe, tdot, spin, chy;
+    float swap, tstripe, tdot, spin, chy, ctr[4][2];
     float do_[3], di[3], ga[3], gb[3], cco[3], cdo[3];
     uint32_t uga, ugb, ucore, udot, urim;
     int i, x, y;
-    (void)sl; (void)seed;
+    (void)sl;
 
     if (!p98_ready) p98_init();
-    p98_tint(pal, tn);
+    if (seed != p98_seed) {
+        uint32_t a = p98_h(seed ^ 0x9898u), b = p98_h(a), c = p98_h(b);
+        p98_teeth = (float)(9 + (int)(a % 10u));                   /* 9..18   */
+        p98_spr   = -6.0f + (float)((a >> 8) % 1000u) * 0.014f;   /* -6..+8  */
+        p98_sk    = 0.20f + (float)(b % 1000u) * 0.00026f;        /* .20..46 */
+        p98_slx   = (b & 0x10000u) ? 1.0f : -1.0f;                /* / or \  */
+        p98_sdir  = (c & 1u) ? 1.0f : -1.0f;
+        p98_base  = p98_h(c) & JD_PAL_MASK;
+        p98_seed  = seed;
+    }
+    p98_buildpal(pal);
+    for (i = 0; i < 4; i++) {   /* push the quad apart or together a little */
+        ctr[i][0] = p98_ctr[i][0] + (i & 1 ? p98_spr : -p98_spr);
+        ctr[i][1] = p98_ctr[i][1] + (i & 2 ? p98_spr * 0.4f : -p98_spr * 0.4f);
+    }
     swap = 0.5f + 0.5f * p98_lsin(t * 0.004f - 2.0f * P98_PI
            * floorf(t * 0.004f / (2.0f * P98_PI)));
     tstripe = t * 0.012f; tstripe -= 2.0f * P98_PI * floorf(tstripe / (2.0f * P98_PI));
     tdot    = t * 0.02f;  tdot    -= 2.0f * P98_PI * floorf(tdot / (2.0f * P98_PI));
-    spin    = t * 0.004f;
+    spin    = p98_sdir * t * 0.004f;
     chy     = t * 0.05f;  chy     -= 26.0f * floorf(chy / 26.0f);
 
     p98_mix(do_, p98_YEL, p98_BLU, swap);
@@ -137,9 +170,9 @@ void pattern_098(uint32_t *fb, int w, int h, int frame, int sl,
     p98_mix(gb,  p98_CYN, p98_GRN, swap);
     p98_mix(cco, p98_NVY, p98_YEL, swap);
     p98_mix(cdo, p98_YEL, p98_NVY, swap);
-    uga = p98_pack(ga, tn); ugb = p98_pack(gb, tn);
-    ucore = p98_pack(cco, tn); udot = p98_pack(cdo, tn);
-    urim = p98_pack(p98_NVY, tn);
+    uga = p98_pack(ga); ugb = p98_pack(gb);
+    ucore = p98_pack(cco); udot = p98_pack(cdo);
+    urim = p98_pack(p98_NVY);
 
     for (y = 0; y < P98_LH; y++) {
         float ly = ((float)y + 0.5f) * (240.0f / (float)P98_LH);
@@ -149,7 +182,7 @@ void pattern_098(uint32_t *fb, int w, int h, int frame, int sl,
         else if (ly >= 224.0f) bflip = 239.0f - ly;
         for (x = 0; x < P98_LW; x++) {
             float lx = ((float)x + 0.5f) * (320.0f / (float)P98_LW);
-            out[x] = (p98_lsin((lx + ly) * 0.32f + tstripe) > 0.0f) ? uga : ugb;
+            out[x] = (p98_lsin((p98_slx * lx + ly) * p98_sk + tstripe) > 0.0f) ? uga : ugb;
             if (bflip >= 0.0f) {
                 float q = lx + 5.0f * floorf(bflip * 0.25f);
                 q -= 26.0f * floorf(q / 26.0f);
@@ -158,7 +191,7 @@ void pattern_098(uint32_t *fb, int w, int h, int frame, int sl,
         }
         /* four gear rosettes */
         for (i = 0; i < 4; i++) {
-            float cy = p98_ctr[i][1], cx = p98_ctr[i][0];
+            float cy = ctr[i][1], cx = ctr[i][0];
             float dy = ly - cy;
             int xa, xb;
             if (dy < -42.0f || dy > 42.0f) continue;
@@ -171,11 +204,11 @@ void pattern_098(uint32_t *fb, int w, int h, int frame, int sl,
                 float aa, tooth, u, col[3];
                 if (rr > 42.0f) continue;
                 aa = p98_atan2(dy, dx);
-                tooth = 34.0f + 5.0f * p98_lcos(14.0f * (aa + spin));
+                tooth = 34.0f + 5.0f * p98_lcos(p98_teeth * (aa + spin));
                 if (rr < tooth) {
                     u = rr * (1.0f / 36.0f); if (u > 1.0f) u = 1.0f;
                     p98_mix(col, di, do_, u);
-                    out[x] = p98_pack(col, tn);
+                    out[x] = p98_pack(col);
                 }
                 if (rr - tooth < 2.2f && tooth - rr < 2.2f) out[x] = urim;
                 if (rr < 15.0f) {

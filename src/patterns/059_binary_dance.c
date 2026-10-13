@@ -102,10 +102,29 @@ static float p59_rf(void)
     return (float)(p59_rs >> 8) * (1.0f / 16777216.0f);
 }
 
-static void p59_init(void)
+/* 3.6.5: per-appearance waltz — the seed used to be ignored, so every
+ * appearance was the same pair in the same orbit and colours (variety audit).
+ * The seed now picks orbit radius and speed, waltz direction, how many moons
+ * each star keeps (2..5), the background stars, and where on the ramp the
+ * pair's two hues sit. */
+static uint32_t p59_seed = 0xFFFFFFFFu;
+static float p59_r = P59_R, p59_om = P59_OM, p59_ha = P59_HA, p59_hb = P59_HB;
+static int p59_nm = 4;
+static uint32_t p59_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p59_init(uint32_t seed)
 {
     int i;
-    p59_rs = 0x59BD0CE3u;
+    uint32_t a = p59_h(seed ^ 0x5959u), b = p59_h(a), c = p59_h(b);
+    float h0 = (float)((c >> 6) % 1000u) * 0.001f;
+    p59_r  = 36.0f + (float)(a % 1000u) * 0.022f;                 /* 36..58 */
+    p59_om = (0.0035f + (float)((a >> 10) % 1000u) * 0.0000020f)  /* 0.0035..0.0055 */
+             * ((b & 1u) ? 1.0f : -1.0f);
+    p59_nm = 2 + (int)((b >> 4) % 4u);
+    p59_ha = P59_HA + h0;
+    /* keep the two stars well apart in hue: 0.30..0.62 of a turn */
+    p59_hb = p59_ha + 0.30f + (float)((c >> 18) % 1000u) * 0.00032f;
+    p59_rs = 0x59BD0CE3u ^ (b | 1u);
     for (i = 0; i < P59_NS; i++) {
         p59_sx[i] = p59_rf() * P59_LW;
         p59_sy[i] = p59_rf() * P59_LH;
@@ -121,13 +140,14 @@ static void p59_init(void)
         p59_fm[i] = powf(u, 1.5f);
     }
     p59_init_done = 1;
+    p59_seed = seed;
 }
 
 static void p59_star(float times, float side, float *x, float *y)
 {
-    float a = times * P59_OM + side;
-    *x = P59_CX + P59_R * cosf(a);
-    *y = P59_CY + P59_R * sinf(a) * 0.78f;
+    float a = times * p59_om + side;
+    *x = P59_CX + p59_r * cosf(a);
+    *y = P59_CY + p59_r * sinf(a) * 0.78f;
 }
 
 void pattern_059(uint32_t *fb, int w, int h, int frame, int sl,
@@ -135,8 +155,8 @@ void pattern_059(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float tt = (float)(frame % 1048576) + 400.0f;
     int i, j, m, side_i, n;
-    (void)sl; (void)seed;
-    if (!p59_init_done) p59_init();
+    (void)sl;
+    if (!p59_init_done || seed != p59_seed) p59_init(seed);
 
     n = P59_LW * P59_LH;
     for (i = 0; i < n; i++) {
@@ -151,7 +171,7 @@ void pattern_059(uint32_t *fb, int w, int h, int frame, int sl,
 
     for (side_i = 0; side_i < 2; side_i++) {
         float side = side_i ? 3.14159265358979f : 0.0f;
-        float hb = side_i ? P59_HB : P59_HA;
+        float hb = side_i ? p59_hb : p59_ha;
         float hx = 0.0f, hy = 0.0f;
         /* star waltz trail */
         for (j = 0; j < P59_TR; j++) {
@@ -162,7 +182,7 @@ void pattern_059(uint32_t *fb, int w, int h, int frame, int sl,
             if (!j) { hx = x; hy = y; }
         }
         /* moons: 4 per star with short trails */
-        for (m = 0; m < 4; m++) {
+        for (m = 0; m < p59_nm; m++) {
             float rm = 13.0f + 4.8f * (float)m;
             float omm = (0.052f - 0.007f * (float)m) * ((m & 1) ? -1.0f : 1.0f);
             float cr, cg, cb;
@@ -195,9 +215,9 @@ void pattern_059(uint32_t *fb, int w, int h, int frame, int sl,
 
     /* exchange stream: figure-8 lemniscate rotating with the pair */
     {
-        float rot = tt * P59_OM;
+        float rot = tt * p59_om;
         float crr = cosf(rot), srr = sinf(rot);
-        float L = P59_R * 2.05f;
+        float L = p59_r * 2.05f;
         for (i = 0; i < 220; i++) {
             float s = tt * 0.008f + (float)i * (P59_TAU / 110.0f);
             float ss = sinf(s), cs = cosf(s);
@@ -206,7 +226,7 @@ void pattern_059(uint32_t *fb, int w, int h, int frame, int sl,
             float ly = L * ss * cs / d * 1.35f;
             float x = P59_CX + lx * crr - ly * srr;
             float y = P59_CY + (lx * srr + ly * crr) * 0.78f;
-            float hue = P59_HA + (P59_HB - P59_HA) * (0.5f - 0.5f * cs);
+            float hue = p59_ha + (p59_hb - p59_ha) * (0.5f - 0.5f * cs);
             float cr, cg, cb;
             p59_color(pal, hue, 0.7f, 1.0f, &cr, &cg, &cb);
             p59_splat(x, y, cr, cg, cb, 0.55f);

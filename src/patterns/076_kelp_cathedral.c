@@ -147,20 +147,26 @@ static void init_tables(void) {
     bgf  = malloc(sizeof(float) * GH * GW * 3);
 }
 
-/* water column: depth gradient + slow god rays */
-static void build_bg(float t) {
+/* water column: depth gradient + slow god rays.
+ * 3.6.5: the water used to be a fixed teal (0.01/0.05/0.10 rising to
+ * 0.025/0.15/0.23) whatever the palette, and it is most of the frame, so C
+ * barely changed the picture (audit dPal 4.6). Water and rays now take
+ * their tint from the palette (wc, rc: brightest channel = 1); the depth
+ * envelope is the lab's blue channel, so luminance stays as it was. */
+static void build_bg(float t, const float *wc, const float *rc) {
     for (int y = 0; y < GH; y++) {
         float up = rowdep[y];
         float u16 = powf(up, 1.6f);
         int roff = (int)((rowsin[y] - t * 0.006f) * 651.8986f);
-        float b0 = 0.01f + 0.015f * up, b1 = 0.05f + 0.10f * up, b2 = 0.10f + 0.13f * up;
+        float bv = 0.06f + 0.14f * up;
+        float b0 = wc[0] * bv, b1 = wc[1] * bv, b2 = wc[2] * bv;
         for (int x = 0; x < GW; x++) {
             float s = 0.5f + 0.5f * sintab[(xphase[x] + roff) & 4095];
             s = s * s; s = s * s;
-            float ray = s * u16 * 0.35f;
-            bgf[y][x][0] = b0 + ray * 0.15f;
-            bgf[y][x][1] = b1 + ray * 0.50f;
-            bgf[y][x][2] = b2 + ray * 0.55f;
+            float ray = s * u16 * 0.35f * 0.55f;
+            bgf[y][x][0] = b0 + ray * rc[0];
+            bgf[y][x][1] = b1 + ray * rc[1];
+            bgf[y][x][2] = b2 + ray * rc[2];
         }
     }
 }
@@ -185,7 +191,14 @@ void pattern_076(uint32_t *fb, int w, int h, int frame, int sl,
     float T = (float)sl + 160.0f;
     float hueoff = (float)((seed >> 11) & 1023) * (1.0f / 1024.0f);
 
-    build_bg(t);
+    {
+        /* water from the ramp beside the strands' band, rays a little
+         * further on so the shafts read as a different light */
+        float wc[3], rc[3];
+        palcol(0.55f + hueoff, 0.80f, 1.0f, wc);
+        palcol(0.62f + hueoff, 0.55f, 1.0f, rc);
+        build_bg(t, wc, rc);
+    }
     memset(acc, 0, sizeof(float) * GH * GW * 3);
 
     for (int i = 0; i < NS; i++) {

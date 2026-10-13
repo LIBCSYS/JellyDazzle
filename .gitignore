@@ -18,3 +18,9 @@ jellydazzle
 .venv/
 venv/
 *.pyc
+
+# editor/hand backups (2026-10-12): every *.bak-* so far was an exact copy of a
+# committed revision - git already holds it
+*.bak
+*.bak-*
+*.orig

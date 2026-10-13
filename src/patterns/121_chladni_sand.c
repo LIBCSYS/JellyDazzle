@@ -21,6 +21,8 @@ static uint8_t  p121_lut[1024];              /* |f|*512 -> line intensity   */
 static uint32_t p121_ramp[256];              /* g -> palette colour         */
 static int      p121_ready;
 
+static uint32_t p121_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
 static void p121_init(void)
 {
     int i;
@@ -44,20 +46,37 @@ void pattern_121(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)(frame & 0xFFFFF);
     float n, m, zoom, ushift, vshift, kn, km;
-    int x, y;
-    (void)sl; (void)seed;
+    float sn0, sm0, ph1, ph2, sz, roff;
+    uint32_t a, b;
+    int x, y, span;
+    (void)sl;
 
     if (!p121_ready) p121_init();
     if (w > P121_MAXD || h > P121_MAXD || w < 2 || h < 2) return;
 
+    /* 3.6.5: it ignored its seed, so every appearance began on the same plate
+     * figure in the same hues. The seed now sets where on their glide the two
+     * modes start and how high they sit, the plate zoom, the drift direction,
+     * and the ramp start and span. All per-appearance constants, so the motion
+     * is exactly as smooth as before (variety audit). */
+    a = p121_h(seed ^ 0x1210u); b = p121_h(a);
+    sn0  = 3.6f + (float)(a % 1000u) * 0.0016f;                /* 3.6..5.2   */
+    sm0  = 6.6f + (float)((a >> 10) % 1000u) * 0.0022f;        /* 6.6..8.8   */
+    ph1  = (float)((a >> 20) & 1023u) * (6.2831853f / 1024.0f);
+    ph2  = (float)(b & 1023u) * (6.2831853f / 1024.0f);
+    sz   = 0.86f + (float)((b >> 10) % 1000u) * 0.00030f;       /* .86..1.16  */
+    roff = (float)((b >> 20) & 1023u) * (1.0f / 1024.0f);
+    span = 64 + (int)(p121_h(b) % 96u);                         /* 64..159    */
+    if (b & 0x80000000u) t = -t;              /* drift the other way round */
+
     /* fractional modes gliding through each other */
-    n = 4.30f + 2.10f * sinf(t * 0.00061f);
-    m = 7.60f + 3.10f * sinf(t * 0.00043f + 1.9f);
-    zoom   = 1.0f + 0.07f * sinf(t * 0.00035f + 0.7f);
+    n = sn0 + 2.10f * sinf(t * 0.00061f + ph1);
+    m = sm0 + 3.10f * sinf(t * 0.00043f + ph2);
+    zoom   = sz * (1.0f + 0.07f * sinf(t * 0.00035f + 0.7f));
     ushift = 0.035f * sinf(t * 0.00027f);
     vshift = 0.035f * sinf(t * 0.00031f + 2.4f);
 
-    p121_buildramp(pal, t * 0.000021f, 96);
+    p121_buildramp(pal, roff + t * 0.000021f, span);
 
     kn = n * P121_PI;
     km = m * P121_PI;

@@ -16,6 +16,7 @@ static float (*acc)[GW][3];
 static float (*acc2)[GW][3];
 static uint8_t (*img)[GW][3];
 static uint8_t (*bgp)[GW][3];
+static float (*bgg)[GW];             /* 3.6.5: pane glow falloff, 0..1 */
 static uint8_t tonelut[2048];
 static float huetab[1024][3];
 static float ax[NMAX], ay[NMAX], ad[NMAX];
@@ -25,6 +26,48 @@ static int inited;
 static int up_w = -1;
 static int *up_xi;
 static uint8_t *up_fx;
+/* 3.6.5: seed now picks branch spacing and reach, spur rhythm, rotation
+ * phase/direction, a small off-centre nucleation point and the hue; the pane
+ * itself is tinted from the palette. It used to be the same dendrite on the
+ * same fixed midnight-blue pane (audit dSeed 0.71, dPal 0.61). */
+static uint32_t p73_seed = 0xFFFFFFFFu;
+static float p73_node = 8.0f, p73_reach = 0.42f, p73_spur = 10.0f;
+static float p73_rot0 = 0.0f, p73_rdir = 1.0f, p73_shim = 0.045f;
+static float p73_cx = GW / 2.0f, p73_cy = GH / 2.0f, p73_hue = 0.0f;
+
+static uint32_t p73_hash(uint32_t x) {
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return x;
+}
+
+static void p73_reseed(uint32_t seed) {
+    uint32_t a = p73_hash(seed ^ 0x73F0u), b = p73_hash(a);
+    p73_node  = 6.0f + (float)(a & 63u) * (5.0f / 63.0f);
+    p73_reach = 0.32f + (float)((a >> 6) & 63u) * (0.20f / 63.0f);
+    p73_spur  = 7.0f + (float)((a >> 12) & 63u) * (7.0f / 63.0f);
+    p73_rot0  = (float)((a >> 18) & 255u) * (1.04719755f / 256.0f);
+    p73_rdir  = ((a >> 26) & 1u) ? -1.0f : 1.0f;
+    p73_shim  = 0.035f + (float)((a >> 27) & 31u) * (0.025f / 31.0f);
+    p73_cx = GW / 2.0f + (float)((int)(b & 63u) - 32) * 0.9f;
+    p73_cy = GH / 2.0f + (float)((int)((b >> 6) & 63u) - 32) * 0.6f;
+    p73_hue = (float)((b >> 12) & 1023u) * (1.0f / 1024.0f);
+    p73_seed = seed;
+}
+
+/* pane colour from the palette: a hue from just past the frost's own band,
+ * normalised so the brightest channel carries the glow, kept dim so the
+ * crystal still reads against it */
+static void p73_build_bg(float hue) {
+    const float *c = huetab[(int)(hue * 1024.0f) & 1023];
+    float k0 = 255.0f * 0.045f, k1 = 255.0f * 0.17f;
+    for (int y = 0; y < GH; y++)
+        for (int x = 0; x < GW; x++) {
+            float v = k0 + k1 * bgg[y][x];
+            bgp[y][x][0] = (uint8_t)(c[0] * v);
+            bgp[y][x][1] = (uint8_t)(c[1] * v);
+            bgp[y][x][2] = (uint8_t)(c[2] * v);
+        }
+}
 
 static void build_huetab(const uint32_t *pal) {
     for (int i = 0; i < 1024; i++) {
@@ -132,13 +175,11 @@ static void init_tables(void) {
     acc2 = malloc(sizeof(float) * GH * GW * 3);
     img  = malloc(GH * GW * 3);
     bgp  = malloc(GH * GW * 3);
+    bgg  = malloc(sizeof(float) * GH * GW);
     for (int y = 0; y < GH; y++)
         for (int x = 0; x < GW; x++) {
             float dx = ((float)x - GW / 2.0f) / GW, dy = ((float)y - GH / 2.0f) / GH;
-            float g = expf(-(dx * dx + dy * dy) * 5.0f);
-            bgp[y][x][0] = (uint8_t)(255.0f * (0.01f + 0.02f * g));
-            bgp[y][x][1] = (uint8_t)(255.0f * (0.02f + 0.05f * g));
-            bgp[y][x][2] = (uint8_t)(255.0f * (0.07f + 0.13f * g));
+            bgg[y][x] = expf(-(dx * dx + dy * dy) * 5.0f);
         }
 }
 
@@ -149,11 +190,13 @@ static void add_pt(float x, float y, float d) {
 
 /* one arm along +x: spine, 60-degree side branches, secondary spurs */
 static void arm_points(float L) {
+    /* 3.6.5: node spacing, side-branch reach and spur rhythm are seeded
+     * (p73_node / p73_reach / p73_spur; lab values 8 / 0.42 / 10) */
     const float ca = 0.5f, sa = 0.8660254f;
     napts = 0;
     for (float s = 0.0f; s < L; s += 1.0f) add_pt(s, 0.0f, s);
-    for (float node = 8.0f; node < L; node += 8.0f) {
-        float bmax = (108.0f - node) * 0.42f;
+    for (float node = p73_node; node < L; node += p73_node) {
+        float bmax = (108.0f - node) * p73_reach;
         float lb = (L - node) * 0.85f;
         if (lb < 0.0f) lb = 0.0f;
         if (lb > bmax) lb = bmax;
@@ -162,7 +205,7 @@ static void arm_points(float L) {
             add_pt(node + u * ca,  u * sa, node + u);
             add_pt(node + u * ca, -u * sa, node + u);
         }
-        for (float n2 = 6.0f; n2 < lb; n2 += 10.0f) {
+        for (float n2 = 6.0f; n2 < lb; n2 += p73_spur) {
             float l2 = (lb - n2) * 0.7f;
             if (l2 > 6.0f) l2 = 6.0f;
             if (l2 < 1.5f) continue;
@@ -177,30 +220,34 @@ static void arm_points(float L) {
 void pattern_073(uint32_t *fb, int w, int h, int frame, int sl,
                  uint32_t seed, const uint32_t *pal) {
     if (!inited) { init_tables(); inited = 1; }
+    if (seed != p73_seed) p73_reseed(seed);
     build_huetab(pal);
     float t = (float)frame;
     float T = (float)sl + 250.0f;
     float L = T * 0.16f; if (L > 105.0f) L = 105.0f;
-    float hueoff = (float)(seed & 1023) * (1.0f / 1024.0f);
+    float hueoff = p73_hue;
+    p73_build_bg(0.64f + hueoff);
 
     arm_points(L);
     for (int i = 0; i < napts; i++) {
         float s = ad[i];
-        float shim = 0.62f + 0.38f * sinf(s * 0.22f - t * 0.045f);
+        float shim = 0.62f + 0.38f * sinf(s * 0.22f - t * p73_shim);
         float hue = 0.52f + 0.06f * sinf(s * 0.05f + t * 0.002f) + hueoff;
-        float sat = 0.75f - 0.65f * expf(-s / 18.0f);
-        if (sat < 0.08f) sat = 0.08f; if (sat > 0.8f) sat = 0.8f;
+        /* 3.6.5: floor raised 0.08 -> 0.30 so the core carries the palette
+         * hue instead of reading as the same white on every scheme */
+        float sat = 0.80f - 0.55f * expf(-s / 18.0f);
+        if (sat < 0.30f) sat = 0.30f; if (sat > 0.85f) sat = 0.85f;
         palcol(hue, sat, shim, ac[i]);
     }
 
     memset(acc, 0, sizeof(float) * GH * GW * 3);
-    float rot0 = t * 0.0012f;
+    float rot0 = p73_rot0 + p73_rdir * t * 0.0012f;
     for (int k = 0; k < 6; k++) {
         float a = rot0 + (float)k * 1.04719755f;
         float ca = cosf(a), sa = sinf(a);
         for (int i = 0; i < napts; i++) {
-            float X = GW / 2.0f + ax[i] * ca - ay[i] * sa;
-            float Y = GH / 2.0f + ax[i] * sa + ay[i] * ca;
+            float X = p73_cx + ax[i] * ca - ay[i] * sa;
+            float Y = p73_cy + ax[i] * sa + ay[i] * ca;
             splat(X, Y, ac[i], 1.0f);
         }
     }
@@ -211,9 +258,9 @@ void pattern_073(uint32_t *fb, int w, int h, int frame, int sl,
         palcol(0.53f + hueoff, 0.35f, 0.9f, col);
         for (int i = 0; i < 120; i++) {
             float th = (float)i * (6.2831853f / 120.0f);
-            float m = fmodf(th + rot0, 1.04719755f) - 0.52359878f;
+            float m = fmodf(th + rot0 + 6.2831853f, 1.04719755f) - 0.52359878f;
             float hx = hr / cosf(m);
-            splat(GW / 2.0f + hx * cosf(th), GH / 2.0f + hx * sinf(th), col, 1.2f);
+            splat(p73_cx + hx * cosf(th), p73_cy + hx * sinf(th), col, 1.2f);
         }
     }
     soften1();

@@ -26,11 +26,42 @@ static int p82_tw, p82_th;
 static float    p82_georow[4096];        /* fallback if the alloc ever fails */
 static uint16_t p82_infrow[4096];
 
+/* 3.6.5: seed-derived look. Every appearance used to be the identical panel
+ * in the identical colours (variety audit, dSeed 0). The seed now picks the
+ * ramp start, the cell hue scatter, the outer wedge count, the stripe duty
+ * and which way the meander crawls. None of it touches the geometry cache,
+ * so a reseed costs nothing. */
+static uint32_t p82_seed = 0xFFFFFFFFu;
+static int   p82_poff;                   /* ramp start, in ptab entries */
+static float p82_wk;                     /* wedge count / 8 (integer counts keep the seam) */
+static float p82_duty, p82_cdir, p82_rdir, p82_cell1, p82_cell2;
+
+static uint32_t p82_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p82_reseed(uint32_t seed)
+{
+    static const float wk[5] = { 4.0f, 6.0f, 8.0f, 12.0f, 16.0f };
+    uint32_t a = p82_h(seed ^ 0x8282u), b = p82_h(a), c = p82_h(b);
+    p82_poff  = (int)(a & 1023u);
+    p82_wk    = wk[(a >> 10) % 5u] * 0.125f;
+    p82_duty  = 0.35f + (float)((b >> 4) & 255u) * (0.30f / 255.0f);
+    p82_cdir  = (b & 1u) ? 1.0f : -1.0f;
+    p82_rdir  = (b & 2u) ? 1.0f : -0.7f;
+    p82_cell1 = 0.8f + (float)((c >> 3) & 255u) * (1.6f / 255.0f);
+    p82_cell2 = 1.2f + (float)((c >> 13) & 255u) * (2.0f / 255.0f);
+    p82_seed = seed;
+    p82_cellh_done = 0;                  /* scatter depends on the seed now */
+}
+
 static void p82_buildpal(const uint32_t *pal)
 {
     int i;
     for (i = 0; i < 1024; i++) {
-        uint32_t u = pal[(i << 5) & JD_PAL_MASK];
+        uint32_t u = pal[((i + p82_poff) << 5) & JD_PAL_MASK];
         float r = (float)((u >> 16) & 255), g = (float)((u >> 8) & 255);
         float b = (float)(u & 255);
         float mx = r > g ? r : g; if (b > mx) mx = b; if (mx < 24.0f) mx = 24.0f;
@@ -116,16 +147,19 @@ void pattern_082(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float t = (float)frame;
     float isx = 320.0f / (float)w, isy = 240.0f / (float)h;
-    float crawl = t * 0.004f, rot = t * 0.0015f, wrot = t * 0.003f;
+    float crawl, rot, wrot;
     int gx, gy, x, y;
-    (void)sl; (void)seed;
+    (void)sl;
 
+    if (seed != p82_seed) p82_reseed(seed);
+    crawl = t * 0.004f * p82_cdir; rot = t * 0.0015f * p82_rdir;
+    wrot = t * 0.003f * p82_cdir;
     p82_buildpal(pal);
     if (!p82_cellh_done) {
         for (gy = 0; gy < 4; gy++)
             for (gx = 0; gx < 6; gx++)
-                p82_cellh[gy * 6 + gx] = sinf((float)gx * 1.3f
-                                              + (float)gy * 2.1f) * 0.06f;
+                p82_cellh[gy * 6 + gx] = sinf((float)gx * p82_cell1
+                                              + (float)gy * p82_cell2) * 0.06f;
         p82_cellh_done = 1;
     }
     p82_map(w, h);
@@ -153,11 +187,11 @@ void pattern_082(uint32_t *fb, int w, int h, int frame, int sl,
             if (bits & 0x4000u) {
                 float s = geo[x] + crawl;
                 s -= floorf(s);
-                if (s < 0.5f) { hue = 0.02f; bright = 1.0f; }
+                if (s < p82_duty) { hue = 0.02f; bright = 1.0f; }
                 else          { hue = 0.55f; bright = 0.50f; }
                 hue += p82_cellh[bits & 31u] + rot;
             } else {
-                float wed = geo[x] + wrot;
+                float wed = geo[x] * p82_wk + wrot;
                 wed -= floorf(wed);
                 hue = floorf(wed * 4.0f) * 0.09f + 0.55f + rot;
                 bright = p82_bval[bits & 511u];

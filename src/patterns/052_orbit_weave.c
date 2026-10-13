@@ -96,16 +96,32 @@ static float p52_rf(void)
     return (float)(p52_rs >> 8) * (1.0f / 16777216.0f);
 }
 
-static void p52_init(void)
+/* 3.6.5: per-appearance shape — the seed used to be ignored, so every
+ * appearance was the same seven-orbit rosette in the same colours (variety
+ * audit). The seed now picks orbit count, ellipse fatness, precession
+ * direction, rosette tilt and where on the ramp the hues start. */
+static uint32_t p52_seed = 0xFFFFFFFFu;
+static int p52_nor = 7;
+static float p52_h0, p52_rot0, p52_bk = 1.0f, p52_dir = 1.0f;
+static uint32_t p52_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p52_init(uint32_t seed)
 {
     int i;
-    p52_rs = 0x520AB1Du;
+    uint32_t a = p52_h(seed ^ 0x5252u), b = p52_h(a), c = p52_h(b);
+    p52_nor  = 5 + (int)(a % 4u);                               /* 5..8 orbits */
+    p52_bk   = 0.70f + (float)((a >> 8) % 1000u) * 0.0006f;      /* 0.70..1.30 */
+    p52_dir  = (b & 1u) ? 1.0f : -1.0f;
+    p52_rot0 = (float)((b >> 4) % 1000u) * (P52_TAU / 1000.0f);
+    p52_h0   = (float)((c >> 6) % 1000u) * 0.001f;
+    p52_rs = 0x520AB1Du ^ (c | 1u);       /* dust re-scatters too; never zero */
     for (i = 0; i < P52_NS; i++) {
         p52_sx[i] = p52_rf() * P52_LW;
         p52_sy[i] = p52_rf() * P52_LH;
         p52_sp[i] = p52_rf() * P52_TAU;
     }
     p52_init_done = 1;
+    p52_seed = seed;
 }
 
 void pattern_052(uint32_t *fb, int w, int h, int frame, int sl,
@@ -113,8 +129,8 @@ void pattern_052(uint32_t *fb, int w, int h, int frame, int sl,
 {
     float tt = (float)(frame % 1048576) + 60.0f;
     int i, j, ring, n;
-    (void)sl; (void)seed;
-    if (!p52_init_done) p52_init();
+    (void)sl;
+    if (!p52_init_done || seed != p52_seed) p52_init(seed);
 
     n = P52_LW * P52_LH;
     for (i = 0; i < n; i++) {
@@ -127,15 +143,15 @@ void pattern_052(uint32_t *fb, int w, int h, int frame, int sl,
         float tv = 0.10f + 0.08f * sinf(tt * 0.04f + p52_sp[i]);
         p52_splat(p52_sx[i], p52_sy[i], tv, tv, tv * 1.3f, 1.0f);
     }
-    for (i = 0; i < 7; i++) {
-        float prec = 0.0016f + 0.00045f * (float)i;
-        float th = (float)i * (P52_TAU / 14.0f) + tt * prec;
+    for (i = 0; i < p52_nor; i++) {
+        float prec = (0.0016f + 0.00045f * (float)i) * p52_dir;
+        float th = p52_rot0 + (float)i * (P52_TAU / (2.0f * (float)p52_nor)) + tt * prec;
         float A = 128.0f - 9.0f * (float)i;
-        float B = 26.0f + 11.0f * (float)i;
+        float B = (26.0f + 11.0f * (float)i) * p52_bk;
         float om = 0.020f + 0.004f * (float)i;
         float ph = tt * om + (float)i * 1.3f;
         float c = cosf(th), sn = sinf(th);
-        float hue = 0.52f + 0.085f * (float)i + tt * 0.0007f;
+        float hue = p52_h0 + 0.52f + 0.085f * (float)i + tt * 0.0007f;
         for (j = 0; j < P52_M; j++) {
             float s = ph - 2.6f * (float)j / (float)(P52_M - 1);
             float ex = A * cosf(s), ey = B * sinf(s);
@@ -168,7 +184,7 @@ void pattern_052(uint32_t *fb, int w, int h, int frame, int sl,
         int ns = 10 + 6 * ring;
         float dir = (ring % 2) ? 1.0f : -1.0f;
         float cr, cg, cb;
-        p52_color(pal, 0.11f + tt * 0.0007f, 0.55f, 1.0f, &cr, &cg, &cb);
+        p52_color(pal, p52_h0 + 0.11f + tt * 0.0007f, 0.55f, 1.0f, &cr, &cg, &cb);
         for (j = 0; j < ns; j++) {
             float aa = (float)j * (P52_TAU / (float)ns) + tt * 0.012f * dir;
             p52_splat(P52_CX + rr * cosf(aa), P52_CY + rr * sinf(aa), cr, cg, cb, 0.9f);

@@ -183,7 +183,9 @@ static double now_ms(void) {
  * the birthday paradox an opening repeated about every ten launches — which
  * is exactly what "I keep seeing the same thing at the start" means.  The
  * engine was random; it was just amnesiac.  We now remember which routines
- * opened the last JD_RECENT runs and refuse them for the FIRST spawn only. */
+ * opened the last JD_RECENT runs and refuse them for the FIRST spawn only.
+ * (Since then EVERY spawn joins the ring — see recent_note in try_spawn — so
+ * it is a per-role recency window within a run as well as across runs.) */
 #define JD_RECENT 72
 static uint16_t g_recent[JD_RECENT];
 static int      g_recent_n;
@@ -366,6 +368,7 @@ static int    g_pic_last = 0;
  * ON SCREEN; the moment a lightning overlay faded the next spark draw could be
  * lightning again.  A family that just left now waits JD_FAM_COOL frames. */
 #define JD_FAM_COOL 2700                    /* 3.5: 45 s (was 10 s — lightning still came back every ~36 s) */
+#define JD_FAM_COOL_G 1800                  /* 3.6.5: 30 s after a GROUND of that family leaves */
 #define JD_NFAM 16
 static int    g_fam_cool[JD_NFAM];
 /* GROUND KIT ALTERNATION (3.4).  133 of the 200 pattern grounds come from one
@@ -597,6 +600,7 @@ static void probe_open(int rt, uint32_t *a, uint32_t *b)
 {
     pr_rt = rt; pr_phase = 0; pr_f = 0;
     pr_seed = mix32(0xC0FFEE11u + (uint32_t)rt + g_run);
+    if (pr_seed == 0xFFFFFFFFu) pr_seed = 0xFFFFFFFEu;   /* sentinel, see try_spawn */
     pr_dsum = 0; pr_dmax = 0; pr_dn = 0; pr_tsmall = 0.0;
     memset(a, 0, (size_t)PW * PH * 4);
     memset(b, 0, (size_t)PW * PH * 4);
@@ -1723,7 +1727,6 @@ static int depth_on(void)
     if (g_depth < 0) { const char *e = getenv("JD_DEPTH"); g_depth = e ? (atoi(e) != 0) : 1; }
     return g_depth;
 }
-void jd_depth_toggle(void) { depth_on(); g_depth ^= 1; }
 int  jd_depth_enabled(void) { return depth_on(); }
 
 /* parallax weight per slot: ground, mid, accent, spark (near) */
@@ -2173,6 +2176,10 @@ static int try_spawn(int slot, int frame)
     const jd_stat *st = &g_st[v];
     L->routine = v;
     L->seed    = mix32(r ^ 0xA5A5A5A5u);
+    /* 0xFFFFFFFF is the "never seeded" sentinel 54 patterns initialise their
+     * seed cache to; handed it on a first call they skip their seeded setup
+     * (002 then divides by a zero tile size).  1 in 2^32, but reachable. */
+    if (L->seed == 0xFFFFFFFFu) L->seed = 0xFFFFFFFEu;
     /* Patterns animate off `frame`, in float.  main.c starts the counter at
      * a random value up to 4.2M, and at that magnitude a per-frame phase
      * step of a few hundredths of a radian quantises away: measured, one
@@ -2599,6 +2606,19 @@ static void sched_tick(int frame)
             if (L->routine >= JD_NASM && s != 0) {
                 unsigned fam = jd_pattern_family[L->routine - JD_NASM];
                 if (fam < JD_NFAM) g_fam_cool[fam] = frame + JD_FAM_COOL;   /* 3.5: family 0 too */
+            }
+            /* 3.6.5: a retiring GROUND cools its family for OVERLAYS. Since 3.5
+             * the cooldown is only consulted for overlay slots, so the 3.4
+             * handover stall cannot come back. Measured on 3.6.5 before this
+             * (4 x 10 min): 22 of 39 same-family returns inside 30 s were a
+             * ground leaving and an overlay of its family arriving. Tagged
+             * families only — family 0 is most of the ground bag and would keep
+             * the soft overlays permanently cooled — and never shortening a
+             * longer overlay cooldown already running. */
+            if (L->routine >= JD_NASM && s == 0) {
+                unsigned fam = jd_pattern_family[L->routine - JD_NASM];
+                if (fam && fam < JD_NFAM && g_fam_cool[fam] < frame + JD_FAM_COOL_G)
+                    g_fam_cool[fam] = frame + JD_FAM_COOL_G;
             }
             g_rest[s] = frame + rest;
         }
@@ -3070,15 +3090,19 @@ void jd_frame(uint32_t *fb, int w, int h, int frame)
                                               L->sl, L->seed, L->pal
                                               + (jd_pattern_family[L->routine - JD_NASM] == 8
                                                  ? g_prot_calm : g_prot));
-            if (L->moving) {                     /* advance the tenancy's drift */
-                L->tz += L->tz_v; L->tx += L->tx_v;
-                L->ty += L->ty_v; L->tr += L->tr_v;
-                if (L->tz < 0.34f) { L->tz = 0.34f; L->tz_v = -L->tz_v; }
-                if ((s == 0 || s == JD_SHADOW) && L->tz < 1.02f) { L->tz = 1.02f; L->tz_v = -L->tz_v; }
-                if (L->tz > 2.90f) { L->tz = 2.90f; L->tz_v = depth_on() ? 0.0f : -L->tz_v; }
-                if (L->tx < -0.42f || L->tx > 0.42f) L->tx_v = -L->tx_v;
-                if (L->ty < -0.42f || L->ty > 0.42f) L->ty_v = -L->ty_v;
-            }
+        }
+        /* advance the tenancy's drift.  Outside the pattern branch since
+         * 3.6.5: asm grounds are spawned moving too, and the ground warp
+         * applied their spawn-time zoom/turn every frame without ever
+         * advancing it — a frozen crop instead of the slow drift. */
+        if (L->moving) {
+            L->tz += L->tz_v; L->tx += L->tx_v;
+            L->ty += L->ty_v; L->tr += L->tr_v;
+            if (L->tz < 0.34f) { L->tz = 0.34f; L->tz_v = -L->tz_v; }
+            if ((s == 0 || s == JD_SHADOW) && L->tz < 1.02f) { L->tz = 1.02f; L->tz_v = -L->tz_v; }
+            if (L->tz > 2.90f) { L->tz = 2.90f; L->tz_v = depth_on() ? 0.0f : -L->tz_v; }
+            if (L->tx < -0.42f || L->tx > 0.42f) L->tx_v = -L->tx_v;
+            if (L->ty < -0.42f || L->ty > 0.42f) L->ty_v = -L->ty_v;
         }
         double dt = now_ms() - t0;
         if (dt > 20.0) TR("SLOW f=%d slot=%d rt=%d sl=%d dt=%.1f\n",

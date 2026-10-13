@@ -19,6 +19,47 @@ static uint16_t *p68_a2;           /* 2*angle, x16 1024-turn */
 static uint16_t *p68_a3;           /* 3*angle, x16 1024-turn */
 static uint16_t *p68_r64;          /* radius * 64 */
 static uint32_t p68_lut[64][256];
+/* 3.6.5: seed now picks the two rim modes, the wormhole's position, the
+ * rain-drop's path, swell speeds/directions and the ramp start — every
+ * appearance used to be the same 2+3-lobe pond (variety audit dSeed 0.00). */
+static uint32_t p68_seed = 0xFFFFFFFFu;
+static int    p68_m1 = 2, p68_m2 = 3;          /* rim lobe counts */
+static double p68_ox = 0.0, p68_oy = 0.0;      /* wormhole centre, 320-space */
+static double p68_dax = 70.0, p68_day = 50.0, p68_dfx = 0.0035, p68_dfy = 0.0052;
+static double p68_dpx = 0.9, p68_dpy = 2.2;
+static double p68_sp[5] = { 1.0, 1.0, 1.0, 1.0, 1.0 };
+static int    p68_poff = 0;
+
+static uint32_t p68_hash(uint32_t x) {
+    x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+    return x;
+}
+
+static void p68_reseed(uint32_t seed) {
+    static const int modes[6][2] = { {2,3}, {3,4}, {2,5}, {3,5}, {4,6}, {2,4} };
+    uint32_t a = p68_hash(seed ^ 0x68C0u), b = p68_hash(a), c = p68_hash(b);
+    int k;
+    p68_m1 = modes[a % 6u][0]; p68_m2 = modes[a % 6u][1];
+    p68_ox = (double)((int)((a >> 8) & 63) - 32) * 1.2;
+    p68_oy = (double)((int)((a >> 14) & 63) - 32) * 0.8;
+    p68_dax = 50.0 + ((a >> 20) & 63) * (40.0 / 63.0);
+    p68_day = 35.0 + ((a >> 26) & 63) * (30.0 / 63.0);
+    p68_dfx = 0.0028 + (b & 255) * (0.0020 / 255.0);
+    p68_dfy = 0.0040 + ((b >> 8) & 255) * (0.0025 / 255.0);
+    p68_dpx = ((b >> 16) & 255) * (6.2831853 / 256.0);
+    p68_dpy = ((b >> 24) & 255) * (6.2831853 / 256.0);
+    /* rim and swell speeds: magnitude never below the lab's, sign free */
+    for (k = 0; k < 5; k++)
+        p68_sp[k] = (((c >> k) & 1u) ? -1.0 : 1.0) * (1.0 + ((c >> (5 + 3 * k)) & 7) * 0.05);
+    p68_poff = (int)(p68_hash(c) >> 17) & JD_PAL_MASK;
+    p68_w = 0;                       /* lobe/centre tables depend on it */
+    p68_seed = seed;
+}
+
+static int p68_ph(double v) {        /* wrap into [0,16384) */
+    int q = (int)fmod(v, 16384.0);
+    return q < 0 ? q + 16384 : q;
+}
 
 static void p68_init(int w, int h) {
     int x, y, i;
@@ -49,17 +90,18 @@ static void p68_init(int w, int h) {
     for (x = 0; x < w; x++) p68_px[x] = (float)((x - w * 0.5) * sx);
     for (y = 0; y < h; y++) p68_py[y] = (float)((y - h * 0.5) * sy);
     for (y = 0, i = 0; y < h; y++) {
-        double py = (y - h * 0.5) * sy;
+        double py = (y - h * 0.5) * sy - p68_oy;
         for (x = 0; x < w; x++, i++) {
-            double px = (x - w * 0.5) * sx;
+            double px = (x - w * 0.5) * sx - p68_ox;
             double r = hypot(px, py) + 1e-3;
             double a = atan2(py, px);
-            double q2 = fmod(a * 2.0 * 2607.6, 16384.0);
-            double q3 = fmod(a * 3.0 * 2607.6, 16384.0);
+            double q2 = fmod(a * p68_m1 * 2607.6, 16384.0);
+            double q3 = fmod(a * p68_m2 * 2607.6, 16384.0);
             if (q2 < 0) q2 += 16384.0;
             if (q3 < 0) q3 += 16384.0;
             p68_a2[i] = (uint16_t)q2;
             p68_a3[i] = (uint16_t)q3;
+            if (r > 1023.0) r = 1023.0;
             p68_r64[i] = (uint16_t)(r * 64.0);
         }
     }
@@ -74,8 +116,16 @@ static void p68_build_lut(const uint32_t *pal) {
     int idx, s, j, e = 0;
     int ar[7], ag[7], ab[7];
     for (j = 0; j < 6; j++) {
-        uint32_t c = pal[(j * 5461) & JD_PAL_MASK];
+        uint32_t c = pal[(j * 5461 + p68_poff) & JD_PAL_MASK];
+        int m;
         ar[j] = (c >> 16) & 255; ag[j] = (c >> 8) & 255; ab[j] = c & 255;
+        /* 3.6.5: seeded ramp start may sit on a dark stretch; lift the
+         * brightest channel to 190, the basin envelope supplies the dark */
+        m = ar[j] > ag[j] ? ar[j] : ag[j]; if (ab[j] > m) m = ab[j];
+        if (m < 190) {
+            if (m < 8) { ar[j] = ag[j] = ab[j] = 8; m = 8; }
+            ar[j] = ar[j] * 190 / m; ag[j] = ag[j] * 190 / m; ab[j] = ab[j] * 190 / m;
+        }
     }
     ar[6] = ar[0]; ag[6] = ag[0]; ab[6] = ab[0];
     for (idx = 0; idx < 256; idx++) {
@@ -102,16 +152,17 @@ void pattern_068(uint32_t *fb, int w, int h, int frame, int sl,
     int x, y, w2, w3, pd, ps, pr;
     double t = (double)frame;
     float dsx, dsy;
-    (void)sl; (void)seed;
+    (void)sl;
+    if (seed != p68_seed) p68_reseed(seed);
     p68_init(w, h);
     p68_build_lut(pal);
-    w2 = (int)fmod(t * 0.012 * 2607.6, 16384.0);
-    w3 = 16384 - (int)fmod(t * 0.008 * 2607.6, 16384.0);
-    pd = 16384 - (int)fmod(t * 0.018 * 2607.6, 16384.0);
-    ps = 16384 - (int)fmod(t * 0.011 * 2607.6, 16384.0);
-    pr = 16384 - (int)fmod(t * 0.015 * 2607.6, 16384.0);
-    dsx = (float)(70.0 * sin(t * 0.0035 + 0.9));
-    dsy = (float)(50.0 * sin(t * 0.0052 + 2.2));
+    w2 = p68_ph(t * 0.012 * p68_sp[0] * 2607.6);
+    w3 = p68_ph(-t * 0.008 * p68_sp[1] * 2607.6);
+    pd = p68_ph(-t * 0.018 * p68_sp[2] * 2607.6);
+    ps = p68_ph(-t * 0.011 * p68_sp[3] * 2607.6);
+    pr = p68_ph(-t * 0.015 * p68_sp[4] * 2607.6);
+    dsx = (float)(p68_dax * sin(t * p68_dfx + p68_dpx));
+    dsy = (float)(p68_day * sin(t * p68_dfy + p68_dpy));
 
     for (y = 0; y < h; y++) {
         const uint16_t *a2 = p68_a2 + (size_t)y * w;

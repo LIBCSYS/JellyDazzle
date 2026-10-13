@@ -21,9 +21,33 @@ static int16_t  p62_ca[P62_RINGS], p62_sa[P62_RINGS];  /* 8.8 fixed */
 static int16_t  p62_pb[P62_RINGS];                     /* sector phase bias */
 static uint32_t p62_lut[64][256];
 
-static void p62_init(int w, int h) {
+/* 3.6.5: per-appearance corridor — the seed used to be ignored, so every
+ * appearance was the same four-sector shaft twisting the same way (variety
+ * audit). The seed now picks sector count (2/4/8), twist direction and
+ * strength, flight speed, a nudge of the vanishing point, and where on the
+ * ramp the colour stops start. Geometry tables rebuild once per appearance. */
+static uint32_t p62_seed = 0xFFFFFFFFu;
+static int p62_sh = 10, p62_smask = 3, p62_off = 0;
+static double p62_tw = 0.00055, p62_fsp = 0.45, p62_ox = 0.0, p62_oy = 0.0;
+static uint32_t p62_hh(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
+static void p62_init(int w, int h, uint32_t seed) {
     int x, y, i;
     double sx = 320.0 / w, sy = 240.0 / h;
+    if (seed != p62_seed) {
+        uint32_t a = p62_hh(seed ^ 0x6262u), b = p62_hh(a), c = p62_hh(b);
+        int ns = 1 << (1 + (int)(a % 3u));             /* 2, 4 or 8 sectors */
+        p62_smask = ns - 1;
+        p62_sh = 12 - (ns == 2 ? 1 : ns == 4 ? 2 : 3);  /* 4096-turn >> sh */
+        p62_tw  = (0.00038 + (double)((a >> 8) % 1000u) * 0.00000036)  /* 0.00038..0.00074 */
+                  * ((b & 1u) ? 1.0 : -1.0);
+        p62_fsp = 0.34 + (double)((b >> 4) % 1000u) * 0.00022;          /* 0.34..0.56 */
+        p62_ox  = -22.0 + (double)((b >> 16) % 1000u) * 0.044;          /* +-22 px */
+        p62_oy  = -16.0 + (double)((c >> 4) % 1000u) * 0.032;           /* +-16 px */
+        p62_off = (int)((c >> 14) & JD_PAL_MASK);
+        p62_seed = seed;
+        p62_w = 0;                                      /* force a table rebuild */
+    }
     if (!p62_tab_ok) {
         for (i = 0; i < 1024; i++)
             p62_sin[i] = (int16_t)(32767.0 * sin(i * (2.0 * M_PI / 1024.0)));
@@ -41,12 +65,12 @@ static void p62_init(int w, int h) {
     p62_dy = (int16_t *)malloc(sizeof(int16_t) * h);
     p62_ring = (uint8_t *)malloc((size_t)w * h);
     p62_ang  = (uint16_t *)malloc((size_t)w * h * 2);
-    for (x = 0; x < w; x++) p62_dx[x] = (int16_t)((x - w * 0.5) * sx * 16.0);
-    for (y = 0; y < h; y++) p62_dy[y] = (int16_t)((y - h * 0.5) * sy * 16.0);
+    for (x = 0; x < w; x++) p62_dx[x] = (int16_t)(((x - w * 0.5) * sx - p62_ox) * 16.0);
+    for (y = 0; y < h; y++) p62_dy[y] = (int16_t)(((y - h * 0.5) * sy - p62_oy) * 16.0);
     for (y = 0, i = 0; y < h; y++) {
-        double py = (y - h * 0.5) * sy;
+        double py = (y - h * 0.5) * sy - p62_oy;
         for (x = 0; x < w; x++, i++) {
-            double px = (x - w * 0.5) * sx;
+            double px = (x - w * 0.5) * sx - p62_ox;
             double r = hypot(px, py);
             int k = (int)(r * (P62_RINGS / 210.0));
             if (k > P62_RINGS - 1) k = P62_RINGS - 1;
@@ -63,7 +87,7 @@ static void p62_build_lut(const uint32_t *pal) {
     int idx, s, j;
     int ar[7], ag[7], ab[7];
     for (j = 0; j < 6; j++) {
-        uint32_t c = pal[(j * 5461) & JD_PAL_MASK];
+        uint32_t c = pal[(j * 5461 + p62_off) & JD_PAL_MASK];
         ar[j] = (c >> 16) & 255; ag[j] = (c >> 8) & 255; ab[j] = c & 255;
     }
     ar[6] = ar[0]; ag[6] = ag[0]; ab[6] = ab[0];
@@ -85,18 +109,21 @@ void pattern_062(uint32_t *fb, int w, int h, int frame, int sl,
     int x, y, k;
     double t = (double)frame;
     int fly, gph;
-    (void)sl; (void)seed;
-    p62_init(w, h);
+    (void)sl;
+    p62_init(w, h, seed);
     p62_build_lut(pal);
 
     for (k = 0; k < P62_RINGS; k++) {
         double r = k * (210.0 / P62_RINGS);
-        double phi = t * 0.00055 * (1.0 + 70.0 / (r + 28.0));
+        double phi = t * p62_tw * (1.0 + 70.0 / (r + 28.0));
         p62_ca[k] = (int16_t)(cos(phi) * 256.0);
         p62_sa[k] = (int16_t)(sin(phi) * 256.0);
         p62_pb[k] = (int16_t)(fmod(1024.0 * (phi * (2.0 / M_PI) - 1.5), 4096.0));
+        /* reversed twist gives negative phi; keep the bias in 0..4095 so the
+         * +65536 guard below still holds */
+        if (p62_pb[k] < 0) p62_pb[k] = (int16_t)(p62_pb[k] + 4096);
     }
-    fly = (int)fmod(t * 0.45 * 16.0, 4096.0);          /* idx * 16 */
+    fly = (int)fmod(t * p62_fsp * 16.0, 4096.0);          /* idx * 16 */
     gph = (int)fmod(t * 0.06 * (1024.0 / (2.0 * M_PI)), 1024.0);
 
     for (y = 0; y < h; y++) {
@@ -117,7 +144,7 @@ void pattern_062(uint32_t *fb, int w, int h, int frame, int sl,
             dq = d >> 2; if (dq > P62_DQ - 1) dq = P62_DQ - 1;
             dep = p62_dep[dq];                        /* depth * 16 */
             v = ((dep * 109) >> 6) + fly;             /* depth*1.7*16 + fly */
-            sect = ((ap[x] + p62_pb[kk] + 65536) >> 10) & 3;
+            sect = ((ap[x] + p62_pb[kk] + 65536) >> p62_sh) & p62_smask;
             idx = ((v >> 4) + sect * 32) & 255;
             s = p62_sin[(((dep * 326) >> 6) + gph) & 1023];
             glow = 46 + ((s * 18) >> 15);             /* (0.72+0.28 sin)*64 */

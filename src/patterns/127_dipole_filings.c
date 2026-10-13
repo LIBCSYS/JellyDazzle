@@ -26,6 +26,8 @@
 static uint32_t p127_low[P127_N];
 static uint32_t p127_ramp[256];
 
+static uint32_t p127_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
+
 static void p127_blit(uint32_t *fb, int w, int h)
 {
     int x, y;
@@ -85,22 +87,34 @@ void pattern_127(uint32_t *fb, int w, int h, int frame, int sl,
     float t = (float)(frame & 0xFFFFF);
     float dx_[P127_ND], dy_[P127_ND], mx_[P127_ND], my_[P127_ND];
     float cx = P127_LW * 0.5f, cy = P127_LH * 0.5f;
-    int i, k, s, pb;
-    (void)sl; (void)seed;
+    int i, k, s, pb, rev;
+    /* 3.6.5: it ignored its seed, so every appearance was the same three
+     * magnets on the same orbit in the same hues. The seed now sets the
+     * orbit size, squash and starting angle, the direction the orbit runs,
+     * which magnet is reversed, each moment's starting heading, and where on
+     * the palette the strands start (variety audit). */
+    uint32_t sa = p127_h(seed ^ 0x1270u), sb = p127_h(sa);
+    float orb  = 104.0f + (float)(sa % 1000u) * 0.050f;        /* 104..154 */
+    float sq   = 0.62f + (float)((sa >> 10) % 1000u) * 0.00034f;/* .62..96  */
+    float a0   = (float)((sa >> 20) & 1023u) * (P127_TAU / 1024.0f);
+    float odir = (sb & 1u) ? 1.0f : -1.0f;
+    (void)sl;
+    rev = (int)((sb >> 1) % 3u);
 
     for (i = 0; i < P127_N; i++) p127_low[i] = 0xFF000000u;
 
-    pb = (int)(t * 4.0f);
+    pb = (int)(t * 4.0f) + (int)((sb >> 8) & JD_PAL_MASK);
     for (i = 0; i < 256; i++)
         p127_ramp[i] = pal[(pb + i * 128) & JD_PAL_MASK] & 0x00FFFFFFu;
 
     for (k = 0; k < P127_ND; k++) {
-        float a  = t * 0.00038f + (float)k * (P127_TAU / P127_ND);
-        float rr = 128.0f + 22.0f * sinf(t * 0.00029f + (float)k * 1.7f);
-        float ma = t * 0.00051f * (k == 1 ? -1.0f : 1.0f) + (float)k * 2.1f;
-        float st = (k == 1 ? -1.0f : 1.0f) * (1.0f + 0.25f * sinf(t * 0.00043f + (float)k));
+        float a  = a0 + odir * t * 0.00038f + (float)k * (P127_TAU / P127_ND);
+        float rr = orb + 22.0f * sinf(t * 0.00029f + (float)k * 1.7f);
+        float ma = t * 0.00051f * (k == rev ? -1.0f : 1.0f) + (float)k * 2.1f
+                 + (float)((sb >> (20 + k * 4)) & 15u) * 0.39f;
+        float st = (k == rev ? -1.0f : 1.0f) * (1.0f + 0.25f * sinf(t * 0.00043f + (float)k));
         dx_[k] = cx + rr * cosf(a);
-        dy_[k] = cy + rr * sinf(a) * 0.78f;
+        dy_[k] = cy + rr * sinf(a) * sq;
         mx_[k] = cosf(ma) * st * 900.0f;
         my_[k] = sinf(ma) * st * 900.0f;
     }

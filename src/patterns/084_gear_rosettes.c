@@ -14,6 +14,33 @@ static float p84_sin[2048];
 static uint32_t p84_gnd[1024];       /* packed ARGB: one load per ground pixel */
 static int p84_inited;
 
+/* 3.6.5: seed now picks tooth and petal counts, spin direction, stripe
+ * pitch/drift and the ramp start. The gears were the same four rosettes in
+ * the same colours on every appearance (variety audit, dSeed 0). Counts stay
+ * integers so the atan2 seam at +-pi never shows. */
+static uint32_t p84_seed = 0xFFFFFFFFu;
+static float p84_teeth, p84_pet, p84_spin, p84_sf, p84_sdir, p84_hoff, p84_amp;
+
+static uint32_t p84_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p84_reseed(uint32_t seed)
+{
+    static const float tt[6] = { 10.0f, 12.0f, 14.0f, 16.0f, 20.0f, 24.0f };
+    uint32_t a = p84_h(seed ^ 0x8484u), b = p84_h(a);
+    p84_teeth = tt[a % 6u];
+    p84_pet   = (float)(5u + ((a >> 8) % 8u));          /* 5..12 petals */
+    p84_spin  = (a & 0x10000u) ? 1.0f : -1.0f;
+    p84_amp   = 3.5f + (float)((a >> 20) & 15u) * 0.2f;  /* tooth depth */
+    p84_sf    = 0.22f + (float)(b & 255u) * (0.26f / 255.0f);
+    p84_sdir  = (b & 0x100u) ? 1.0f : -1.0f;
+    p84_hoff  = (float)((b >> 12) & 1023u) * (1.0f / P84_HSPAN);
+    p84_seed  = seed;
+}
+
 /* Per-gear geometry cache. Inside a gear's bounding box the radius and the
  * atan2 angle depend only on (x,y) — only the rotation phase moves per frame —
  * so the sqrtf and the atan2 divide are hoisted out of the frame loop. */
@@ -124,17 +151,18 @@ void pattern_084(uint32_t *fb, int w, int h, int frame, int sl,
     float sx = (float)w / 320.0f, sy = (float)h / 240.0f;
     float isx = 1.0f / sx, isy = 1.0f / sy;
     int i, x, y;
-    (void)sl; (void)seed;
+    (void)sl;
 
     if (!p84_inited) p84_init();
+    if (seed != p84_seed) p84_reseed(seed);
     p84_map(w, h);
     p84_buildpal(pal);
 
     /* ---- diagonal stripe ground LUT over s = (x+y)/2, s in [0,512) ---- */
     for (i = 0; i < 1024; i++) {
         float s = (float)i * 0.5f;
-        float g = 0.5f + 0.5f * p84_lsin(s * 0.35f - t * 0.008f);
-        float hg = 0.62f + 0.05f * p84_lsin(s * 0.04f + t * 0.002f);
+        float g = 0.5f + 0.5f * p84_lsin(s * p84_sf - t * 0.008f * p84_sdir);
+        float hg = 0.62f + p84_hoff + 0.05f * p84_lsin(s * 0.04f + t * 0.002f);
         float bri = 0.18f + 0.22f * g;
         const float *c = p84_ptab[(int)(hg * P84_HSPAN + 4096.0f) & 1023];
         uint32_t v = 0xFF000000u;
@@ -158,9 +186,9 @@ void pattern_084(uint32_t *fb, int w, int h, int frame, int sl,
 
     /* ---- four gear rosettes ---- */
     for (i = 0; i < 4; i++) {
-        float rot = fmodf(t * 0.006f * ((i & 1) ? 1.0f : -1.0f) + (float)i * 0.7f,
+        float rot = fmodf(t * 0.006f * ((i & 1) ? p84_spin : -p84_spin) + (float)i * 0.7f,
                           P84_TAU);
-        float hbase = 0.13f + 0.05f * p84_lsin(t * 0.004f + (float)i);
+        float hbase = 0.13f + p84_hoff + 0.05f * p84_lsin(t * 0.004f + (float)i);
         float lim = 52.0f;
         int x0, x1, y0, y1;
         if (p84_gr[0]) {
@@ -190,12 +218,12 @@ void pattern_084(uint32_t *fb, int w, int h, int frame, int sl,
                 int ir, ig, ib;
                 if (r > lim) continue;
                 th = tr[x - x0];
-                R = 44.0f + 5.0f * p84_lsin(16.0f * (th + rot));
+                R = 44.0f + p84_amp * p84_lsin(p84_teeth * (th + rot));
                 rim = 1.0f - fabsf(r - R) * 0.4f;
                 if (rim < 0.0f) rim = 0.0f; if (rim > 1.0f) rim = 1.0f;
                 if (r < R) {
                     sd = 0.5f + 0.5f * p84_lsin(r * 0.55f - t * 0.012f)
-                                     * p84_lsin(8.0f * (th - rot * 2.0f));
+                                     * p84_lsin(p84_pet * (th - rot * 2.0f));
                     hue = hbase + sd * 0.12f;
                     bri = 0.40f + 0.60f * sd;
                     c = p84_ptab[(int)(hue * P84_HSPAN + 4096.0f) & 1023];
@@ -222,7 +250,7 @@ void pattern_084(uint32_t *fb, int w, int h, int frame, int sl,
         int x0 = (int)((160.0f - 9.5f) * sx), x1 = (int)((160.0f + 9.5f) * sx) + 1;
         if (x0 < 0) x0 = 0; if (x1 > w) x1 = w;
         for (y = 0; y < h; y++) {
-            float py = ((float)y + 0.5f) * isy + t * 0.05f;
+            float py = ((float)y + 0.5f) * isy + t * 0.05f * p84_sdir + 1000.0f;
             float m = py - 30.0f * floorf(py * (1.0f / 30.0f)) - 15.0f;
             float am = fabsf(m);
             uint32_t *row = fb + (long)y * w;

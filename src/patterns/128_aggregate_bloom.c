@@ -20,7 +20,7 @@
 #define P128_G   321            /* odd, so there is a true centre cell      */
 #define P128_C   160
 #define P128_NP  2700
-#define P128_SYM 6
+#define P128_SYM 8              /* most rotations a run may use      */
 #define P128_TAU 6.283185307179586f
 
 static uint32_t p128_low[P128_N];
@@ -29,6 +29,23 @@ static int16_t  p128_px[P128_NP], p128_py[P128_NP];
 static int      p128_np;
 static uint8_t  p128_occ[P128_G * P128_G];
 static int      p128_ready;
+
+/* 3.6.5: it ignored its seed — the DLA was always grown from one fixed
+ * random state, so every appearance was the identical snowflake in the same
+ * hues — and the smoothstep growth left the first ~200 frames almost black.
+ * The seed now grows its own arm, picks 5-, 6-, 7- or 8-fold symmetry (the
+ * arm's wedge narrows to suit), spin direction and ramp start; the bloom
+ * opens on a small seed-sized crystal instead of an empty screen (variety
+ * audit: dSeed 0.0, luma 0.1 at segment start). */
+static uint32_t p128_seed = 0xFFFFFFFFu;
+static int      p128_sym = 6;           /* rotations in use                 */
+static float    p128_wedge = 0.5317f;   /* tan of the arm wedge             */
+static float    p128_wrad = 0.4887f;    /* the wedge in radians             */
+static float    p128_dir = 1.0f;        /* spin direction                   */
+static float    p128_g0 = 0.0f;         /* fraction already grown at sl 0   */
+static int      p128_pbase = 0;         /* ramp start                       */
+
+static uint32_t p128_h(uint32_t x) { x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16; return x; }
 
 static uint32_t p128_rs = 0x1D0BEEF5u;
 static uint32_t p128_rnd(void)
@@ -54,7 +71,7 @@ static void p128_init(void)
     p128_px[p128_np] = 0; p128_py[p128_np] = 0; p128_np++;
 
     while (p128_np < P128_NP && rmax < 150.0f) {
-        float a = -0.09f + (float)(p128_rnd() >> 8) * (0.67f / 16777216.0f);
+        float a = -0.09f + (float)(p128_rnd() >> 8) * ((p128_wrad + 0.18f) / 16777216.0f);
         float fx = (rmax + 4.0f) * cosf(a), fy = (rmax + 4.0f) * sinf(a);
         int x = P128_C + (int)fx, y = P128_C + (int)fy, guard = 0, stuck = 0;
         while (guard++ < 6000) {
@@ -80,9 +97,10 @@ static void p128_init(void)
         if (stuck && p128_free(x, y)) {
             float dx = (float)(x - P128_C), dy = (float)(y - P128_C);
             float r = sqrtf(dx * dx + dy * dy);
-            /* the arm is confined to a 28-degree wedge, so the twelve stamped
-             * copies interlock into a snowflake instead of overlapping */
-            if (r > 3.0f && !(dx > 0.0f && dy >= 0.0f && dy <= 0.5317f * dx))
+            /* the arm is confined to a wedge just under 180/sym degrees, so
+             * the stamped copies interlock into a snowflake instead of
+             * overlapping */
+            if (r > 3.0f && !(dx > 0.0f && dy >= 0.0f && dy <= p128_wedge * dx))
                 continue;
             p128_occ[y * P128_G + x] = 1;
             p128_px[p128_np] = (int16_t)(x - P128_C);
@@ -168,15 +186,25 @@ void pattern_128(uint32_t *fb, int w, int h, int frame, int sl,
     float grow, amp, scale, spin, cs[P128_SYM], sn[P128_SYM];
     float cx = P128_LW * 0.5f, cy = P128_LH * 0.5f;
     int i, k, pb, nvis;
-    (void)seed;
 
-    if (!p128_ready) p128_init();
+    if (seed != p128_seed || !p128_ready) {
+        uint32_t a = p128_h(seed ^ 0x1280u), b = p128_h(a);
+        p128_sym   = 5 + (int)(a % 4u);                            /* 5..8 */
+        p128_wrad  = (180.0f / (float)p128_sym - 2.0f) * (P128_TAU / 360.0f);
+        p128_wedge = tanf(p128_wrad);
+        p128_dir   = (a & 0x100u) ? 1.0f : -1.0f;
+        p128_g0    = 0.08f + (float)((a >> 12) % 1000u) * 0.00010f;  /* .08..18 */
+        p128_pbase = (int)(b & JD_PAL_MASK);
+        p128_rs    = (b >> 4) | 1u;          /* xorshift must not start at 0 */
+        p128_seed  = seed;
+        p128_init();                          /* grow this run's arm (once) */
+    }
     for (i = 0; i < P128_N; i++) p128_low[i] = 0xFF000000u;
 
     /* growth over the first 1400 frames, dissolve over the last 500 */
     grow = (float)sl * (1.0f / 1400.0f);
     if (grow > 1.0f) grow = 1.0f;
-    grow = grow * grow * (3.0f - 2.0f * grow);
+    grow = p128_g0 + (1.0f - p128_g0) * grow * grow * (3.0f - 2.0f * grow);
     amp = 1.0f;
     if (sl > 1548) {
         amp = 1.0f - (float)(sl - 1548) * (1.0f / 499.0f);
@@ -193,13 +221,13 @@ void pattern_128(uint32_t *fb, int w, int h, int frame, int sl,
     if (nvis < 1) nvis = 1;
 
     scale = (float)P128_LH * 0.00306f * (1.0f + 0.03f * sinf(t * 0.00042f));
-    spin  = t * 0.00030f;
-    for (k = 0; k < P128_SYM; k++) {
-        float a = spin + (float)k * (P128_TAU / (float)P128_SYM);
+    spin  = p128_dir * t * 0.00030f;
+    for (k = 0; k < p128_sym; k++) {
+        float a = spin + (float)k * (P128_TAU / (float)p128_sym);
         cs[k] = cosf(a) * scale; sn[k] = sinf(a) * scale;
     }
 
-    pb = (int)(t * 3.0f);
+    pb = (int)(t * 3.0f) + p128_pbase;
     for (i = 0; i < 256; i++)
         p128_ramp[i] = pal[(pb + i * 128) & JD_PAL_MASK] & 0x00FFFFFFu;
 
@@ -217,7 +245,7 @@ void pattern_128(uint32_t *fb, int w, int h, int frame, int sl,
         cb += (int)(hot * 0.5f * (255 - cb));
         wq = (int)((150.0f + 190.0f * hot) * amp);
         if (wq < 2) continue;
-        for (k = 0; k < P128_SYM; k++) {
+        for (k = 0; k < p128_sym; k++) {
             float ux = gx * cs[k] - gy * sn[k];
             float uy = gx * sn[k] + gy * cs[k];
             p128_blob(cx + ux, cy + uy, cr, cg, cb, wq);

@@ -7,28 +7,54 @@
 #include <math.h>
 
 #define P86_TAU 6.28318530718f
-#define P86_NG 9
+#define P86_NG 11                     /* up to 10 orbiting gems + the centre one */
 #define P86_HSPAN 820.0f
 
 static float p86_ptab[1024][3];
 static float p86_hexinv[1024];
 static float p86_sin[2048];
 static uint8_t p86_gnd[1024][3];
-static float p86_fbri[P86_NG][6];
-static const float *p86_fcol[P86_NG][6];
+static float p86_fbri[P86_NG][8];
+static const float *p86_fcol[P86_NG][8];
 static int p86_inited;
 
-static void p86_init(void)
+/* 3.6.5: seed now picks how many gems orbit, their cut (facet count), the
+ * orbit's size and direction, gem size and the ramp start. Every appearance
+ * used to be the same nine hexagons on the same ellipse (variety audit,
+ * dSeed 0). The ngon table is rebuilt per seed, so the per-pixel cost is
+ * unchanged. */
+static uint32_t p86_seed = 0xFFFFFFFFu;
+static int   p86_norb, p86_nf;
+static float p86_rx, p86_ry, p86_odir, p86_gsz, p86_hoff, p86_ospd;
+
+static uint32_t p86_h(uint32_t x)
+{
+    x ^= x >> 16; x *= 0x7FEB352Du; x ^= x >> 15; x *= 0x846CA68Bu; x ^= x >> 16;
+    return x;
+}
+
+static void p86_init(uint32_t seed)
 {
     int i;
+    uint32_t a = p86_h(seed ^ 0x8686u), b = p86_h(a);
+    float seg;
+    p86_norb = 6 + (int)(a % 5u);                          /* 6..10 */
+    p86_nf   = 5 + (int)((a >> 4) % 4u);                   /* 5..8 facets */
+    p86_rx   = 84.0f + (float)((a >> 8) & 255u) * (24.0f / 255.0f);
+    p86_ry   = 60.0f + (float)((a >> 16) & 255u) * (22.0f / 255.0f);
+    p86_odir = (a & 0x1000000u) ? 1.0f : -1.0f;
+    p86_gsz  = 0.95f + (float)(b & 255u) * (0.30f / 255.0f) - (float)(p86_norb - 8) * 0.04f;
+    p86_ospd = 0.0025f * (1.0f + (float)((b >> 18) & 255u) * (0.4f / 255.0f));
+    p86_hoff = (float)((b >> 8) & 1023u) * (1.0f / P86_HSPAN);
+    seg = P86_TAU / (float)p86_nf;
     for (i = 0; i < 2048; i++)
         p86_sin[i] = sinf((float)i * (P86_TAU / 2048.0f));
     for (i = 0; i < 1024; i++) {
         float th = (float)i * (P86_TAU / 1024.0f);
-        float seg = P86_TAU / 6.0f;
-        float a = th - seg * floorf(th / seg) - seg * 0.5f;
-        p86_hexinv[i] = cosf(a) / cosf(3.14159265f / 6.0f);   /* 1 / ngon_r */
+        float an = th - seg * floorf(th / seg) - seg * 0.5f;
+        p86_hexinv[i] = cosf(an) / cosf(seg * 0.5f);       /* 1 / ngon_r */
     }
+    p86_seed = seed;
     p86_inited = 1;
 }
 
@@ -69,11 +95,13 @@ void pattern_086(uint32_t *fb, int w, int h, int frame, int sl,
     float sx = (float)w / 320.0f, sy = (float)h / 240.0f;
     float isx = 1.0f / sx, isy = 1.0f / sy;
     float gcx[P86_NG], gcy[P86_NG], gspin[P86_NG], ginv[P86_NG], glim[P86_NG];
-    float orb = t * 0.0025f, hdrift = t * 0.0015f;
-    int k, f, i, x, y;
-    (void)sl; (void)seed;
+    float orb, hdrift;
+    int k, f, i, x, y, ng, nf;
+    (void)sl;
 
-    if (!p86_inited) p86_init();
+    if (!p86_inited || seed != p86_seed) p86_init(seed);
+    orb = t * p86_ospd * p86_odir; hdrift = t * 0.0015f + p86_hoff;
+    ng = p86_norb + 1; nf = p86_nf;
     p86_buildpal(pal);
 
     /* ---- ground ---- */
@@ -99,21 +127,21 @@ void pattern_086(uint32_t *fb, int w, int h, int frame, int sl,
     }
 
     /* ---- gem placement + per-facet shading ---- */
-    for (k = 0; k < P86_NG; k++) {
+    for (k = 0; k < ng; k++) {
         float R;
-        if (k < 8) {
-            float a = orb + (float)k * 0.785398163f;
-            gcx[k] = 160.0f + 96.0f * p86_lsin(a + 1.570796327f);
-            gcy[k] = 120.0f + 72.0f * p86_lsin(a);
-            R = 17.0f;
+        if (k < p86_norb) {
+            float a = orb + (float)k * (P86_TAU / (float)p86_norb);
+            gcx[k] = 160.0f + p86_rx * p86_lsin(a + 1.570796327f);
+            gcy[k] = 120.0f + p86_ry * p86_lsin(a);
+            R = 17.0f * p86_gsz;
         } else {
-            gcx[k] = 160.0f; gcy[k] = 120.0f; R = 27.0f;
+            gcx[k] = 160.0f; gcy[k] = 120.0f; R = 27.0f * p86_gsz;
         }
         ginv[k] = 1.0f / R;
         glim[k] = R * 1.10f + 2.0f;
         gspin[k] = fmodf(t * 0.008f * ((k & 1) ? 1.0f : -1.0f) + (float)k, P86_TAU);
         if (gspin[k] < 0.0f) gspin[k] += P86_TAU;
-        for (f = 0; f < 6; f++) {
+        for (f = 0; f < nf; f++) {
             float hue = (float)k * 0.117f + (float)f * 0.045f + hdrift;
             p86_fbri[k][f] = 0.55f + 0.35f * p86_lsin((float)f * 2.1f + t * 0.010f
                                                       + (float)k * 1.7f);
@@ -122,7 +150,7 @@ void pattern_086(uint32_t *fb, int w, int h, int frame, int sl,
     }
 
     /* ---- gems ---- */
-    for (k = 0; k < P86_NG; k++) {
+    for (k = 0; k < ng; k++) {
         float lim = glim[k], cx = gcx[k], cy = gcy[k], iv = ginv[k], sp = gspin[k];
         int x0 = (int)((cx - lim) * sx), x1 = (int)((cx + lim) * sx) + 1;
         int y0 = (int)((cy - lim) * sy), y1 = (int)((cy + lim) * sy) + 1;
@@ -143,7 +171,7 @@ void pattern_086(uint32_t *fb, int w, int h, int frame, int sl,
                 ai = (int)(th * (1024.0f / P86_TAU) + 1024.5f) & 1023;
                 d = r * iv * p86_hexinv[ai];
                 if (d >= 1.10f) continue;
-                fi = (ai * 6) >> 10;
+                fi = (ai * nf) >> 10;
                 c = p86_fcol[k][fi];
                 s = 1.3f - d; if (s < 0.0f) s = 0.0f; if (s > 1.0f) s = 1.0f;
                 s *= p86_fbri[k][fi];
