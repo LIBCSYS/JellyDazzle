@@ -14,9 +14,9 @@ on your Mac, iPhone or iPad — and paints to it, never the same pattern, never 
 - **All 666 routines play**, and 60+ patterns that looked identical each time now vary.
 
 **3.6.6 is the current release; all earlier versions are deprecated.** It is on the
-**[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** for
-[iPhone and iPad](#iphone-and-ipad) now, the Mac App Store copy is in review, and the direct Mac
-download below is 3.6.6.
+**[App Store](https://apps.apple.com/us/app/jellydazzle/id6808884433)** for Mac,
+[iPhone and iPad](#iphone-and-ipad) — released October 13, 2026 — and the direct Mac download
+below is 3.6.6.
 
 An homage to **DAZZLE.EXE**, rebuilt from scratch — mostly C, with an ARM64 assembly core:
 24 engine modes hand-written in ARM64 assembly under a library of 642 C pattern plug-ins,
